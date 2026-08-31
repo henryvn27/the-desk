@@ -33,104 +33,241 @@ public struct NotebookLMManagerView: View {
 
     public var body: some View {
         NavigationStack {
-            Form {
-                Section("Connection") {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: connectorSymbol)
-                            .font(.title2)
-                            .foregroundStyle(connectorColor)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(connectorTitle).font(.headline)
-                            Text(connectorDetail).font(.callout).foregroundStyle(.secondary)
-                            Text("The passive status check contacts Google but never refreshes or rewrites your saved session. NotebookLM is unofficial, optional, and never blocks your local library.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 12)
-                        if isCheckingConnection { ProgressView().controlSize(.small) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: LHSpacing.lg) {
+                    DeskPageHeader(
+                        "NotebookLM companion",
+                        eyebrow: "Optional secondary engine",
+                        detail: "Mirror only what you choose. The Desk remains your complete, canonical study library."
+                    )
+
+                    connectionCard
+
+                    if connectorIsReady {
+                        workspaceCard
+                        mirrorCard
+                        askCard
+                    } else {
+                        pausedWorkspaceCard
                     }
 
-                    HStack {
-                        Button("Check again") { Task { await refreshConnection() } }
-                            .disabled(isCheckingConnection || isWorking)
-                        if connectorState != .ready {
-                            Button(showingSetup ? "Hide setup" : "Set up NotebookLM") {
-                                showingSetup.toggle()
-                            }
-                        }
-                    }
-
-                    if showingSetup, connectorState != .ready {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(setupTitle).font(.headline)
-                            Text(setupDetail).font(.callout).foregroundStyle(.secondary)
-                            if let command = setupCommand {
-                                Text(command)
-                                    .font(.caption.monospaced())
-                                    .textSelection(.enabled)
-                                    .padding(10)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 6))
-                                Button("Copy setup command") { copyToPasteboard(command) }
-                            }
-                            Text("The Desk never installs packages or opens a sign-in window automatically. Run the copied command when you are ready, then choose Check again.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
+                    resultCard
                 }
-
-                Section("Class notebook") {
-                    Picker("Space", selection: Binding(
-                        get: { selectedSpaceID ?? store.selectedSpaceID },
-                        set: { selectedSpaceID = $0; selectedSourceID = nil }
-                    )) {
-                        ForEach(store.spaces) { Text($0.title).tag(Optional($0.id)) }
-                    }
-                    TextField("Notebook ID", text: $notebookID)
-                    HStack {
-                        Button("List notebooks") { runList() }
-                            .disabled(!connectorIsReady || isWorking)
-                        Button("Create for this space") { runCreate() }
-                            .disabled(!connectorIsReady || isWorking || selectedSpace == nil)
-                    }
-                }
-
-                Section("Selected-source mirror") {
-                    Picker("Source", selection: $selectedSourceID) {
-                        Text("Choose a source").tag(UUID?.none)
-                        ForEach(availableSources) { Text($0.title).tag(Optional($0.id)) }
-                    }
-                    Button("Mirror original into NotebookLM") { runMirror() }
-                        .disabled(!connectorIsReady || isWorking || notebookID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedSourceID == nil)
-                    Text("Only the selected original is mirrored. NotebookLM is optional and never becomes The Desk's canonical library.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                Section("Ask the selected notebook") {
-                    TextField("Question", text: $question, axis: .vertical).lineLimit(2...5)
-                    Button("Ask NotebookLM") { runAsk() }
-                        .disabled(!connectorIsReady || isWorking || notebookID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-
-                Section("Connector result") {
-                    if isWorking { ProgressView("Waiting for the Mac connector…") }
-                    if let noticeMessage {
-                        Label(noticeMessage, systemImage: "info.circle")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(output.isEmpty ? "No connector action has run yet." : output)
-                        .font(.callout.monospaced())
-                        .textSelection(.enabled)
+                .padding(.horizontal, LHSpacing.xl)
+                .padding(.vertical, LHSpacing.lg)
+                .frame(maxWidth: 860, alignment: .leading)
+                .frame(maxWidth: .infinity)
+            }
+            .background(LearningPalette.appBackground)
+            .navigationTitle("NotebookLM")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
-            .formStyle(.grouped)
-            .navigationTitle("NotebookLM secondary engine")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         }
         .frame(minWidth: 620, minHeight: 600)
         .task { await refreshConnection() }
+    }
+
+    private var connectionCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            HStack(alignment: .top, spacing: LHSpacing.md) {
+                Image(systemName: connectorSymbol)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(connectorState == .ready ? LearningPalette.primaryForeground : connectorColor)
+                    .frame(width: 44, height: 44)
+                    .background(connectorState == .ready ? connectorColor : connectorColor.opacity(0.12), in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
+                VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                    HStack(spacing: LHSpacing.xs) {
+                        Text(connectorTitle)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(LearningPalette.ink)
+                        StatusPill(connectorIsReady ? "Available" : "Optional", symbol: connectorIsReady ? "checkmark" : "pause", tone: connectorIsReady ? .success : .neutral)
+                    }
+                    Text(connectorDetail)
+                        .font(.subheadline)
+                        .foregroundStyle(LearningPalette.mutedInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: LHSpacing.sm)
+                if isCheckingConnection {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(LearningPalette.copper)
+                        .accessibilityLabel("Checking NotebookLM connection")
+                }
+            }
+
+            Text("A passive status check may contact Google, but it never refreshes or rewrites your saved session. If this connector is unavailable, every local study feature still works.")
+                .font(.caption)
+                .foregroundStyle(LearningPalette.mutedInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: LHSpacing.sm) {
+                Button { Task { await refreshConnection() } } label: {
+                    Label("Check connection", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .tint(LearningPalette.copper)
+                .disabled(isCheckingConnection || isWorking)
+
+                if connectorState != .ready {
+                    Button(showingSetup ? "Hide setup" : "Show setup") {
+                        showingSetup.toggle()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(LearningPalette.copper)
+                }
+            }
+
+            if showingSetup, connectorState != .ready {
+                setupCard
+            }
+        }
+        .padding(LHSpacing.lg)
+        .learningSurface()
+    }
+
+    private var setupCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.sm) {
+            Label(setupTitle, systemImage: "wrench.and.screwdriver")
+                .font(.headline)
+                .foregroundStyle(LearningPalette.ink)
+            Text(setupDetail)
+                .font(.callout)
+                .foregroundStyle(LearningPalette.mutedInk)
+                .fixedSize(horizontal: false, vertical: true)
+            if let command = setupCommand {
+                Text(command)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(LearningPalette.onGraphite)
+                    .textSelection(.enabled)
+                    .padding(LHSpacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(LearningPalette.graphite, in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
+                Button { copyToPasteboard(command) } label: {
+                    Label("Copy setup command", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(LearningPalette.copper)
+            }
+            Text("Nothing installs and no browser opens until you run the copied command yourself. Return here and check the connection afterward.")
+                .font(.caption)
+                .foregroundStyle(LearningPalette.mutedInk)
+        }
+        .padding(LHSpacing.md)
+        .background(LearningPalette.copperSoft, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+    }
+
+    private var workspaceCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            SectionHeading("Class notebook", detail: "Link or create one NotebookLM notebook for the selected class or track.")
+            Picker("Space", selection: Binding(
+                get: { selectedSpaceID ?? store.selectedSpaceID },
+                set: { selectedSpaceID = $0; selectedSourceID = nil }
+            )) {
+                ForEach(store.spaces) { Text($0.title).tag(Optional($0.id)) }
+            }
+            TextField("Notebook ID", text: $notebookID)
+                .textFieldStyle(.roundedBorder)
+            HStack(spacing: LHSpacing.sm) {
+                Button("List notebooks") { runList() }
+                    .disabled(isWorking)
+                Button("Create for this space") { runCreate() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(LearningPalette.copper)
+                    .disabled(isWorking || selectedSpace == nil)
+            }
+        }
+        .padding(LHSpacing.lg)
+        .learningSurface()
+    }
+
+    private var mirrorCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            SectionHeading("Mirror one source", detail: "NotebookLM receives only the original you explicitly select.")
+            Picker("Source", selection: $selectedSourceID) {
+                Text("Choose a source").tag(UUID?.none)
+                ForEach(availableSources) { Text($0.title).tag(Optional($0.id)) }
+            }
+            Button { runMirror() } label: {
+                Label("Mirror selected original", systemImage: "arrow.up.doc")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(LearningPalette.copper)
+            .disabled(isWorking || notebookID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedSourceID == nil)
+            Label("Your original and citations stay in The Desk.", systemImage: "lock.doc")
+                .font(.caption)
+                .foregroundStyle(LearningPalette.mutedInk)
+        }
+        .padding(LHSpacing.lg)
+        .learningSurface(emphasized: false)
+    }
+
+    private var askCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            SectionHeading("Ask NotebookLM", detail: "Run an explicit query against the linked notebook.")
+            TextField("What should I understand from these sources?", text: $question, axis: .vertical)
+                .lineLimit(2...5)
+                .textFieldStyle(.roundedBorder)
+            Button { runAsk() } label: {
+                Label("Ask selected notebook", systemImage: "sparkles")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(LearningPalette.copper)
+            .disabled(isWorking || notebookID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(LHSpacing.lg)
+        .learningSurface()
+    }
+
+    private var pausedWorkspaceCard: some View {
+        HStack(alignment: .top, spacing: LHSpacing.md) {
+            Image(systemName: "books.vertical")
+                .font(.title2)
+                .foregroundStyle(LearningPalette.moss)
+            VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                Text("Your Desk library is ready without NotebookLM")
+                    .font(.headline)
+                    .foregroundStyle(LearningPalette.ink)
+                Text("You can keep importing, searching, studying, and building canvases now. Set up this optional companion whenever it becomes useful.")
+                    .font(.subheadline)
+                    .foregroundStyle(LearningPalette.mutedInk)
+            }
+        }
+        .padding(LHSpacing.lg)
+        .background(LearningPalette.mossSoft)
+        .clipShape(RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+    }
+
+    private var resultCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.sm) {
+            HStack {
+                Text("Connector activity")
+                    .font(.headline)
+                    .foregroundStyle(LearningPalette.ink)
+                Spacer()
+                if isWorking {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(LearningPalette.copper)
+                        .accessibilityLabel("Waiting for NotebookLM")
+                }
+            }
+            if let noticeMessage {
+                Label(noticeMessage, systemImage: "info.circle")
+                    .font(.callout)
+                    .foregroundStyle(LearningPalette.mutedInk)
+            }
+            Text(output.isEmpty ? "No NotebookLM action has run in this session." : output)
+                .font(.callout.monospaced())
+                .foregroundStyle(output.isEmpty ? LearningPalette.mutedInk : LearningPalette.ink)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(LHSpacing.lg)
+        .learningSurface(emphasized: false)
     }
 
     private var connectorIsReady: Bool { connectorState == .ready }
@@ -161,7 +298,7 @@ public struct NotebookLMManagerView: View {
         case .ready: LearningPalette.success
         case .transientFailure, .degraded: LearningPalette.warning
         case .disconnected: .secondary
-        default: LearningPalette.indigo
+        default: LearningPalette.copper
         }
     }
 

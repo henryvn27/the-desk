@@ -1,6 +1,6 @@
 # The Desk — original reskin plan
 
-Status: proposed direction, not yet implemented
+Status: implemented foundation and core product surfaces on August 31, 2026; ongoing device dogfood remains
 Reference review date: August 30, 2026
 Direction revised: August 30, 2026
 

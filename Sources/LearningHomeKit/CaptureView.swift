@@ -37,31 +37,28 @@ public struct CaptureView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHSpacing.lg) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Capture Inbox")
-                        .font(.system(.largeTitle, design: .serif, weight: .semibold))
-                    Text("Everything gets a space. Suggested destinations always wait for your approval.")
-                        .foregroundStyle(.secondary)
-                }
+                DeskPageHeader(
+                    "Capture anything",
+                    eyebrow: "Capture inbox",
+                    detail: "Drop in a thought, textbook, photo, link, or recording. You always choose where it belongs before The Desk processes it."
+                )
 
-                HStack {
-                    Picker("Capture type", selection: $kind) {
-                        ForEach(CaptureKind.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    Spacer(minLength: LHSpacing.lg)
-                    Picker("Destination", selection: $destinationID) {
-                        ForEach(store.spaces) { Text($0.title).tag(Optional($0.id)) }
-                    }
-                    .frame(width: 220)
-                }
+                captureMethods
+                destinationCard
 
                 captureSurface
 
                 if !statusMessage.isEmpty {
-                    Label(statusMessage, systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(LearningPalette.success)
-                        .font(.subheadline)
+                    HStack(spacing: LHSpacing.xs) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(LearningPalette.moss)
+                        Text(statusMessage)
+                            .foregroundStyle(LearningPalette.ink)
+                    }
+                        .font(.subheadline.weight(.medium))
+                        .padding(LHSpacing.sm)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(LearningPalette.mossSoft, in: RoundedRectangle(cornerRadius: LHRadius.control))
                 }
 
                 queuePreview
@@ -95,6 +92,98 @@ public struct CaptureView: View {
         )) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Unknown error") }
     }
 
+    private var captureMethods: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: LHSpacing.sm)], spacing: LHSpacing.sm) {
+            captureMethodButton(.note, symbol: "square.and.pencil", detail: "Type or paste")
+            captureMethodButton(.file, symbol: "doc.viewfinder", detail: "Scan or upload")
+            captureMethodButton(.link, symbol: "link", detail: "Save a lesson")
+            captureMethodButton(.audio, symbol: "waveform", detail: "Record a session")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Capture method")
+    }
+
+    private func captureMethodButton(_ value: CaptureKind, symbol: String, detail: String) -> some View {
+        let isSelected = kind == value
+        return Button {
+            withAnimation(LHMotion.direct) { kind = value }
+        } label: {
+            HStack(spacing: LHSpacing.sm) {
+                Image(systemName: symbol)
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? LearningPalette.primaryForeground : LearningPalette.copper)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        isSelected ? LearningPalette.copper : LearningPalette.copperSoft,
+                        in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous)
+                    )
+                VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                    Text(value.rawValue)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(LearningPalette.ink)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(LearningPalette.mutedInk)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(LHSpacing.sm)
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            .background(isSelected ? LearningPalette.copperSoft : LearningPalette.surface)
+            .clipShape(RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                    .stroke(isSelected ? LearningPalette.copper : LearningPalette.hairline, lineWidth: isSelected ? 1.5 : 0.75)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(value.rawValue), \(detail)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var destinationCard: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: LHSpacing.md) {
+                destinationLabel
+                Spacer(minLength: LHSpacing.md)
+                destinationPicker
+            }
+            VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                destinationLabel
+                destinationPicker
+            }
+        }
+        .padding(LHSpacing.md)
+        .background(LearningPalette.graphite)
+        .clipShape(RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                .stroke(LearningPalette.graphiteSoft, lineWidth: 0.75)
+        }
+    }
+
+    @ViewBuilder
+    private var destinationLabel: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+            Label("Save to", systemImage: "folder.fill")
+                .font(.headline)
+                .foregroundStyle(LearningPalette.onGraphite)
+            Text("Every capture needs an approved class or track.")
+                .font(.subheadline)
+                .foregroundStyle(LearningPalette.onGraphite.opacity(0.72))
+        }
+    }
+
+    private var destinationPicker: some View {
+        Picker("Destination space", selection: $destinationID) {
+            ForEach(store.spaces) { Text($0.title).tag(Optional($0.id)) }
+        }
+        .labelsHidden()
+        .frame(maxWidth: 240)
+        .tint(LearningPalette.copper)
+        .accessibilityLabel("Destination space")
+    }
+
     @ViewBuilder
     private var captureSurface: some View {
         switch kind {
@@ -107,7 +196,7 @@ public struct CaptureView: View {
 
     private var noteCapture: some View {
         VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            Label("Quick note", systemImage: "square.and.pencil").font(.headline)
+            SectionHeading("Quick note", detail: "Paste typed notes or a Wispr transcript excerpt.")
             TextField("Title", text: $noteTitle)
                 .textFieldStyle(.roundedBorder)
             TextEditor(text: $noteBody)
@@ -117,10 +206,13 @@ public struct CaptureView: View {
                 .padding(LHSpacing.sm)
                 .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.surface))
             HStack {
-                Text("Paste typed notes or a Wispr transcript excerpt.").font(.caption).foregroundStyle(.secondary)
+                Label("Saved as an original source", systemImage: "lock.doc")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
                 Spacer()
                 Button("Save to space", action: saveNote)
                     .buttonStyle(.borderedProminent)
+                    .tint(LearningPalette.copper)
                     .disabled(noteBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || destination == nil)
             }
         }
@@ -132,17 +224,19 @@ public struct CaptureView: View {
         VStack(spacing: LHSpacing.md) {
             Image(systemName: "doc.viewfinder")
                 .font(.system(size: 38, weight: .light))
-                .foregroundStyle(LearningPalette.indigo)
+                .foregroundStyle(LearningPalette.copper)
             Text("Textbooks, notes, slides, photos, or audio")
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(LearningPalette.ink)
             Text("Originals are preserved, deduplicated by SHA-256, and indexed with page or timestamp anchors on the Mac.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LearningPalette.mutedInk)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 540)
             HStack {
                 #if os(iOS)
                 Button { showingScanner = true } label: { Label("Scan pages", systemImage: "doc.viewfinder") }
                     .buttonStyle(.borderedProminent)
+                    .tint(LearningPalette.copper)
                     .disabled(destination == nil || isWorking || !VNDocumentCameraViewController.isSupported)
                 #endif
                 Button { showingImporter = true } label: { Label("Choose files", systemImage: "plus") }
@@ -159,15 +253,16 @@ public struct CaptureView: View {
 
     private var linkCapture: some View {
         VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            Label("Add a lesson or reference", systemImage: "link").font(.headline)
+            SectionHeading("Add a lesson or reference", detail: "Keep a return path to the original material.")
             TextField("https://…", text: $linkText)
                 .textFieldStyle(.roundedBorder)
             Text("Khan Academy links are stored with a return check-in; The Desk never scrapes answers or progress.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(LearningPalette.mutedInk)
             HStack {
                 Spacer()
                 Button("Save link", action: saveLink)
                     .buttonStyle(.borderedProminent)
+                    .tint(LearningPalette.copper)
                     .disabled(URL(string: linkText)?.scheme?.hasPrefix("http") != true || destination == nil)
             }
         }
@@ -178,16 +273,17 @@ public struct CaptureView: View {
     private var audioCapture: some View {
         VStack(spacing: LHSpacing.md) {
             ZStack {
-                Circle().fill((recorder.isRecording ? LearningPalette.danger : LearningPalette.indigo).opacity(0.1))
+                Circle().fill((recorder.isRecording ? LearningPalette.danger : LearningPalette.copper).opacity(0.12))
                 Image(systemName: recorder.isRecording ? "stop.fill" : "mic.fill")
                     .font(.system(size: 30))
-                    .foregroundStyle(recorder.isRecording ? LearningPalette.danger : LearningPalette.indigo)
+                    .foregroundStyle(recorder.isRecording ? LearningPalette.danger : LearningPalette.copper)
             }
             .frame(width: 72, height: 72)
             Text(recorder.isRecording ? recorder.elapsed.formattedRecordingTime : "Record a study session")
                 .font(.title3.weight(.semibold).monospacedDigit())
+                .foregroundStyle(LearningPalette.ink)
             Text("Recording is visible, user-started, and transcribed only after you stop.")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(LearningPalette.mutedInk)
             Button(recorder.isRecording ? "Stop and import" : "Start recording") {
                 if recorder.isRecording {
                     if let url = recorder.stop() { importFiles([url]) }
@@ -196,7 +292,7 @@ public struct CaptureView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(recorder.isRecording ? LearningPalette.danger : LearningPalette.indigo)
+            .tint(recorder.isRecording ? LearningPalette.danger : LearningPalette.copper)
             .disabled(destination == nil || isWorking)
         }
         .frame(maxWidth: .infinity)
@@ -205,23 +301,208 @@ public struct CaptureView: View {
     }
 
     private var queuePreview: some View {
-        VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            SectionHeading("Mac processing queue", detail: "Companion captures wait safely when the Mac is offline.")
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            SectionHeading("Processing queue", detail: "Companion captures wait safely when the Mac is offline, then resume without duplication.")
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: LHSpacing.sm) {
+                    captureProgressChip("Captured", tint: LearningPalette.copper)
+                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(LearningPalette.mutedInk)
+                    captureProgressChip("Processed on Mac", tint: LearningPalette.moss)
+                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(LearningPalette.mutedInk)
+                    captureProgressChip("Ready to study", tint: LearningPalette.moss)
+                }
+                VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                    captureProgressChip("1 · Captured", tint: LearningPalette.copper)
+                    captureProgressChip("2 · Processed on Mac", tint: LearningPalette.moss)
+                    captureProgressChip("3 · Ready to study", tint: LearningPalette.moss)
+                }
+            }
+
             if store.jobs.isEmpty {
-                Text("No queued captures").foregroundStyle(.secondary).padding(LHSpacing.md).frame(maxWidth: .infinity, alignment: .leading).learningSurface()
+                HStack(spacing: LHSpacing.xs) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(LearningPalette.moss)
+                    Text("Nothing is waiting. Your latest captures are ready to study.")
+                        .foregroundStyle(LearningPalette.ink)
+                }
+                    .font(.subheadline)
+                    .padding(LHSpacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .learningSurface(emphasized: false)
             } else {
                 ForEach(store.jobs.prefix(5)) { job in
-                    HStack {
-                        Image(systemName: job.state == .completed ? "checkmark.circle" : "desktopcomputer.and.arrow.down")
-                        Text(job.kindRaw.capitalized).font(.subheadline.weight(.medium))
-                        Spacer()
-                        StatusPill(job.stateRaw, tone: job.state == .failedFinal ? .danger : .neutral)
+                    VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                        HStack(spacing: LHSpacing.sm) {
+                            Image(systemName: queueSymbol(job.state))
+                                .foregroundStyle(queueTint(job.state))
+                                .frame(width: 34, height: 34)
+                                .background(queueTint(job.state).opacity(0.12), in: RoundedRectangle(cornerRadius: LHRadius.control))
+                            VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                                Text(job.kindRaw.capitalized)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(LearningPalette.ink)
+                                Text(queueDetail(job.state))
+                                    .font(.caption)
+                                    .foregroundStyle(LearningPalette.mutedInk)
+                            }
+                            Spacer()
+                            if job.state == .processing { ProgressView().controlSize(.small) }
+                            queueStateBadge(job.state)
+                        }
+
+                        if isFailure(job.state), !job.errorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(job.errorMessage)
+                                .font(.caption)
+                                .foregroundStyle(LearningPalette.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(LHSpacing.sm)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.control))
+                                .accessibilityLabel("Processing error: \(job.errorMessage)")
+                        }
+
+                        queueRecovery(for: job)
                     }
-                    .padding(LHSpacing.sm)
+                    .padding(LHSpacing.md)
                     .learningSurface(emphasized: false)
                 }
             }
         }
+    }
+
+    private func queueTitle(_ state: SyncJobState) -> String {
+        switch state {
+        case .queued: "Queued"
+        case .processing: "Processing"
+        case .waitingForMac: "Waiting for Mac"
+        case .needsAuthentication: "Sign in needed"
+        case .failedRetryable: "Will retry"
+        case .failedFinal: "Needs attention"
+        case .completed: "Ready"
+        }
+    }
+
+    private func queueDetail(_ state: SyncJobState) -> String {
+        switch state {
+        case .queued: "Ready for the next processing pass"
+        case .processing: "The Mac is extracting and indexing this capture"
+        case .waitingForMac: "Safe in your private queue until the Mac reconnects"
+        case .needsAuthentication: "A connected service needs you to sign in again"
+        case .failedRetryable: "The Desk will retry without creating a duplicate"
+        case .failedFinal: "This capture reached the safe retry limit"
+        case .completed: "Processed and available in its study space"
+        }
+    }
+
+    private func queueSymbol(_ state: SyncJobState) -> String {
+        switch state {
+        case .completed: "checkmark.circle.fill"
+        case .processing: "gearshape.2"
+        case .waitingForMac: "desktopcomputer"
+        case .needsAuthentication: "person.crop.circle.badge.exclamationmark"
+        case .failedRetryable: "arrow.clockwise"
+        case .failedFinal: "exclamationmark.triangle.fill"
+        case .queued: "clock.fill"
+        }
+    }
+
+    private func queueTint(_ state: SyncJobState) -> Color {
+        switch state {
+        case .completed: LearningPalette.moss
+        case .failedFinal: LearningPalette.danger
+        case .needsAuthentication, .failedRetryable: LearningPalette.warning
+        case .queued, .processing, .waitingForMac: LearningPalette.copper
+        }
+    }
+
+    private func isFailure(_ state: SyncJobState) -> Bool {
+        state == .failedRetryable || state == .failedFinal
+    }
+
+    private func captureProgressChip(_ title: String, tint: Color) -> some View {
+        HStack(spacing: LHSpacing.xxs) {
+            Circle()
+                .fill(tint)
+                .frame(width: 6, height: 6)
+            Text(title)
+                .foregroundStyle(LearningPalette.ink)
+        }
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, LHSpacing.xs)
+        .frame(minHeight: 28)
+        .background(tint.opacity(0.12), in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func queueStateBadge(_ state: SyncJobState) -> some View {
+        HStack(spacing: LHSpacing.xxs) {
+            Circle()
+                .fill(queueTint(state))
+                .frame(width: 6, height: 6)
+            Text(queueTitle(state))
+                .foregroundStyle(LearningPalette.ink)
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, LHSpacing.xs)
+        .padding(.vertical, LHSpacing.xxs)
+        .background(queueTint(state).opacity(0.12), in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func queueRecovery(for job: SyncJob) -> some View {
+        switch job.state {
+        case .failedRetryable:
+            #if os(macOS)
+            HStack(alignment: .firstTextBaseline, spacing: LHSpacing.sm) {
+                Text("The queue will retry automatically after its safety backoff.")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                Spacer()
+                Button("Retry eligible items") {
+                    Task {
+                        isWorking = true
+                        let summary = await MacQueueProcessor.shared.drain(into: store)
+                        statusMessage = summary.processed > 0
+                            ? "Processed \(summary.processed) queued capture\(summary.processed == 1 ? "" : "s")"
+                            : "Retry check complete. The capture remains safely queued."
+                        isWorking = false
+                    }
+                }
+                .buttonStyle(.bordered)
+                .tint(LearningPalette.copper)
+                .disabled(isWorking)
+            }
+            #else
+            Text("Keep the Mac app open. The queue will retry automatically after its safety backoff.")
+                .font(.caption)
+                .foregroundStyle(LearningPalette.mutedInk)
+            #endif
+        case .failedFinal:
+            HStack(alignment: .firstTextBaseline, spacing: LHSpacing.sm) {
+                Text("Start a fresh capture from the original item; this failure stays here for reference.")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                Spacer()
+                Button("Start fresh") {
+                    kind = captureKind(for: job.kindRaw)
+                    statusMessage = "Ready for a fresh \(kind.rawValue.lowercased()) capture"
+                }
+                .buttonStyle(.bordered)
+                .tint(LearningPalette.copper)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func captureKind(for rawKind: String) -> CaptureKind {
+        let normalized = rawKind.lowercased()
+        if normalized.contains("file") { return .file }
+        if normalized.contains("url") || normalized.contains("link") { return .link }
+        if normalized.contains("audio") || normalized.contains("record") { return .audio }
+        return .note
     }
 
     private func saveNote() {

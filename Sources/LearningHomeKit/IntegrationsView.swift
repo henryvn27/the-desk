@@ -22,26 +22,34 @@ public struct IntegrationsView: View {
     @ViewStorage private var message = ""
     @ViewStorage private var errorMessage: String?
     @ViewStorage private var showingNotebookLMManager = false
+    @ViewStorage private var showingAdditionalProviders = false
 
     public init() {}
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: LHSpacing.lg) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Integrations")
-                        .font(.system(.largeTitle, design: .serif, weight: .semibold))
-                    Text("External services are optional and independently health-checked. Local sources and saved canvases keep working when one fails.")
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: LHSpacing.xl) {
+                DeskPageHeader(
+                    "Connections",
+                    eyebrow: "The Desk",
+                    detail: "Keep your study system connected without giving up control of your library or credentials.",
+                    actionTitle: "Check all",
+                    actionSymbol: "arrow.clockwise"
+                ) {
+                    Task { await refresh() }
                 }
+
+                connectionOverview
 
                 codexSection
                 byokSection
                 studyConnectorSection
                 privacySection
             }
-            .padding(LHSpacing.lg)
-            .frame(maxWidth: 920, alignment: .leading)
+            .padding(.horizontal, LHSpacing.xl)
+            .padding(.vertical, LHSpacing.lg)
+            .frame(maxWidth: 1_020, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .background(LearningPalette.appBackground)
         .navigationTitle("Integrations")
@@ -60,19 +68,57 @@ public struct IntegrationsView: View {
         }
     }
 
+    private var connectionOverview: some View {
+        HStack(spacing: LHSpacing.md) {
+            IntegrationIcon(
+                symbol: engineHealth == nil ? "desktopcomputer.trianglebadge.exclamationmark" : "desktopcomputer",
+                tint: engineHealth == nil ? LearningPalette.warning : LearningPalette.moss,
+                emphasized: true
+            )
+            VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                Text(engineHealth == nil ? "Mac learning engine unavailable" : "Mac learning engine ready")
+                    .font(.headline)
+                    .foregroundStyle(LearningPalette.ink)
+                Text("Local study, sources, and saved canvases stay available even when an optional connector is offline.")
+                    .font(.subheadline)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: LHSpacing.sm)
+            if isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Checking integrations")
+            } else {
+                StatusPill(engineHealth == nil ? "Check needed" : "Local first", symbol: engineHealth == nil ? "exclamationmark" : "lock.fill", tone: engineHealth == nil ? .warning : .success)
+            }
+        }
+        .padding(LHSpacing.md)
+        .background(LearningPalette.mossSoft)
+        .clipShape(RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                .stroke(LearningPalette.moss.opacity(0.22), lineWidth: 0.75)
+        }
+    }
+
     private var codexSection: some View {
         VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            SectionHeading("Default AI · Codex plan", detail: "Connect the ChatGPT plan already used by Codex on this Mac. No API key or separate billing.")
-            VStack(alignment: .leading, spacing: LHSpacing.md) {
+            SectionHeading("Your default study intelligence", detail: "Use the ChatGPT plan already connected to Codex on this Mac. There is no API key to paste and no separate API bill.")
+            VStack(alignment: .leading, spacing: LHSpacing.lg) {
                 HStack(alignment: .top, spacing: LHSpacing.md) {
-                    IntegrationIcon(symbol: "cpu", tint: codexIsConnected ? LearningPalette.success : LearningPalette.indigo)
+                    IntegrationIcon(symbol: "sparkles", tint: codexIsConnected ? LearningPalette.moss : LearningPalette.copper, emphasized: true)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("ChatGPT through Codex").font(.headline)
-                        Text(codexAccount).font(.subheadline).foregroundStyle(.secondary)
+                        Text("ChatGPT through Codex")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(LearningPalette.onGraphite)
+                        Text(codexAccount)
+                            .font(.subheadline)
+                            .foregroundStyle(LearningPalette.onGraphite.opacity(0.72))
                         if let version = engineHealth?.codex.version {
                             Text("Pinned runtime · \(version)")
                                 .font(.caption.monospaced())
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(LearningPalette.onGraphite.opacity(0.52))
                         }
                     }
                     Spacer()
@@ -80,52 +126,97 @@ public struct IntegrationsView: View {
                 }
 
                 if let deviceLogin {
-                    VStack(alignment: .leading, spacing: LHSpacing.sm) {
-                        HStack(alignment: .firstTextBaseline) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Enter this one-time code")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: LHSpacing.md) {
+                        HStack(alignment: .top, spacing: LHSpacing.md) {
+                            ZStack {
+                                Circle()
+                                    .fill(LearningPalette.copper)
+                                    .frame(width: 30, height: 30)
+                                Text("1")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(LearningPalette.primaryForeground)
+                            }
+                            VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                                Text("Copy your one-time code")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(LearningPalette.ink)
                                 Text(deviceLogin.userCode ?? "Code unavailable")
-                                    .font(.title2.weight(.semibold).monospaced())
+                                    .font(.system(.title2, design: .monospaced).weight(.bold))
+                                    .foregroundStyle(LearningPalette.copper)
+                                    .tracking(1.2)
                                     .textSelection(.enabled)
                             }
                             Spacer()
                             if codexLoginPhase == .waiting {
-                                ProgressView().controlSize(.small).accessibilityLabel("Checking ChatGPT connection")
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(LearningPalette.copper)
+                                    .accessibilityLabel("Checking ChatGPT connection")
                             }
                         }
-                        Text(loginInstruction)
-                            .font(.caption)
-                            .foregroundStyle(codexLoginPhase == .timedOut ? LearningPalette.warning : .secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack {
-                            if let url = deviceLogin.verificationURL {
-                                Link("Open ChatGPT sign-in", destination: url)
-                                    .buttonStyle(.borderedProminent)
+
+                        HStack(alignment: .top, spacing: LHSpacing.md) {
+                            ZStack {
+                                Circle()
+                                    .fill(LearningPalette.moss)
+                                    .frame(width: 30, height: 30)
+                                Text("2")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(LearningPalette.primaryForeground)
                             }
-                            Button("Cancel") { cancelCodexLogin() }
-                                .buttonStyle(.bordered)
+                            VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                                Text("Approve Codex in ChatGPT")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(LearningPalette.ink)
+                                Text(loginInstruction)
+                                    .font(.caption)
+                                    .foregroundStyle(codexLoginPhase == .timedOut ? LearningPalette.warning : LearningPalette.mutedInk)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+
+                        HStack(spacing: LHSpacing.sm) {
+                            if let url = deviceLogin.verificationURL {
+                                Link(destination: url) {
+                                    Label("Continue in ChatGPT", systemImage: "arrow.up.right")
+                                }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(LearningPalette.copper)
+                                    .controlSize(.large)
+                            }
                             if codexLoginPhase == .timedOut {
                                 Button("Try a new code") { startCodexLogin() }
                                     .buttonStyle(.bordered)
                             }
+                            Button("Cancel") { cancelCodexLogin() }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(LearningPalette.mutedInk)
                         }
                     }
                     .padding(LHSpacing.md)
-                    .background(LearningPalette.indigo.opacity(0.07), in: RoundedRectangle(cornerRadius: LHRadius.control))
+                    .background(LearningPalette.paper, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                            .stroke(LearningPalette.copper.opacity(0.22), lineWidth: 0.75)
+                    }
                     .accessibilityElement(children: .contain)
                 }
 
-                HStack {
+                HStack(spacing: LHSpacing.sm) {
                     if !codexIsConnected && deviceLogin == nil {
-                        Button("Connect ChatGPT") { startCodexLogin() }
+                        Button { startCodexLogin() } label: {
+                            Label("Connect ChatGPT", systemImage: "person.crop.circle.badge.plus")
+                        }
                             .buttonStyle(.borderedProminent)
+                            .tint(LearningPalette.copper)
+                            .controlSize(.large)
                             .disabled(engineHealth?.codex.available != true || codexLoginPhase == .starting)
                     }
                     if codexLoginPhase == .starting {
-                        ProgressView().controlSize(.small)
-                        Text("Creating a secure sign-in code…").font(.caption).foregroundStyle(.secondary)
+                        ProgressView().controlSize(.small).tint(LearningPalette.copper)
+                        Text("Preparing a secure one-time code…")
+                            .font(.caption)
+                            .foregroundStyle(LearningPalette.onGraphite.opacity(0.7))
                     }
                     Spacer()
                     Button {
@@ -133,45 +224,91 @@ public struct IntegrationsView: View {
                     } label: {
                         Label("Check now", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(LearningPalette.onGraphite.opacity(0.72))
                     .disabled(isRefreshing)
                 }
             }
-            .padding(LHSpacing.md)
-            .learningSurface()
+            .padding(LHSpacing.lg)
+            .background(LearningPalette.graphite)
+            .clipShape(RoundedRectangle(cornerRadius: LHRadius.prominent, style: .continuous))
+            .overlay(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: LHRadius.prominent, style: .continuous)
+                    .stroke(LearningPalette.copper.opacity(0.26), lineWidth: 0.75)
+            }
+            .shadow(color: LearningPalette.ink.opacity(0.12), radius: 18, x: 0, y: 8)
         }
     }
 
     private var byokSection: some View {
         VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            SectionHeading("Bring your own provider", detail: "Keys stay in this Mac’s Keychain and never enter CloudKit.")
-            ForEach([ProviderIdentifier.openAI, .anthropic, .gemini], id: \.rawValue) { provider in
-                HStack(spacing: LHSpacing.md) {
-                    IntegrationIcon(symbol: providerSymbol(provider), tint: providerTint(provider))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(provider.title).font(.headline)
-                        Text(providerAvailability[provider] == true ? "Configured on this Mac" : "Separate API billing")
-                            .font(.caption).foregroundStyle(.secondary)
+            SectionHeading("More AI providers", detail: "Codex stays the default. Add a separate API provider only when you want one.")
+            if showingAdditionalProviders {
+                ForEach([ProviderIdentifier.openAI, .anthropic, .gemini], id: \.rawValue) { provider in
+                    HStack(spacing: LHSpacing.md) {
+                        IntegrationIcon(symbol: providerSymbol(provider), tint: providerTint(provider), emphasized: providerAvailability[provider] == true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(provider.title).font(.headline).foregroundStyle(LearningPalette.ink)
+                            Text(providerAvailability[provider] == true ? "Configured on this Mac" : "Separate API billing")
+                                .font(.caption).foregroundStyle(LearningPalette.mutedInk)
+                        }
+                        Spacer()
+                        SecureField("API key", text: Binding(
+                            get: { providerKeys[provider] ?? "" },
+                            set: { providerKeys[provider] = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 240)
+                        Button("Save") { saveKey(provider) }
+                            .buttonStyle(.borderedProminent)
+                            .tint(LearningPalette.copper)
+                            .disabled((providerKeys[provider] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        if providerAvailability[provider] == true {
+                            Button(role: .destructive) { removeKey(provider) } label: { Image(systemName: "trash") }
+                                .buttonStyle(.bordered)
+                        }
                     }
-                    Spacer()
-                    SecureField("API key", text: Binding(
-                        get: { providerKeys[provider] ?? "" },
-                        set: { providerKeys[provider] = $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
-                    Button("Save") { saveKey(provider) }
-                        .buttonStyle(.borderedProminent)
-                        .disabled((providerKeys[provider] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    if providerAvailability[provider] == true {
-                        Button(role: .destructive) { removeKey(provider) } label: { Image(systemName: "trash") }
-                            .buttonStyle(.bordered)
-                    }
+                    .padding(LHSpacing.md)
+                    .learningSurface(emphasized: false)
                 }
-                .padding(LHSpacing.md)
-                .learningSurface()
+                Button("Hide provider setup") {
+                    withAnimation(LHMotion.direct) { showingAdditionalProviders = false }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(LearningPalette.mutedInk)
+            } else {
+                Button {
+                    withAnimation(LHMotion.direct) { showingAdditionalProviders = true }
+                } label: {
+                    HStack(spacing: LHSpacing.md) {
+                        IntegrationIcon(symbol: "plus", tint: LearningPalette.copper, emphasized: true)
+                        VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                            Text(configuredProviderCount == 0 ? "Add another AI provider" : "Manage additional providers")
+                                .font(.headline)
+                                .foregroundStyle(LearningPalette.ink)
+                            Text(configuredProviderCount == 0
+                                 ? "OpenAI API, Anthropic, and Gemini use keys stored only in this Mac’s Keychain."
+                                 : "\(configuredProviderCount) additional provider\(configuredProviderCount == 1 ? " is" : "s are") configured on this Mac.")
+                                .font(.subheadline)
+                                .foregroundStyle(LearningPalette.mutedInk)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(LearningPalette.copper)
+                    }
+                    .padding(LHSpacing.md)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .learningSurface(emphasized: false)
             }
         }
+    }
+
+    private var configuredProviderCount: Int {
+        [ProviderIdentifier.openAI, .anthropic, .gemini]
+            .filter { providerAvailability[$0] == true }
+            .count
     }
 
     private var studyConnectorSection: some View {
@@ -229,7 +366,10 @@ public struct IntegrationsView: View {
                 actionHandler: {}
             )
             if !message.isEmpty {
-                Text(message).font(.subheadline).foregroundStyle(.secondary).padding(LHSpacing.sm)
+                Label(message, systemImage: "info.circle")
+                    .font(.subheadline)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                    .padding(LHSpacing.sm)
             }
         }
     }
@@ -238,9 +378,9 @@ public struct IntegrationsView: View {
         VStack(alignment: .leading, spacing: LHSpacing.sm) {
             SectionHeading("Execution boundary")
             HStack(alignment: .top, spacing: LHSpacing.md) {
-                Image(systemName: "lock.shield.fill").font(.title2).foregroundStyle(LearningPalette.success)
+                Image(systemName: "lock.shield.fill").font(.title2).foregroundStyle(LearningPalette.moss)
                 Text("The Mac is the only AI execution host. Companion devices upload private captures and typed jobs through the user’s iCloud account. Provider keys, Codex sessions, logs, and raw screen captures never sync to iPhone or iPad.")
-                    .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.subheadline).foregroundStyle(LearningPalette.mutedInk).fixedSize(horizontal: false, vertical: true)
             }
             .padding(LHSpacing.md)
             .learningSurface(emphasized: false)
@@ -445,17 +585,25 @@ public struct IntegrationsView: View {
         switch provider { case .openAI: "circle.hexagongrid"; case .anthropic: "textformat"; case .gemini: "sparkles"; default: "cpu" }
     }
     private func providerTint(_ provider: ProviderIdentifier) -> Color {
-        switch provider { case .openAI: .teal; case .anthropic: .orange; case .gemini: .blue; default: LearningPalette.indigo }
+        switch provider {
+        case .openAI: LearningPalette.moss
+        case .anthropic: LearningPalette.copper
+        case .gemini: LearningPalette.graphiteSoft
+        default: LearningPalette.copper
+        }
     }
 }
 
 private struct IntegrationIcon: View {
     let symbol: String
     let tint: Color
+    var emphasized = false
     var body: some View {
-        Image(systemName: symbol).font(.title3).foregroundStyle(tint)
-            .frame(width: 42, height: 42)
-            .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        Image(systemName: symbol)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(emphasized ? LearningPalette.primaryForeground : tint)
+            .frame(width: 44, height: 44)
+            .background(emphasized ? tint : tint.opacity(0.12), in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
     }
 }
 
@@ -470,20 +618,24 @@ private struct ConnectorCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: LHSpacing.md) {
-            IntegrationIcon(symbol: symbol, tint: tint)
+            IntegrationIcon(symbol: symbol, tint: tint, emphasized: status == "ready")
             VStack(alignment: .leading, spacing: 4) {
-                HStack { Text(title).font(.headline); StatusPill(badge, tone: .neutral) }
-                Text(detail).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack { Text(title).font(.headline).foregroundStyle(LearningPalette.ink); StatusPill(badge, tone: .neutral) }
+                Text(detail).font(.subheadline).foregroundStyle(LearningPalette.mutedInk).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             StatusPill(statusLabel, symbol: status == "ready" ? "checkmark" : "gearshape", tone: status == "ready" ? .success : .warning)
-            if let action { Button(action, action: actionHandler).buttonStyle(.bordered) }
+            if let action {
+                Button(action, action: actionHandler)
+                    .buttonStyle(.bordered)
+                    .tint(LearningPalette.copper)
+            }
         }
         .padding(LHSpacing.md)
-        .learningSurface()
+        .learningSurface(emphasized: false)
     }
 
-    private var tint: Color { status == "ready" ? LearningPalette.success : LearningPalette.indigo }
+    private var tint: Color { status == "ready" ? LearningPalette.moss : LearningPalette.copper }
     private var statusLabel: String {
         switch status {
         case "ready": "Ready"

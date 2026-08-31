@@ -26,7 +26,7 @@ public final class StudyBuddyPanelController: NSObject, NSWindowDelegate {
     }
 
     private func makePanel(store: LearningHomeStore) -> NSPanel {
-        let size = CGSize(width: 760, height: 620)
+        let size = CGSize(width: StudyBuddyLayout.minimumPanelWidth, height: 620)
         let panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
@@ -39,7 +39,13 @@ public final class StudyBuddyPanelController: NSObject, NSWindowDelegate {
         panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.minSize = CGSize(width: 640, height: 520)
+        // Keep the supported window range wider than both HSplitView child
+        // minima plus its divider. Resizing can compress the panels, but never
+        // below a width where their controls overlap or clip.
+        panel.minSize = CGSize(
+            width: StudyBuddyLayout.minimumPanelWidth,
+            height: StudyBuddyLayout.minimumPanelHeight
+        )
         panel.delegate = self
         panel.contentView = NSHostingView(rootView: StudyBuddyView(onClose: { [weak self] in
             self?.hide()

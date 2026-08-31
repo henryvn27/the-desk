@@ -329,7 +329,7 @@ public final class StudySpace: Codable, Identifiable {
     public var kindRaw: String = StudySpaceKind.class.rawValue
     public var title: String = ""
     public var subtitle: String = ""
-    public var colorHex: String = "#4657B8"
+    public var colorHex: String = "#54706A"
     public var symbolName: String = "book.closed"
     public var tutorStyleRaw: String = TutorStyle.coachFirst.rawValue
     public var customTutorInstructions: String = ""

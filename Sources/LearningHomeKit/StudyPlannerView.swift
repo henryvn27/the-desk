@@ -13,6 +13,12 @@ public struct StudyPlanDraft: Identifiable, Hashable, Sendable {
     public var linkedSourceID: UUID?
 }
 
+private struct StudyPlanDraftDay: Identifiable {
+    var day: Date
+    var drafts: [StudyPlanDraft]
+    var id: Date { day }
+}
+
 @MainActor
 public enum StudyPlanBuilder {
     public static func build(
@@ -101,7 +107,7 @@ public struct StudyPlannerView: View {
     @ViewStorage private var durationMinutes = 45
     @ViewStorage private var drafts: [StudyPlanDraft] = []
     @ViewStorage private var calendarOptions: [StudyCalendarOption] = []
-    @ViewStorage private var selectedCalendarID = ""
+    @AppStorage("TheDesk.StudyPlanner.selectedCalendarID") private var selectedCalendarID = ""
     @ViewStorage private var isConnectingCalendar = false
     @ViewStorage private var isExporting = false
     @ViewStorage private var message = ""
@@ -111,6 +117,7 @@ public struct StudyPlannerView: View {
     @ViewStorage private var editNotes = ""
     @ViewStorage private var editStart = Date()
     @ViewStorage private var editDurationMinutes = 45
+    @ViewStorage private var showsPlanSettings = false
 
     public init() {}
 
@@ -120,25 +127,109 @@ public struct StudyPlannerView: View {
         }
     }
 
+    private var currentWeek: DateInterval? {
+        Calendar.current.dateInterval(of: .weekOfYear, for: Date())
+    }
+
+    private var scheduledThisWeek: [StudySession] {
+        guard let currentWeek else { return [] }
+        return store.sessions.filter {
+            guard $0.isPlannedBlock,
+                  $0.planState != .cancelled,
+                  let start = $0.scheduledStart else { return false }
+            return currentWeek.contains(start)
+        }
+    }
+
+    private var targetDrafts: [StudyPlanDraft] {
+        if !drafts.isEmpty { return drafts }
+        return StudyPlanBuilder.build(
+            spaces: store.spaces,
+            assignments: store.assignments,
+            mastery: store.mastery,
+            sources: store.sources,
+            startingAt: startingAt,
+            days: days,
+            sessionsPerDay: sessionsPerDay,
+            durationMinutes: durationMinutes
+        )
+    }
+
+    private var weekTargetCount: Int {
+        guard let currentWeek else { return 0 }
+        return targetDrafts.filter { currentWeek.contains($0.start) }.count
+    }
+
+    private var weekScheduledProgress: Double? {
+        guard weekTargetCount > 0 else { return nil }
+        return min(Double(scheduledThisWeek.count) / Double(weekTargetCount), 1)
+    }
+
+    private var draftDays: [StudyPlanDraftDay] {
+        Dictionary(grouping: drafts) { Calendar.current.startOfDay(for: $0.start) }
+            .map { StudyPlanDraftDay(day: $0.key, drafts: $0.value.sorted { $0.start < $1.start }) }
+            .sorted { $0.day < $1.day }
+    }
+
+    private var recommendationTitle: String {
+        let dueCount = store.assignments.filter { $0.state != .verifiedComplete }.count
+        let weakCount = store.mastery.filter { $0.score < 0.82 }.count
+        if dueCount == 0 && weakCount == 0 {
+            return store.sources.isEmpty ? "Add material to build your first plan" : "Create a calm review rhythm"
+        }
+        if dueCount > 0 && weakCount > 0 { return "Balance due work with targeted review" }
+        if dueCount > 0 { return "Turn your due work into focus blocks" }
+        return "Strengthen the topics that need another pass"
+    }
+
+    private var recommendationDetail: String {
+        let dueCount = store.assignments.filter { $0.state != .verifiedComplete }.count
+        let weakCount = store.mastery.filter { $0.score < 0.82 }.count
+        let candidateCount = dueCount + weakCount + (dueCount == 0 && weakCount == 0 ? store.sources.count : 0)
+        guard candidateCount > 0 else {
+            return "Capture a note, textbook, lesson, or assignment first. The Desk will then turn it into a reviewable schedule."
+        }
+        let totalBlocks = min(days * sessionsPerDay, candidateCount)
+        return "The Desk recommends up to \(totalBlocks) \(durationMinutes)-minute block\(totalBlocks == 1 ? "" : "s") across \(days) day\(days == 1 ? "" : "s"), prioritizing \(dueCount) open assignment\(dueCount == 1 ? "" : "s") and \(weakCount) weak topic\(weakCount == 1 ? "" : "s")."
+    }
+
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHSpacing.lg) {
                 header
                 #if os(macOS)
-                planComposer
+                recommendationCard
                 if !drafts.isEmpty { draftReview }
                 #endif
-                upcomingSection
                 if !message.isEmpty {
-                    Label(message, systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(LearningPalette.success)
+                    Label(message, systemImage: drafts.isEmpty ? "checkmark.circle.fill" : "sparkles")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(drafts.isEmpty ? LearningPalette.moss : LearningPalette.copper)
+                        .padding(LHSpacing.sm)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            drafts.isEmpty ? LearningPalette.mossSoft : LearningPalette.copperSoft,
+                            in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous)
+                        )
                 }
+                #if os(macOS)
+                planComposer
+                #endif
+                upcomingSection
             }
             .padding(LHSpacing.lg)
             .frame(maxWidth: 980, alignment: .leading)
         }
         .background(LearningPalette.appBackground)
         .navigationTitle("Study Plan")
+        #if os(macOS)
+        .onAppear {
+            if drafts.isEmpty && upcoming.isEmpty {
+                generate()
+                message = ""
+            }
+        }
+        #endif
         .alert("Study plan needs attention", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -167,99 +258,149 @@ public struct StudyPlannerView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Time-block the work that matters")
-                    .font(.system(.title2, design: .serif, weight: .semibold))
-                Text("Plans stay honest: The Desk schedules study time, but a calendar event does not prove an assignment was submitted.")
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            StatusPill("\(upcoming.count) upcoming", symbol: "calendar", tone: .info)
-        }
+        DeskPageHeader(
+            "Study Plan",
+            eyebrow: "Your week",
+            detail: "Turn due work and weak topics into realistic focus blocks. Calendar events schedule the work; they never count as submission proof."
+        )
     }
 
     #if os(macOS)
+    private var recommendationCard: some View {
+        PrimaryStudyCard(
+            drafts.isEmpty ? recommendationTitle : "Your draft is ready to review",
+            eyebrow: drafts.isEmpty ? "Recommended plan" : "\(drafts.count) proposed blocks",
+            detail: drafts.isEmpty ? recommendationDetail : "Check every start time, remove anything that does not fit, then approve the plan before sending blocks to a calendar.",
+            actionTitle: drafts.isEmpty ? "Build recommended plan" : nil,
+            actionSymbol: "sparkles",
+            action: generate,
+            progress: weekScheduledProgress,
+            progressLabel: weekTargetCount == 0 ? nil : "\(scheduledThisWeek.count) of \(weekTargetCount) scheduled this week",
+            background: LearningPalette.clay,
+            accent: LearningPalette.copper
+        )
+    }
+
     private var planComposer: some View {
-        VStack(alignment: .leading, spacing: LHSpacing.md) {
-            SectionHeading("Build a plan", detail: "Prioritizes due work and weak mastery areas. Nothing is saved until you approve the draft.")
-            HStack(spacing: LHSpacing.md) {
-                DatePicker("Start", selection: $startingAt)
-                Stepper("\(days) day\(days == 1 ? "" : "s")", value: $days, in: 1...14)
-                Stepper("\(sessionsPerDay)/day", value: $sessionsPerDay, in: 1...6)
-                Picker("Block", selection: $durationMinutes) {
-                    ForEach([25, 35, 45, 60, 90], id: \.self) { Text("\($0) min").tag($0) }
+        DisclosureGroup(isExpanded: $showsPlanSettings) {
+            VStack(alignment: .leading, spacing: LHSpacing.md) {
+                Divider()
+                Text("Tune the recommendation before generating another draft. Nothing is saved until you approve it.")
+                    .font(.subheadline)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: LHSpacing.md) { planControls }
+                    VStack(alignment: .leading, spacing: LHSpacing.md) { planControls }
                 }
-                .frame(width: 130)
-                Button("Generate draft") { generate() }.buttonStyle(.borderedProminent)
             }
+            .padding(.top, LHSpacing.xs)
+        } label: {
+            Label("Adjust plan settings", systemImage: "slider.horizontal.3")
+                .font(.headline)
+                .foregroundStyle(LearningPalette.ink)
         }
         .padding(LHSpacing.md)
-        .learningSurface()
+        .learningSurface(emphasized: false)
+    }
+
+    @ViewBuilder
+    private var planControls: some View {
+        DatePicker("Start", selection: $startingAt)
+        Stepper("\(days) day\(days == 1 ? "" : "s")", value: $days, in: 1...14)
+        Stepper("\(sessionsPerDay) per day", value: $sessionsPerDay, in: 1...6)
+        Picker("Block length", selection: $durationMinutes) {
+            ForEach([25, 35, 45, 60, 90], id: \.self) { Text("\($0) min").tag($0) }
+        }
+        .frame(maxWidth: 170)
+        Button("Generate new draft") { generate() }
+            .buttonStyle(.borderedProminent)
+            .tint(LearningPalette.copper)
     }
 
     private var draftReview: some View {
         VStack(alignment: .leading, spacing: LHSpacing.md) {
-            SectionHeading("Review \(drafts.count) time blocks", detail: "Adjust every start time before approval.")
-            ForEach(drafts) { draft in
-                HStack(spacing: LHSpacing.md) {
-                    Circle().fill(spaceColor(draft.spaceID)).frame(width: 8, height: 8)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(draft.title).font(.headline)
-                        Text("\(spaceTitle(draft.spaceID)) · \(draft.detail)").font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            SectionHeading("Review your time blocks", detail: "Adjust each start time before approval. The Desk has not saved anything yet.")
+            ForEach(draftDays) { day in
+                VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(day.day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                                .font(.headline)
+                                .foregroundStyle(LearningPalette.ink)
+                            Text(priorityRationale(for: day.drafts))
+                                .font(.caption)
+                                .foregroundStyle(LearningPalette.mutedInk)
+                        }
+                        Spacer()
+                        ProgressChip(
+                            "\(day.drafts.reduce(0) { $0 + $1.durationMinutes }) min total",
+                            tint: LearningPalette.moss
+                        )
                     }
-                    Spacer()
-                    DatePicker("Start", selection: draftStartBinding(draft.id), displayedComponents: [.date, .hourAndMinute])
-                        .labelsHidden()
-                    Picker("Duration", selection: draftDurationBinding(draft.id)) {
-                        ForEach([25, 35, 45, 60, 90], id: \.self) { Text("\($0)m").tag($0) }
+
+                    ForEach(day.drafts) { draft in
+                        HStack(spacing: LHSpacing.md) {
+                            Image(systemName: "clock")
+                                .foregroundStyle(spaceColor(draft.spaceID))
+                                .frame(width: 36, height: 36)
+                                .background(spaceColor(draft.spaceID).opacity(0.12), in: RoundedRectangle(cornerRadius: LHRadius.control))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(draft.title)
+                                    .font(.headline)
+                                    .foregroundStyle(LearningPalette.ink)
+                                Text("\(spaceTitle(draft.spaceID)) · \(draft.detail)")
+                                    .font(.caption)
+                                    .foregroundStyle(LearningPalette.mutedInk)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            DatePicker("Start", selection: draftStartBinding(draft.id), displayedComponents: [.date, .hourAndMinute])
+                                .labelsHidden()
+                            Picker("Duration", selection: draftDurationBinding(draft.id)) {
+                                ForEach([25, 35, 45, 60, 90], id: \.self) { Text("\($0)m").tag($0) }
+                            }
+                            .frame(width: 82)
+                            Button(role: .destructive) { drafts.removeAll { $0.id == draft.id } } label: { Image(systemName: "xmark") }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Remove \(draft.title)")
+                        }
+                        .padding(.vertical, LHSpacing.xs)
                     }
-                    .frame(width: 82)
-                    Button(role: .destructive) { drafts.removeAll { $0.id == draft.id } } label: { Image(systemName: "xmark") }
-                        .buttonStyle(.borderless)
+                    Divider()
                 }
-                .padding(.vertical, LHSpacing.xs)
-                Divider()
             }
             HStack {
                 Button("Discard draft") { drafts = [] }.buttonStyle(.bordered)
                 Spacer()
-                Button("Approve and save in The Desk") { approveDraft() }.buttonStyle(.borderedProminent)
+                Button("Approve \(drafts.count) block\(drafts.count == 1 ? "" : "s")") { approveDraft() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(LearningPalette.copper)
             }
         }
-        .padding(LHSpacing.md)
+        .padding(LHSpacing.lg)
         .learningSurface()
     }
     #endif
 
     private var upcomingSection: some View {
         VStack(alignment: .leading, spacing: LHSpacing.md) {
-            HStack {
-                SectionHeading("Upcoming blocks", detail: "Visible on every device after the Mac publishes the private companion snapshot.")
-                Spacer()
-                #if os(macOS)
-                if calendarOptions.isEmpty {
-                    Button(isConnectingCalendar ? "Connecting…" : "Connect Apple or Google Calendar") {
-                        Task { await connectCalendar() }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isConnectingCalendar)
-                } else {
-                    Picker("Calendar", selection: $selectedCalendarID) {
-                        ForEach(calendarOptions) { option in
-                            Text("\(option.accountKind.title) · \(option.title)").tag(option.id)
-                        }
-                    }
-                    .frame(maxWidth: 280)
-                    Button("Add unlinked blocks") { addUnlinkedToCalendar() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(selectedCalendarID.isEmpty || upcoming.allSatisfy { $0.calendarEventIdentifier != nil })
+            SectionHeading("Upcoming blocks", detail: "Approved blocks appear on every device after the Mac publishes the private companion snapshot.")
+
+            #if os(macOS)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: LHSpacing.sm) {
+                    calendarLabel
+                    Spacer(minLength: LHSpacing.sm)
+                    calendarButtons
                 }
-                Button("Export .ics") { isExporting = true }
-                    .buttonStyle(.bordered)
-                    .disabled(upcoming.isEmpty)
-                #endif
+                VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                    calendarLabel
+                    calendarButtons
+                }
             }
+            .padding(LHSpacing.sm)
+            .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+            #endif
 
             if upcoming.isEmpty {
                 ContentUnavailableView(
@@ -267,19 +408,23 @@ public struct StudyPlannerView: View {
                     systemImage: "calendar.badge.plus",
                     description: Text("Build and approve a plan on the paired Mac.")
                 )
+                .frame(maxWidth: .infinity, minHeight: 180)
+                .learningSurface(emphasized: false)
             } else {
                 ForEach(upcoming) { session in
                     HStack(spacing: LHSpacing.md) {
                         DateTile(date: session.scheduledStart ?? session.startedAt, tint: spaceColor(session.spaceID))
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(session.title).font(.headline)
+                            Text(session.title)
+                                .font(.headline)
+                                .foregroundStyle(LearningPalette.ink)
                             Text("\(spaceTitle(session.spaceID)) · \(session.plannedDurationMinutes ?? 0) minutes")
-                                .font(.caption).foregroundStyle(.secondary)
-                            if !session.notes.isEmpty { Text(session.notes).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                                .font(.caption).foregroundStyle(LearningPalette.mutedInk)
+                            if !session.notes.isEmpty { Text(session.notes).font(.caption).foregroundStyle(LearningPalette.mutedInk).lineLimit(2) }
                             if let targetLabel = targetLabel(session) {
                                 Label(targetLabel, systemImage: "link")
                                     .font(.caption2.weight(.medium))
-                                    .foregroundStyle(LearningPalette.indigo)
+                                    .foregroundStyle(LearningPalette.copper)
                             }
                         }
                         Spacer()
@@ -299,6 +444,39 @@ public struct StudyPlannerView: View {
             }
         }
     }
+
+    #if os(macOS)
+    private var calendarLabel: some View {
+        Label("Calendar", systemImage: "calendar")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(LearningPalette.ink)
+    }
+
+    @ViewBuilder
+    private var calendarButtons: some View {
+        if calendarOptions.isEmpty {
+            Button(isConnectingCalendar ? "Connecting…" : "Connect Apple or Google Calendar") {
+                Task { await connectCalendar() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isConnectingCalendar)
+        } else {
+            Picker("Calendar", selection: $selectedCalendarID) {
+                ForEach(calendarOptions) { option in
+                    Text("\(option.accountKind.title) · \(option.title)").tag(option.id)
+                }
+            }
+            .frame(maxWidth: 280)
+            Button("Add unlinked blocks") { addUnlinkedToCalendar() }
+                .buttonStyle(.borderedProminent)
+                .tint(LearningPalette.copper)
+                .disabled(selectedCalendarID.isEmpty || upcoming.allSatisfy { $0.calendarEventIdentifier != nil })
+        }
+        Button("Export .ics") { isExporting = true }
+            .buttonStyle(.bordered)
+            .disabled(upcoming.isEmpty)
+    }
+    #endif
 
     #if os(macOS)
     private func generate() {
@@ -443,7 +621,9 @@ public struct StudyPlannerView: View {
         isConnectingCalendar = true
         do {
             calendarOptions = try await StudyCalendarConnector.shared.writableCalendars()
-            selectedCalendarID = calendarOptions.first?.id ?? ""
+            if !calendarOptions.contains(where: { $0.id == selectedCalendarID }) {
+                selectedCalendarID = calendarOptions.first?.id ?? ""
+            }
             if calendarOptions.isEmpty { errorMessage = "No writable Apple, Google, Exchange, or local calendars were found on this Mac." }
         } catch { errorMessage = error.localizedDescription }
         isConnectingCalendar = false
@@ -484,10 +664,19 @@ public struct StudyPlannerView: View {
             set: { value in if let index = drafts.firstIndex(where: { $0.id == id }) { drafts[index].durationMinutes = value } }
         )
     }
+
+    private func priorityRationale(for drafts: [StudyPlanDraft]) -> String {
+        let assignments = drafts.filter { $0.linkedAssignmentID != nil }.count
+        let weakTopics = drafts.filter { $0.linkedMasteryRecordID != nil }.count
+        if assignments > 0 && weakTopics > 0 { return "Balances due work with low-mastery review." }
+        if assignments > 0 { return "Prioritizes open work by priority and due date." }
+        if weakTopics > 0 { return "Prioritizes the lowest-mastery topics." }
+        return "Source review keeps your momentum moving."
+    }
     #endif
 
     private func spaceTitle(_ id: UUID) -> String { store.space(id: id)?.title ?? "Study" }
-    private func spaceColor(_ id: UUID) -> Color { Color(hex: store.space(id: id)?.colorHex ?? "#4657B8") }
+    private func spaceColor(_ id: UUID) -> Color { Color(hex: store.space(id: id)?.colorHex ?? "#54706A") }
     private func targetLabel(_ session: StudySession) -> String? {
         if session.linkedAssignmentID != nil { return "Linked assignment" }
         if session.linkedMasteryRecordID != nil { return "Linked weak topic" }

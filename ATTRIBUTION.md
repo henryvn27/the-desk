@@ -18,7 +18,7 @@ These products informed specific interaction ideas. The Desk does not include th
 
 - [Clicky](https://github.com/farzaa/clicky), by Farza — MIT. Its user-invoked, cursor-adjacent tutor pattern informed Study Buddy. The streaming response overlay is adapted from Clicky's non-activating panel pattern at commit `a80fa80721a8aebe51a170a7780705024ebc6e46`; the retained copyright and MIT notice are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). No Clicky assets, provider proxy, analytics, prompts, or sample data are included.
 - [OpenAI Visualizations](https://learn.chatgpt.com/docs/visualizations) — product reference for generated interactive explanations. Study Canvas uses The Desk's own versioned native scene schema and renderer.
-- [Acely](https://acely.com/ai-sat-tutor) — visual and product reference for clear daily priorities, progress beside practice, and an encouraging study experience. The planned reskin is original and uses no Acely assets or code.
+- [Acely](https://acely.com/ai-sat-tutor) — product-flow reference for clear daily priorities, progress beside practice, and an encouraging study experience. The implemented Desk visual system is original and uses no Acely palette, assets, source, or proprietary layouts.
 
 ## Repository research references
 

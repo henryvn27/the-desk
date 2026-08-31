@@ -16,6 +16,8 @@ public struct LearningInspector: View {
                 case .integrations: integrationInspector
                 case .planner: plannerInspector
                 case .today: todayInspector
+                case .library: libraryInspector
+                case .canvas: canvasInspector
                 }
             }
             .padding(LHSpacing.md)
@@ -133,6 +135,35 @@ public struct LearningInspector: View {
                     }
                     Text(integration.isReadOnly ? "Read only" : "Scoped access").font(.caption).foregroundStyle(.secondary)
                 }
+            }
+        }
+    }
+
+    private var libraryInspector: some View {
+        Group {
+            Label("Library", systemImage: "books.vertical").font(.title3.weight(.semibold))
+            inspectorSection("Indexed material") {
+                Text("\(store.sources.count) sources across \(store.spaces.count) spaces")
+                    .font(.subheadline)
+                Text("Originals, revisions, and citation anchors remain attached to their class or track.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var canvasInspector: some View {
+        Group {
+            Label("Study Canvas", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                .font(.title3.weight(.semibold))
+            inspectorSection("Saved artifacts") {
+                Text("\(store.canvases.count) persistent canvas\(store.canvases.count == 1 ? "" : "es")")
+                    .font(.subheadline)
+                let staleCount = store.canvases.filter(\.isStale).count
+                if staleCount > 0 { StatusPill("\(staleCount) need review", tone: .warning) }
+                Text("Important claims stay linked to source anchors and prior versions remain available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
