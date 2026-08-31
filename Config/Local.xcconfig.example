@@ -1,0 +1,8 @@
+// Copy this file to Config/Local.xcconfig and replace every value with an
+// identifier registered to your Apple development team.
+THE_DESK_MAC_BUNDLE_ID = com.yourname.thedesk
+THE_DESK_MOBILE_BUNDLE_ID = com.yourname.thedesk.companion
+THE_DESK_TEST_BUNDLE_ID = com.yourname.thedesk.tests
+THE_DESK_CLOUD_CONTAINER = iCloud.com.yourname.thedesk
+THE_DESK_KEYCHAIN_SERVICE = com.yourname.thedesk.providers
+THE_DESK_KVSTORE_SUFFIX = com.yourname.thedesk

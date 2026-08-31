@@ -1,0 +1,10 @@
+// Public development defaults. Forks can override these values in the ignored
+// Config/Local.xcconfig without editing project source.
+THE_DESK_MAC_BUNDLE_ID = com.example.thedesk
+THE_DESK_MOBILE_BUNDLE_ID = com.example.thedesk.companion
+THE_DESK_TEST_BUNDLE_ID = com.example.thedesk.tests
+THE_DESK_CLOUD_CONTAINER = iCloud.com.example.thedesk
+THE_DESK_KEYCHAIN_SERVICE = com.example.thedesk.providers
+THE_DESK_KVSTORE_SUFFIX = com.example.thedesk
+
+#include? "Local.xcconfig"
