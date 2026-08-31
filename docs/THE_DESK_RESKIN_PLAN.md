@@ -1,25 +1,30 @@
-# The Desk — Acely-inspired reskin plan
+# The Desk — original reskin plan
 
 Status: proposed direction, not yet implemented
 Reference review date: August 30, 2026
+Direction revised: August 30, 2026
 
 ## Goal
 
 The current interface proves the product architecture, but it reads like a dark macOS utility. The reskin should make The Desk feel like a place a student wants to return to: clear, optimistic, focused on progress, and always ready with one useful next step.
 
-Acely is the visual and product reference for hierarchy, momentum, and study feedback. The Desk will not copy Acely's brand, assets, copy, or proprietary layouts. It will translate the useful patterns into an original native Apple system that supports classes, source material, capture, planning, tutoring, and Study Canvas.
+Acely is a product-flow reference for hierarchy, momentum, and study feedback, not a visual identity to reproduce. The Desk will not copy Acely's brand, palette, assets, copy, or proprietary layouts. It will translate the useful interaction patterns into an original native Apple system that supports classes, source material, capture, planning, tutoring, and Study Canvas.
 
-## What to carry over from Acely
+## Product patterns worth retaining
 
 The public Acely product surfaces consistently use:
 
-- A deep navy navigation rail beside a bright, warm content canvas.
+- Persistent navigation beside a focused content canvas.
 - One dominant study action instead of several equally weighted controls.
 - Large daily-plan cards that answer “what should I do now?”
 - Progress and accuracy shown directly beside the skill or task they describe.
-- Lime, lavender, and blue as purposeful feedback colors rather than decoration.
+- Semantic feedback placed close to the work it describes.
 - Friendly, plain language with configuration moved out of the main path.
 - Generous rounded surfaces, quiet borders, and selective depth.
+
+### Visual separation rule
+
+The Desk must not reproduce Acely's recognizable deep-navy navigation, bright-blue action, lime-progress, lavender-coaching, and warm-canvas combination—or assign near-equivalent colors to those same roles. References are for interaction hierarchy only. The Desk's own direction is **quiet, tactile, and studious**, rooted in the physical desk metaphor: graphite and paper echo the supplied app icon, while copper and moss establish a distinct product identity.
 
 Primary references:
 
@@ -87,7 +92,7 @@ The Desk
     └── Integrations
 ```
 
-The deep navy sidebar provides stable navigation. Capture stays available as a compact primary toolbar action. Study Buddy remains global and user-invoked, but is visually quieter until activated.
+The graphite sidebar provides stable navigation. Capture stays available as a compact primary toolbar action. Study Buddy remains global and user-invoked, but is visually quieter until activated.
 
 ### iPhone
 
@@ -108,7 +113,7 @@ Use the Mac hierarchy with a collapsible sidebar. Class study, Tutor, and Canvas
 
 ### Home
 
-Home becomes the Acely-like momentum surface.
+Home becomes the momentum surface.
 
 - Greeting and date in a compact header.
 - A large “Today at The Desk” card with planned minutes, completed minutes, and one primary `Start next task` action.
@@ -197,7 +202,7 @@ using The Desk's provider, source, privacy, and artifact systems.
 
 - A configurable global hold-to-talk shortcut starts a visible voice turn without activating The Desk.
 - Releasing the shortcut takes one clearly indicated snapshot of the approved display, window, or region; it never starts continuous screen recording.
-- A small navy coach card follows the cursor and streams the answer while the lecture, video, worksheet, or browser keeps focus.
+- A small graphite coach card follows the cursor and streams the answer while the lecture, video, worksheet, or browser keeps focus.
 - The compact card expands only on request to show class citations, provider/model, transcript, and `Save to Canvas`.
 - Validated `OverlayCueSpec` highlights and labels the relevant region without moving the real cursor, clicking, typing, or executing model-authored commands.
 - The active class contributes its tutor profile, retrieved notes, and recent session context. Switching classes is explicit and visible in the coach card.
@@ -220,20 +225,20 @@ multi-turn session memory.
 
 | Token | Value | Purpose |
 |---|---:|---|
-| Desk Navy | `#101B4B` | Sidebar, focused study chrome |
-| Desk Blue | `#4E5FE7` | Primary action, links, selection |
-| Progress Lime | `#C8F56A` | Completion and positive progress |
-| Study Lavender | `#E8D9FF` | Plans, coaching, low-pressure focus areas |
-| Warm Paper | `#FCFBF7` | Main content canvas |
-| Soft Canvas | `#F4F3EF` | Secondary background |
-| Desk Ink | `#171A32` | Primary text |
-| Muted Ink | `#707386` | Secondary text |
-| Hairline | `#E2E2E8` | Quiet structure |
-| Success | `#2B9A6E` | Verified completion and healthy connections |
-| Warning | `#D8902F` | Review required |
-| Danger | `#C95757` | Destructive or final failure only |
+| Desk Graphite | `#25282B` | Sidebar and focused study chrome |
+| Desk Copper | `#9D4E31` | Primary action, links, and selection |
+| Desk Moss | `#50705A` | Verified progress and healthy momentum |
+| Soft Clay | `#E8D7CC` | Plans, coaching, and low-pressure focus areas |
+| Desk Paper | `#F7F4ED` | Main content canvas |
+| Parchment | `#E8E2D7` | Secondary background |
+| Desk Ink | `#1F2326` | Primary text |
+| Muted Ink | `#656A67` | Secondary text |
+| Hairline | `#D6D0C5` | Quiet structure |
+| Success | `#3F765A` | Verified completion and healthy connections |
+| Warning | `#A66A25` | Review required |
+| Danger | `#A34848` | Destructive or final failure only |
 
-Class colors should tint a surface or small marker, never recolor the entire interface. Dark mode should be designed independently rather than generated by inverting the light palette.
+White text on Desk Copper is `5.89:1`; Desk Ink on Desk Paper is `14.41:1`; Muted Ink on Desk Paper is `5.02:1`. These pass WCAG AA for their intended text sizes. Class colors should tint a surface or small marker, never recolor the entire interface. Dark mode should be designed independently rather than generated by inverting the light palette.
 
 ### Type
 
@@ -329,7 +334,7 @@ Exit: every core workflow has a stable fixture and the old shell remains usable.
 ### Phase 1 — tokens, components, and app shell
 
 - Replace the current palette, radius, typography, and surface primitives.
-- Build the navy sidebar, warm content canvas, page header, cards, progress components, empty states, and notices.
+- Build the graphite sidebar, paper content canvas, page header, cards, progress components, empty states, and notices.
 - Change Mac from a permanent three-column split to two columns plus a contextual evidence drawer.
 - Rebuild iPhone tabs and iPad adaptive navigation.
 
@@ -408,7 +413,7 @@ Exit: no screen falls back to the old visual language and all acceptance flows a
 - The light interface is the primary art direction; dark mode is equally legible and intentionally designed.
 - Mac, iPhone, and iPad retain the same hierarchy while respecting platform navigation conventions.
 - VoiceOver, keyboard navigation, Dynamic Type, Reduce Motion, and contrast checks pass.
-- The new visual system uses no Acely logos, copy, proprietary assets, or copied source code.
+- The new visual system uses no Acely logos, copy, proprietary assets, copied source code, palette, or recognizable color-role mapping.
 
 ## Definition of done
 

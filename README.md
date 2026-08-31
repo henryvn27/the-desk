@@ -15,7 +15,7 @@ The Desk is a native, local-first study workspace for macOS, iPhone, and iPad. I
 - Review-first action extraction from notes or Wispr transcripts; suggestions cannot create assignments or linked Reminders until the user explicitly approves them.
 - A review-first Study Plan that time-blocks due work and weak topics, then writes only approved blocks to a selected Apple or Google calendar configured on the Mac; `.ics` export supports other calendar setups.
 
-See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the verified boundary and credential-gated integrations. The supplied PDF, media, RAG, routing, voice, and agent repositories are assessed in [reference repository review](docs/REFERENCE_REVIEW.md). The current functional shell is scheduled for an original [Acely-inspired reskin](docs/ACELY_RESKIN_PLAN.md) focused on clear daily priorities and visible study progress.
+See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the verified boundary and credential-gated integrations. The supplied PDF, media, RAG, routing, voice, and agent repositories are assessed in [reference repository review](docs/REFERENCE_REVIEW.md). The current functional shell is scheduled for an [original Desk reskin](docs/THE_DESK_RESKIN_PLAN.md) focused on clear daily priorities and visible study progress. Acely informs product hierarchy only; its palette and color-role mapping are explicitly out of scope.
 
 ## Generate and run the Apple project
 

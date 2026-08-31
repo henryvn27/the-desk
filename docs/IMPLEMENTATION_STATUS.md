@@ -44,6 +44,6 @@ The supplied external PDF, media, RAG, routing, voice, and agent projects were r
 
 The Clicky repository informed the user-initiated interaction pattern. The cursor-following streaming response overlay adapts its MIT-licensed non-activating panel pattern with the required notice retained in `THIRD_PARTY_NOTICES.md`; no Clicky assets, prompts, analytics, provider proxy, or vendor-specific service code are included.
 
-The existing interface is a functional foundation rather than the accepted visual direction. The [Acely-inspired reskin plan](ACELY_RESKIN_PLAN.md) defines an original, bright, progress-first native design without copying Acely source or assets.
+The existing interface is a functional foundation rather than the accepted visual direction. The [original Desk reskin plan](THE_DESK_RESKIN_PLAN.md) defines a quiet, tactile, progress-first native design. Acely informs product hierarchy only; its palette, color-role mapping, source, and assets are explicitly excluded.
 
 These gates do not block the local Mac study core, source ingestion, retrieval, saved canvases, planning, or cached companion viewing. Codex and optional connectors become available only when their matching runtimes, credentials, and permissions are present.
