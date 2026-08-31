@@ -11,7 +11,7 @@ enum DemoData {
             kind: .class,
             title: "AP Physics C",
             subtitle: "Mechanics · Unit 1",
-            colorHex: "#4657B8",
+            colorHex: "#54706A",
             symbolName: "function",
             tutorStyle: .coachFirst,
             sortOrder: 0
@@ -21,7 +21,7 @@ enum DemoData {
             kind: .class,
             title: "AP Statistics",
             subtitle: "Unit 1 · Sample class",
-            colorHex: "#B86D3E",
+            colorHex: "#9D4E31",
             symbolName: "chart.xyaxis.line",
             tutorStyle: .explainFirst,
             sortOrder: 1
@@ -31,7 +31,7 @@ enum DemoData {
             kind: .track,
             title: "Writing Portfolio",
             subtitle: "Sample long-form writing project",
-            colorHex: "#347A78",
+            colorHex: "#7A6651",
             symbolName: "text.book.closed",
             tutorStyle: .custom,
             sortOrder: 2
@@ -41,7 +41,7 @@ enum DemoData {
             kind: .track,
             title: "SAT Prep",
             subtitle: "Math and reading practice",
-            colorHex: "#76589B",
+            colorHex: "#66717A",
             symbolName: "scope",
             tutorStyle: .examPractice,
             sortOrder: 3

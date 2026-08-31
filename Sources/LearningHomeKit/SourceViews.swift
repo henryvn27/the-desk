@@ -11,6 +11,7 @@ public struct SourceLibraryView: View {
     @ViewStorage private var errorMessage: String?
     @ViewStorage private var revisionTargetID: UUID?
     @ViewStorage private var actionSource: SourceAsset?
+    @ViewStorage private var searchText = ""
 
     public init(spaceID: UUID? = nil) {
         fixedSpaceID = spaceID
@@ -22,37 +23,78 @@ public struct SourceLibraryView: View {
         guard let activeSpaceID else { return store.sources }
         return store.sources(in: activeSpaceID)
     }
+    private var filteredSources: [SourceAsset] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return visibleSources }
+        return visibleSources.filter { source in
+            source.title.localizedCaseInsensitiveContains(query)
+                || source.connectorName.localizedCaseInsensitiveContains(query)
+                || source.kind.rawValue.localizedCaseInsensitiveContains(query)
+                || source.originalFilename.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                if fixedSpaceID == nil {
-                    Picker("Space", selection: $selectedSpaceID) {
-                        Text("All spaces").tag(nil as UUID?)
-                        ForEach(store.spaces) { Text($0.title).tag(Optional($0.id)) }
-                    }
-                    .frame(maxWidth: 240)
+        ScrollView {
+            VStack(alignment: .leading, spacing: LHSpacing.lg) {
+                DeskPageHeader(
+                    "Library",
+                    eyebrow: activeSpaceTitle,
+                    detail: "Your class materials, preserved with page and timestamp citations.",
+                    actionTitle: "Import",
+                    actionSymbol: "plus"
+                ) {
+                    showingImporter = true
                 }
-                Spacer()
-                if isImporting { ProgressView().controlSize(.small) }
-                if !importStatus.isEmpty { Text(importStatus).font(.caption).foregroundStyle(.secondary) }
-                Button { showingImporter = true } label: { Label("Import", systemImage: "square.and.arrow.down") }
-                    .buttonStyle(.borderedProminent)
-            }
-            .padding(LHSpacing.md)
 
-            Divider()
+                HStack(spacing: LHSpacing.sm) {
+                    if fixedSpaceID == nil {
+                        Picker("Space", selection: $selectedSpaceID) {
+                            Text("All spaces").tag(nil as UUID?)
+                            ForEach(store.spaces) { Text($0.title).tag(Optional($0.id)) }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 220)
+                    }
+                    TextField("Search source titles and metadata", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 380)
+                    Spacer()
+                    if isImporting {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    if !importStatus.isEmpty {
+                        ProgressChip(importStatus, tint: isImporting ? LearningPalette.copper : LearningPalette.moss)
+                    }
+                }
+                .padding(LHSpacing.sm)
+                .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
 
-            if visibleSources.isEmpty {
-                ContentUnavailableView(
-                    "No sources yet",
-                    systemImage: "doc.badge.plus",
-                    description: Text("Import notes, a textbook, slides, photos, or a recording.")
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: LHSpacing.sm) {
-                        ForEach(visibleSources) { source in
+                HStack(spacing: LHSpacing.sm) {
+                    libraryMetric(value: "\(visibleSources.count)", label: "sources", symbol: "books.vertical")
+                    libraryMetric(value: "\(readySourceCount)", label: "ready to study", symbol: "checkmark.circle")
+                    libraryMetric(value: "\(queuedSourceCount)", label: "processing", symbol: "arrow.triangle.2.circlepath")
+                }
+
+                if visibleSources.isEmpty {
+                    ContentUnavailableView(
+                        "Build this space’s library",
+                        systemImage: "doc.badge.plus",
+                        description: Text("Import notes, a textbook, slides, photos, or a recording. The originals stay preserved.")
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 320)
+                    .learningSurface(emphasized: false)
+                } else if filteredSources.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                        .frame(maxWidth: .infinity, minHeight: 260)
+                } else {
+                    SectionHeading(
+                        "Materials",
+                        detail: "\(filteredSources.count) item\(filteredSources.count == 1 ? "" : "s") in this view"
+                    )
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: LHSpacing.sm)], spacing: LHSpacing.sm) {
+                        ForEach(filteredSources) { source in
                             SourceCard(source: source)
                                 .onTapGesture {
                                     store.selectedSourceID = source.id
@@ -71,9 +113,11 @@ public struct SourceLibraryView: View {
                                 #endif
                         }
                     }
-                    .padding(LHSpacing.md)
                 }
             }
+            .padding(LHSpacing.lg)
+            .frame(maxWidth: 1180, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(LearningPalette.appBackground)
         .navigationTitle("Library")
@@ -97,6 +141,34 @@ public struct SourceLibraryView: View {
                 .frame(minWidth: 620, idealWidth: 700, minHeight: 520, idealHeight: 620)
         }
         #endif
+        .onAppear {
+            if fixedSpaceID == nil && selectedSpaceID == nil {
+                selectedSpaceID = store.selectedSpaceID ?? store.spaces.first?.id
+            }
+        }
+    }
+
+    private var activeSpaceTitle: String {
+        guard let activeSpaceID, let space = store.space(id: activeSpaceID) else { return "All spaces" }
+        return space.title
+    }
+
+    private var readySourceCount: Int {
+        visibleSources.filter { $0.processingState == .ready }.count
+    }
+
+    private var queuedSourceCount: Int {
+        visibleSources.filter { $0.processingState == .queued || $0.processingState == .processing }.count
+    }
+
+    private func libraryMetric(value: String, label: String, symbol: String) -> some View {
+        MetricBlock(value: value, label: label, symbol: symbol, tint: LearningPalette.moss)
+            .padding(LHSpacing.sm)
+            .background(LearningPalette.surface, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                    .stroke(LearningPalette.hairline.opacity(0.72), lineWidth: 0.75)
+            }
     }
 
     private func importFiles(_ urls: [URL]) {
@@ -209,7 +281,7 @@ private struct StudyActionReviewSheet: View {
                                 if let anchor = action.sourceAnchor {
                                     Label(actionAnchorLabel(anchor), systemImage: anchor.timestamp == nil ? "book.pages" : "waveform")
                                         .font(.caption2.weight(.medium))
-                                        .foregroundStyle(LearningPalette.indigo)
+                                        .foregroundStyle(LearningPalette.copper)
                                     if !anchor.excerpt.isEmpty {
                                         Text(anchor.excerpt)
                                             .font(.caption2)
@@ -348,44 +420,59 @@ public struct SourceCard: View {
     public init(source: SourceAsset) { self.source = source }
 
     public var body: some View {
-        HStack(alignment: .top, spacing: LHSpacing.md) {
-            Image(systemName: source.kind.symbol)
-                .font(.title3)
-                .foregroundStyle(tint)
-                .frame(width: 42, height: 42)
-                .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(source.title).font(.headline)
-                    Spacer()
-                    ProcessingStatusPill(source.processingState)
-                }
-                HStack(spacing: LHSpacing.sm) {
-                    SourceKindLabel(source: source)
-                    Text("·").foregroundStyle(.tertiary)
-                    Text(source.connectorName).font(.caption).foregroundStyle(.secondary)
-                    if source.pageCount > 0 {
-                        Text("· \(source.pageCount) pages").font(.caption).foregroundStyle(.secondary)
-                    } else if source.duration > 0 {
-                        Text("· \(source.duration.formattedDuration)").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                if let text = store.latestRevision(for: source.id)?.extractedText, !text.isEmpty {
-                    Text(text.replacingOccurrences(of: #"\[\[(page|time):[^\]]+\]\]"#, with: "", options: .regularExpression))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            HStack(alignment: .top, spacing: LHSpacing.sm) {
+                Image(systemName: source.kind.symbol)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 44, height: 44)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
+                VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                    Text(source.title)
+                        .font(.headline)
+                        .foregroundStyle(LearningPalette.ink)
                         .lineLimit(2)
+                    Text(source.connectorName)
+                        .font(.caption)
+                        .foregroundStyle(LearningPalette.mutedInk)
+                }
+                Spacer(minLength: LHSpacing.xs)
+                ProcessingStatusPill(source.processingState)
+            }
+
+            if let text = store.latestRevision(for: source.id)?.extractedText, !text.isEmpty {
+                Text(String(text.prefix(1_500)).replacingOccurrences(of: #"\[\[(page|time):[^\]]+\]\]"#, with: "", options: .regularExpression))
+                    .font(.subheadline)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+            }
+
+            Divider()
+
+            HStack(spacing: LHSpacing.xs) {
+                SourceKindLabel(source: source)
+                Spacer()
+                if source.pageCount > 0 {
+                    Label("\(source.pageCount) pages", systemImage: "book.pages")
+                        .font(.caption)
+                        .foregroundStyle(LearningPalette.mutedInk)
+                } else if source.duration > 0 {
+                    Label(source.duration.formattedDuration, systemImage: "waveform")
+                        .font(.caption)
+                        .foregroundStyle(LearningPalette.mutedInk)
                 }
             }
         }
         .padding(LHSpacing.md)
         .learningSurface()
+        .frame(maxHeight: .infinity, alignment: .top)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
     private var tint: Color {
-        store.space(id: source.spaceID).map { Color(hex: $0.colorHex) } ?? LearningPalette.indigo
+        store.space(id: source.spaceID).map { Color(hex: $0.colorHex) } ?? LearningPalette.copper
     }
 }
 

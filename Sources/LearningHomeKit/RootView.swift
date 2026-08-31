@@ -4,6 +4,8 @@ public enum AppDestination: Hashable {
     case today
     case planner
     case capture
+    case library
+    case canvas
     case integrations
     case space(UUID)
 }
@@ -32,23 +34,33 @@ private struct MacLearningHomeRootView: View {
     @EnvironmentObject private var store: LearningHomeStore
     @ViewStorage private var selection = AppDestination.today
     @ViewStorage private var showingNewSpace = false
+    @ViewStorage private var showingInspector = false
 
     var body: some View {
         NavigationSplitView {
             LearningSidebar(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 210, ideal: 232, max: 280)
-        } content: {
-            destinationView
-                .navigationSplitViewColumnWidth(min: 570, ideal: 720)
+                .navigationSplitViewColumnWidth(min: 204, ideal: 220, max: 252)
         } detail: {
+            destinationView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .inspector(isPresented: $showingInspector) {
             LearningInspector(selection: selection)
-                .navigationSplitViewColumnWidth(min: 250, ideal: 286, max: 360)
+                .inspectorColumnWidth(min: 260, ideal: 300, max: 380)
         }
         .background(LearningPalette.appBackground)
         .safeAreaInset(edge: .top, spacing: 0) { PersistenceRecoveryBanner() }
-        .tint(LearningPalette.indigo)
+        .tint(LearningPalette.copper)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showingInspector.toggle()
+                } label: {
+                    Label(showingInspector ? "Hide context" : "Show context", systemImage: "sidebar.trailing")
+                }
+                .help("Show source and study context")
+
                 Button {
                     selection = .capture
                 } label: {
@@ -104,9 +116,15 @@ private struct MacLearningHomeRootView: View {
     @ViewBuilder
     private var destinationView: some View {
         switch selection {
-        case .today: TodayView(openSpace: { selection = .space($0) })
+        case .today:
+            TodayView(
+                openSpace: { selection = .space($0) },
+                openPlan: { selection = .planner }
+            )
         case .planner: StudyPlannerView()
         case .capture: CaptureView()
+        case .library: SourceLibraryView()
+        case .canvas: CanvasLibraryDestinationView()
         case .integrations: IntegrationsView()
         case .space(let id):
             if let space = store.space(id: id) {
@@ -123,62 +141,243 @@ private struct LearningSidebar: View {
     @Binding var selection: AppDestination
 
     var body: some View {
-        List(selection: $selection) {
-            Section {
-                Label("Today", systemImage: "sun.max")
-                    .tag(AppDestination.today)
-                Label("Study Plan", systemImage: "calendar.badge.clock")
-                    .tag(AppDestination.planner)
-                HStack {
-                    Label("Capture Inbox", systemImage: "tray.and.arrow.down")
-                    Spacer()
-                    let waiting = store.jobs.filter { $0.state == .waitingForMac || $0.state == .queued }.count
-                    if waiting > 0 { Text("\(waiting)").foregroundStyle(.secondary) }
+        VStack(spacing: 0) {
+            HStack(spacing: LHSpacing.sm) {
+                Image(systemName: "rectangle.topthird.inset.filled")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(LearningPalette.copper)
+                    .frame(width: 34, height: 34)
+                    .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Text("The Desk")
+                    .font(.title3.weight(.bold))
+                    .tracking(-0.4)
+                Spacer()
+            }
+            .padding(.horizontal, LHSpacing.md)
+            .padding(.top, LHSpacing.lg)
+            .padding(.bottom, LHSpacing.md)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                    SidebarDestinationButton("Home", symbol: "house", destination: .today, selection: $selection)
+                    SidebarDestinationButton("Study Plan", symbol: "calendar.badge.clock", destination: .planner, selection: $selection)
+                    SidebarDestinationButton("Library", symbol: "books.vertical", destination: .library, selection: $selection)
+                    SidebarDestinationButton("Canvas", symbol: "point.3.filled.connected.trianglepath.dotted", destination: .canvas, selection: $selection)
+
+                    SidebarSectionTitle("Classes")
+                    ForEach(store.spaces.filter { $0.kind == .class }) { space in
+                        SidebarSpaceButton(space: space, selection: $selection)
+                    }
+
+                    SidebarSectionTitle("Tracks")
+                    ForEach(store.spaces.filter { $0.kind == .track }) { space in
+                        SidebarSpaceButton(space: space, selection: $selection)
+                    }
                 }
-                .tag(AppDestination.capture)
+                .padding(.horizontal, LHSpacing.xs)
+                .padding(.bottom, LHSpacing.md)
             }
 
-            Section("Classes") {
-                ForEach(store.spaces.filter { $0.kind == .class }) { space in
-                    SpaceSidebarLabel(space: space)
-                        .tag(AppDestination.space(space.id))
-                }
+            VStack(spacing: LHSpacing.xxs) {
+                let waiting = store.jobs.filter { $0.state == .waitingForMac || $0.state == .queued }.count
+                SidebarDestinationButton(
+                    "Capture Inbox",
+                    symbol: "tray.and.arrow.down",
+                    badge: waiting > 0 ? "\(waiting)" : nil,
+                    destination: .capture,
+                    selection: $selection
+                )
+                SidebarDestinationButton("Settings", symbol: "gearshape", destination: .integrations, selection: $selection)
             }
-
-            Section("Tracks") {
-                ForEach(store.spaces.filter { $0.kind == .track }) { space in
-                    SpaceSidebarLabel(space: space)
-                        .tag(AppDestination.space(space.id))
-                }
-            }
-
-            Section {
-                Label("Integrations", systemImage: "point.3.connected.trianglepath.dotted")
-                    .tag(AppDestination.integrations)
+            .padding(LHSpacing.xs)
+            .overlay(alignment: .top) {
+                Rectangle().fill(.white.opacity(0.09)).frame(height: 1)
             }
         }
-        .listStyle(.sidebar)
-        .navigationTitle("The Desk")
+        .foregroundStyle(.white)
+        .background(LearningPalette.graphite)
+        .accessibilityElement(children: .contain)
     }
 }
 
-private struct SpaceSidebarLabel: View {
-    let space: StudySpace
+private struct SidebarDestinationButton: View {
+    let title: String
+    let symbol: String
+    let badge: String?
+    let destination: AppDestination
+    @Binding var selection: AppDestination
+
+    init(
+        _ title: String,
+        symbol: String,
+        badge: String? = nil,
+        destination: AppDestination,
+        selection: Binding<AppDestination>
+    ) {
+        self.title = title
+        self.symbol = symbol
+        self.badge = badge
+        self.destination = destination
+        _selection = selection
+    }
+
+    private var isSelected: Bool { selection == destination }
 
     var body: some View {
-        Label {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(space.title)
-                Text(space.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        Button {
+            withAnimation(LHMotion.direct) { selection = destination }
+        } label: {
+            HStack(spacing: LHSpacing.sm) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 20)
+                Text(title).font(.subheadline.weight(isSelected ? .semibold : .medium))
+                Spacer(minLength: LHSpacing.xs)
+                if let badge {
+                    Text(badge)
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.white.opacity(0.11), in: Capsule())
+                }
             }
-        } icon: {
-            Image(systemName: space.symbolName)
-                .foregroundStyle(Color(hex: space.colorHex))
+            .foregroundStyle(isSelected ? .white : .white.opacity(0.68))
+            .padding(.horizontal, LHSpacing.sm)
+            .frame(maxWidth: .infinity, minHeight: 39, alignment: .leading)
+            .background(isSelected ? LearningPalette.graphiteSoft : .clear, in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct SidebarSectionTitle: View {
+    let title: String
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.bold))
+            .tracking(1.15)
+            .foregroundStyle(.white.opacity(0.38))
+            .padding(.horizontal, LHSpacing.sm)
+            .padding(.top, LHSpacing.lg)
+            .padding(.bottom, LHSpacing.xxs)
+    }
+}
+
+private struct SidebarSpaceButton: View {
+    let space: StudySpace
+    @Binding var selection: AppDestination
+
+    private var destination: AppDestination { .space(space.id) }
+    private var isSelected: Bool { selection == destination }
+
+    var body: some View {
+        Button {
+            withAnimation(LHMotion.direct) { selection = destination }
+        } label: {
+            HStack(spacing: LHSpacing.sm) {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color(hex: space.colorHex))
+                    .frame(width: 10, height: 10)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(space.title)
+                        .font(.subheadline.weight(isSelected ? .semibold : .medium))
+                        .lineLimit(1)
+                    Text(space.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.42))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isSelected ? .white : .white.opacity(0.7))
+            .padding(.horizontal, LHSpacing.sm)
+            .frame(maxWidth: .infinity, minHeight: 45, alignment: .leading)
+            .background(isSelected ? LearningPalette.graphiteSoft : .clear, in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct CanvasLibraryDestinationView: View {
+    @EnvironmentObject private var store: LearningHomeStore
+
+    var body: some View {
+        HSplitView {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Study Canvas")
+                        .font(.title2.weight(.semibold))
+                    Text("Persistent visual lessons")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(LHSpacing.md)
+
+                Divider()
+
+                ScrollView {
+                    LazyVStack(spacing: LHSpacing.xs) {
+                        ForEach(store.canvases) { artifact in
+                            Button {
+                                store.selectedCanvasID = artifact.id
+                                store.selectedSpaceID = artifact.spaceID
+                            } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(artifact.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(2)
+                                    HStack {
+                                        Text(store.space(id: artifact.spaceID)?.title ?? "Study")
+                                        Spacer()
+                                        Text("v\(artifact.version)").monospacedDigit()
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                .padding(LHSpacing.sm)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    store.selectedCanvasID == artifact.id ? LearningPalette.copperMuted : .clear,
+                                    in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(LHSpacing.xs)
+                }
+            }
+            .frame(minWidth: 210, idealWidth: 240, maxWidth: 280)
+            .background(LearningPalette.secondarySurface)
+
+            if let artifact = selectedArtifact,
+               let space = store.space(id: artifact.spaceID) {
+                StudyCanvasView(artifact: artifact, space: space)
+            } else {
+                ContentUnavailableView(
+                    "No canvas yet",
+                    systemImage: "point.3.filled.connected.trianglepath.dotted",
+                    description: Text("Ask a tutor to visualize a topic, then save it here.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(LearningPalette.appBackground)
+            }
+        }
+        .onAppear {
+            if store.selectedCanvasID == nil { store.selectedCanvasID = store.canvases.first?.id }
+        }
+    }
+
+    private var selectedArtifact: CanvasArtifact? {
+        store.canvases.first(where: { $0.id == store.selectedCanvasID }) ?? store.canvases.first
     }
 }
 #endif
@@ -187,27 +386,44 @@ private struct SpaceSidebarLabel: View {
 private struct MobileLearningHomeRootView: View {
     @EnvironmentObject private var store: LearningHomeStore
     @ViewStorage private var selectedTab = 0
+    @ViewStorage private var showingPlan = false
+    @State private var homePath: [UUID] = []
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            NavigationStack { TodayView() }
-                .tabItem { Label("Today", systemImage: "sun.max") }
+            NavigationStack(path: $homePath) {
+                TodayView(
+                    openSpace: { id in
+                        store.selectedSpaceID = id
+                        homePath.append(id)
+                    },
+                    openPlan: { showingPlan = true }
+                )
+                .navigationDestination(for: UUID.self) { id in
+                    if let space = store.space(id: id) {
+                        StudySpaceView(space: space)
+                    } else {
+                        ContentUnavailableView("Space unavailable", systemImage: "books.vertical")
+                    }
+                }
+            }
+                .tabItem { Label("Home", systemImage: "house") }
                 .tag(0)
             MobileSpacesView()
-                .tabItem { Label("Spaces", systemImage: "books.vertical") }
+                .tabItem { Label("Classes", systemImage: "books.vertical") }
                 .tag(1)
-            NavigationStack { StudyPlannerView() }
-                .tabItem { Label("Plan", systemImage: "calendar.badge.clock") }
-                .tag(2)
             NavigationStack { CaptureView() }
                 .tabItem { Label("Capture", systemImage: "plus.viewfinder") }
-                .tag(3)
+                .tag(2)
             NavigationStack { SourceLibraryView() }
                 .tabItem { Label("Library", systemImage: "books.vertical.fill") }
-                .tag(4)
+                .tag(3)
         }
-        .tint(LearningPalette.indigo)
+        .tint(LearningPalette.copper)
         .safeAreaInset(edge: .top, spacing: 0) { PersistenceRecoveryBanner() }
+        .sheet(isPresented: $showingPlan) {
+            NavigationStack { StudyPlannerView() }
+        }
         .task {
             repeat {
                 _ = await CloudCaptureQueue.shared.flushLocalOutbox()
@@ -270,12 +486,12 @@ private struct NewStudySpaceSheet: View {
     @ViewStorage private var kind = StudySpaceKind.class
     @ViewStorage private var title = ""
     @ViewStorage private var subtitle = ""
-    @ViewStorage private var colorHex = "#4657B8"
+    @ViewStorage private var colorHex = "#54706A"
     @ViewStorage private var tutorStyle = TutorStyle.coachFirst
     @ViewStorage private var errorMessage: String?
     let onCreate: (StudySpace) -> Void
 
-    private let colors = ["#4657B8", "#B86D3E", "#347A78", "#76589B", "#2E7D5B", "#B24B45"]
+    private let colors = ["#54706A", "#9D4E31", "#6C6A61", "#7A6651", "#3F765A", "#A34848"]
 
     var body: some View {
         NavigationStack {

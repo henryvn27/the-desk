@@ -8,10 +8,13 @@ import UIKit
 
 public struct TodayView: View {
     @EnvironmentObject private var store: LearningHomeStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     private let openSpace: ((UUID) -> Void)?
+    private let openPlan: (() -> Void)?
 
-    public init(openSpace: ((UUID) -> Void)? = nil) {
+    public init(openSpace: ((UUID) -> Void)? = nil, openPlan: (() -> Void)? = nil) {
         self.openSpace = openSpace
+        self.openPlan = openPlan
     }
 
     private var activeAssignments: [Assignment] {
@@ -26,55 +29,70 @@ public struct TodayView: View {
         .sorted { ($0.scheduledStart ?? .distantFuture) < ($1.scheduledStart ?? .distantFuture) }
     }
 
+    private var todayBlocks: [StudySession] {
+        store.sessions.filter {
+            $0.isPlannedBlock && $0.planState != .cancelled &&
+            Calendar.current.isDateInToday($0.scheduledStart ?? .distantPast)
+        }
+    }
+
+    private var plannedMinutes: Int {
+        todayBlocks.reduce(0) { $0 + ($1.plannedDurationMinutes ?? 0) }
+    }
+
+    private var completedMinutes: Int {
+        todayBlocks.filter { $0.planState == .completed }.reduce(0) { $0 + ($1.plannedDurationMinutes ?? 0) }
+    }
+
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHSpacing.lg) {
                 header
-                summary
                 if let focusAssignment, let space = store.space(id: focusAssignment.spaceID) {
                     focusCard(assignment: focusAssignment, space: space)
+                } else {
+                    emptyFocusCard
                 }
-                studyBlockSection
                 assignmentSection
+                studyBlockSection
                 resumeSection
             }
-            .padding(LHSpacing.lg)
-            .frame(maxWidth: 940, alignment: .leading)
+            .padding(.horizontal, horizontalSizeClass == .compact ? LHSpacing.md : LHSpacing.xl)
+            .padding(.vertical, LHSpacing.xl)
+            .frame(maxWidth: 1080, alignment: .leading)
         }
         .background(LearningPalette.appBackground)
-        .navigationTitle("Today")
+        .navigationTitle("Home")
     }
 
     private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Text("Know what matters next.")
-                    .font(.system(.largeTitle, design: .serif, weight: .semibold))
+        HStack(alignment: .top, spacing: LHSpacing.lg) {
+            VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()).uppercased())
+                    .font(.caption.weight(.bold))
+                    .tracking(1.05)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                Text("\(greeting). Ready to make progress?")
+                    .font(.system(size: 38, weight: .bold, design: .default))
+                    .tracking(-1.1)
+                    .foregroundStyle(LearningPalette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             #if os(macOS)
-            StatusPill("Mac engine", symbol: "desktopcomputer", tone: .success)
+            StatusPill("Mac study host", symbol: "desktopcomputer", tone: .neutral)
             #else
-            StatusPill("Paired Mac host", symbol: "desktopcomputer", tone: .neutral)
+            StatusPill("Runs when Mac is online", symbol: "desktopcomputer", tone: .neutral)
             #endif
         }
     }
 
-    private var summary: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 138), spacing: LHSpacing.md)], alignment: .leading, spacing: LHSpacing.md) {
-            MetricBlock(value: "\(activeAssignments.count)", label: "open items", symbol: "checklist", tint: LearningPalette.indigo)
-            let reviews = store.mastery.filter { $0.nextReviewAt <= Date() }.count
-            MetricBlock(value: "\(reviews)", label: "reviews due", symbol: "arrow.clockwise", tint: LearningPalette.warning)
-            let queued = store.jobs.filter { $0.state != .completed }.count
-            MetricBlock(value: "\(queued)", label: "captures queued", symbol: "tray", tint: Color(hex: "#347A78"))
-            let todayBlocks = upcomingBlocks.filter { Calendar.current.isDateInToday($0.scheduledStart ?? .distantPast) }.count
-            MetricBlock(value: "\(todayBlocks)", label: "blocks today", symbol: "calendar.badge.clock", tint: LearningPalette.success)
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5..<12: "Good morning"
+        case 12..<18: "Good afternoon"
+        default: "Good evening"
         }
-        .padding(LHSpacing.md)
-        .learningSurface()
     }
 
     private var studyBlockSection: some View {
@@ -95,7 +113,7 @@ public struct TodayView: View {
                         } label: {
                             HStack(spacing: LHSpacing.md) {
                                 Image(systemName: "calendar.badge.clock")
-                                    .foregroundStyle(store.space(id: session.spaceID).map { Color(hex: $0.colorHex) } ?? LearningPalette.indigo)
+                                    .foregroundStyle(store.space(id: session.spaceID).map { Color(hex: $0.colorHex) } ?? LearningPalette.copper)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(session.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
                                     Text("\(store.space(id: session.spaceID)?.title ?? "Study") · \((session.scheduledStart ?? session.startedAt).formatted(date: .abbreviated, time: .shortened)) · \(session.plannedDurationMinutes ?? 0) min")
@@ -123,57 +141,133 @@ public struct TodayView: View {
     }
 
     private func focusCard(assignment: Assignment, space: StudySpace) -> some View {
-        HStack(spacing: LHSpacing.lg) {
-            VStack(alignment: .leading, spacing: LHSpacing.sm) {
-                Label("Best next move", systemImage: "scope")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(hex: space.colorHex))
-                Text(assignment.title)
-                    .font(.title2.weight(.semibold))
-                Text(assignment.detail)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: LHSpacing.sm) {
-                    Button("Start focused study") {
-                        store.selectedSpaceID = space.id
-                        openSpace?(space.id)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color(hex: space.colorHex))
-                    Button("Open source") {
-                        if let url = assignment.externalURL {
-                            #if os(macOS)
-                            NSWorkspace.shared.open(url)
-                            #else
-                            UIApplication.shared.open(url)
-                            #endif
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(assignment.externalURL == nil)
+        Group {
+            if horizontalSizeClass == .compact {
+                VStack(alignment: .leading, spacing: LHSpacing.lg) {
+                    focusCopy(assignment: assignment, space: space)
+                    focusProgress(assignment: assignment)
                 }
-            }
-            Spacer(minLength: LHSpacing.md)
-            VStack(alignment: .trailing, spacing: LHSpacing.sm) {
-                SpaceIdentity(space: space)
-                Text(assignment.dueAt.learningDueLabel)
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                AssignmentStatePill(assignment.state)
+            } else {
+                HStack(alignment: .center, spacing: LHSpacing.xl) {
+                    focusCopy(assignment: assignment, space: space)
+                    Spacer(minLength: LHSpacing.md)
+                    focusProgress(assignment: assignment)
+                }
             }
         }
         .padding(LHSpacing.lg)
-        .background(Color(hex: space.colorHex).opacity(0.065))
+        .background(LearningPalette.clay)
         .clipShape(RoundedRectangle(cornerRadius: LHRadius.prominent, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: LHRadius.prominent, style: .continuous)
-                .stroke(Color(hex: space.colorHex).opacity(0.22), lineWidth: 1)
+                .stroke(LearningPalette.copper.opacity(0.12), lineWidth: 1)
         }
+    }
+
+    private func focusCopy(assignment: Assignment, space: StudySpace) -> some View {
+        VStack(alignment: .leading, spacing: LHSpacing.sm) {
+            Text("TODAY AT THE DESK")
+                .font(.caption.weight(.bold))
+                .tracking(1.0)
+                .foregroundStyle(LearningPalette.copper)
+            Text(assignment.title)
+                .font(.system(size: 29, weight: .bold))
+                .tracking(-0.65)
+                .foregroundStyle(LearningPalette.ink)
+            Text("\(heroTitle) \(space.title): \(assignment.detail)")
+                .font(.body)
+                .foregroundStyle(LearningPalette.mutedInk)
+                .fixedSize(horizontal: false, vertical: true)
+            if horizontalSizeClass == .compact {
+                VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                    startButton(space: space)
+                    HStack(spacing: LHSpacing.sm) {
+                        sourceLink(assignment: assignment)
+                        adjustPlanButton
+                    }
+                }
+            } else {
+                HStack(spacing: LHSpacing.sm) {
+                    startButton(space: space)
+                    sourceLink(assignment: assignment)
+                    adjustPlanButton
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func startButton(space: StudySpace) -> some View {
+        Button("Start \(space.title)") {
+            store.selectedSpaceID = space.id
+            openSpace?(space.id)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(LearningPalette.copper)
+    }
+
+    @ViewBuilder
+    private func sourceLink(assignment: Assignment) -> some View {
+        if let url = assignment.externalURL {
+            Link("Open source", destination: url)
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private var adjustPlanButton: some View {
+        Button("Adjust plan") { openPlan?() }
+            .buttonStyle(.bordered)
+    }
+
+    private func focusProgress(assignment: Assignment) -> some View {
+        VStack(alignment: .leading, spacing: LHSpacing.xs) {
+            Text("\(completedMinutes)")
+                .font(.system(size: 40, weight: .bold).monospacedDigit())
+                .tracking(-1.2)
+            Text("of \(max(plannedMinutes, 60)) min")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(LearningPalette.mutedInk)
+            ProgressView(value: Double(completedMinutes), total: Double(max(plannedMinutes, 60)))
+                .tint(LearningPalette.moss)
+                .frame(maxWidth: 128)
+            Text(assignment.dueAt.learningDueLabel)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .padding(LHSpacing.md)
+        .frame(width: horizontalSizeClass == .compact ? nil : 160, alignment: .leading)
+        .background(LearningPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+    }
+
+    private var heroTitle: String {
+        if plannedMinutes > 0 {
+            return "\(plannedMinutes) focused minutes, already planned."
+        }
+        return "One focused session, ready when you are."
+    }
+
+    private var emptyFocusCard: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.sm) {
+            Text("TODAY AT THE DESK")
+                .font(.caption.weight(.bold))
+                .tracking(1.0)
+                .foregroundStyle(LearningPalette.copper)
+            Text("Your desk is clear.")
+                .font(.title2.weight(.bold))
+            Text("Build a study plan or capture material when you are ready.")
+                .foregroundStyle(LearningPalette.mutedInk)
+            Button("Build a study plan") { openPlan?() }
+                .buttonStyle(.borderedProminent)
+                .tint(LearningPalette.copper)
+        }
+        .padding(LHSpacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LearningPalette.clay, in: RoundedRectangle(cornerRadius: LHRadius.prominent, style: .continuous))
     }
 
     private var assignmentSection: some View {
         VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            SectionHeading("Your day", detail: "Completion and submission evidence stay separate.")
+            SectionHeading("Your daily tasks", detail: "\(activeAssignments.count) open · completion and submission stay separate")
             VStack(spacing: 0) {
                 ForEach(Array(activeAssignments.prefix(5).enumerated()), id: \.element.id) { index, assignment in
                     TodayAssignmentRow(assignment: assignment, space: store.space(id: assignment.spaceID))
@@ -222,10 +316,15 @@ private struct TodayAssignmentRow: View {
 
     var body: some View {
         HStack(spacing: LHSpacing.sm) {
-            Image(systemName: space?.symbolName ?? "checklist")
-                .foregroundStyle(space.map { Color(hex: $0.colorHex) } ?? .secondary)
-                .frame(width: 34, height: 34)
-                .background((space.map { Color(hex: $0.colorHex) } ?? .secondary).opacity(0.09), in: RoundedRectangle(cornerRadius: 8))
+            Image(systemName: space?.symbolName ?? "doc.text")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(space.map { Color(hex: $0.colorHex) } ?? LearningPalette.copper)
+                .frame(width: 28, height: 28)
+                .background(
+                    (space.map { Color(hex: $0.colorHex) } ?? LearningPalette.copper).opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(assignment.title).font(.subheadline.weight(.semibold))
                 Text("\(space?.title ?? "Study") · \(assignment.dueAt.learningDueLabel)")
@@ -280,10 +379,10 @@ struct MiniTrajectoryPlot: View {
                 if step == 0 { curve.move(to: CGPoint(x: x, y: y)) }
                 else { curve.addLine(to: CGPoint(x: x, y: y)) }
             }
-            context.stroke(curve, with: .color(LearningPalette.indigo), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+            context.stroke(curve, with: .color(LearningPalette.copper), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
         }
         .padding(6)
-        .background(LearningPalette.paper.opacity(0.75), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(LearningPalette.paper.opacity(0.75), in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
         .accessibilityLabel("Projectile trajectory preview")
     }
 }

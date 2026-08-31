@@ -45,41 +45,98 @@ public struct TutorView: View {
     }
 
     private var tutorToolbar: some View {
-        HStack(spacing: LHSpacing.sm) {
-            SpaceIdentity(space: space, compact: true)
-            Divider().frame(height: 24)
-            Label(space.tutorStyle.title, systemImage: "person.crop.circle.badge.questionmark")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-            #if os(macOS)
-            Picker("Provider", selection: $providerChoice) {
-                Text("Automatic").tag("automatic")
-                ForEach(ProviderIdentifier.allCases, id: \.rawValue) { provider in
-                    Text(provider.title).tag(provider.rawValue)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: LHSpacing.sm) {
+                tutorIdentity
+                Spacer(minLength: LHSpacing.sm)
+                tutorControls
             }
-            .labelsHidden()
-            .frame(width: 170)
-            #else
-            StatusPill("Runs on paired Mac", symbol: "desktopcomputer", tone: .info)
-            #endif
-            StatusPill(status, symbol: isRunning ? "ellipsis" : "checkmark", tone: isRunning ? .info : .neutral)
+            VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                tutorIdentity
+                tutorControls
+            }
         }
         .padding(.horizontal, LHSpacing.md)
         .padding(.vertical, LHSpacing.sm)
         .background(LearningPalette.surface)
     }
 
-    private var starter: some View {
-        VStack(alignment: .leading, spacing: LHSpacing.md) {
-            Text("Study with your sources")
-                .font(.system(.title, design: .serif, weight: .semibold))
-            Text("The Desk retrieves a small set of relevant class passages, keeps their page or timestamp anchors, and labels any knowledge the provider adds.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private var tutorIdentity: some View {
+        HStack(spacing: LHSpacing.sm) {
+            ZStack {
+                RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous)
+                    .fill(LearningPalette.copperSoft)
+                Image(systemName: "person.crop.circle.badge.questionmark")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(LearningPalette.copper)
+            }
+            .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Study with The Desk")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LearningPalette.ink)
+                Text("\(space.title) · \(space.tutorStyle.title)")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
 
-            HStack(spacing: LHSpacing.sm) {
+    private var tutorControls: some View {
+        HStack(spacing: LHSpacing.sm) {
+            #if os(macOS)
+            Picker("Provider", selection: $providerChoice) {
+                Text("Automatic provider").tag("automatic")
+                ForEach(ProviderIdentifier.allCases, id: \.rawValue) { provider in
+                    Text(provider.title).tag(provider.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 180)
+            .accessibilityHint("Choose which AI provider answers this question")
+            #else
+            StatusPill("Runs on paired Mac", symbol: "desktopcomputer", tone: .info)
+            #endif
+            StatusPill(status, symbol: statusSymbol, tone: statusTone)
+        }
+    }
+
+    private var statusSymbol: String {
+        if isRunning { return "ellipsis" }
+        if status == "Complete" || status == "Canvas ready" { return "checkmark" }
+        if status == "Needs attention" { return "exclamationmark" }
+        return "circle"
+    }
+
+    private var statusTone: StatusPill.Tone {
+        if status == "Complete" || status == "Canvas ready" { return .success }
+        if status == "Needs attention" { return .warning }
+        return isRunning ? .info : .neutral
+    }
+
+    private var starter: some View {
+        VStack(alignment: .leading, spacing: LHSpacing.lg) {
+            HStack(alignment: .top, spacing: LHSpacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                        .fill(LearningPalette.clay)
+                    Image(systemName: "books.vertical.fill")
+                        .font(.title2)
+                        .foregroundStyle(LearningPalette.copper)
+                }
+                .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                    Text("Ask from your class")
+                        .font(.title.weight(.semibold))
+                        .foregroundStyle(LearningPalette.ink)
+                    Text("The Desk retrieves a small set of relevant passages, keeps page or timestamp anchors, and labels knowledge added by the provider.")
+                        .foregroundStyle(LearningPalette.mutedInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: LHSpacing.sm)], alignment: .leading, spacing: LHSpacing.sm) {
                 starterButton("Quiz me from my notes", symbol: "checkmark.message")
                 starterButton("Explain my weakest topic", symbol: "lightbulb")
                 starterButton("Plan a 25-minute session", symbol: "timer")
@@ -95,21 +152,33 @@ public struct TutorView: View {
             submit()
         } label: {
             Label(title, systemImage: symbol)
+                .foregroundStyle(LearningPalette.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 34)
         }
         .buttonStyle(.bordered)
+        .tint(LearningPalette.copper)
     }
 
     private var conversation: some View {
         VStack(alignment: .leading, spacing: LHSpacing.lg) {
             VStack(alignment: .leading, spacing: LHSpacing.xs) {
-                Text("You").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text(prompt).font(.body)
+                Label("You", systemImage: "person.crop.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(LearningPalette.mutedInk)
+                Text(prompt)
+                    .font(.body)
+                    .foregroundStyle(LearningPalette.ink)
             }
+            .padding(LHSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
 
             VStack(alignment: .leading, spacing: LHSpacing.sm) {
                 HStack {
-                    Text("The Desk").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Label("The Desk", systemImage: "deskclock.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(LearningPalette.copper)
                     Spacer()
                     if let usedProvider {
                         StatusPill("\(usedProvider.title) · \(usedModel)", symbol: "cpu", tone: .info)
@@ -117,6 +186,7 @@ public struct TutorView: View {
                 }
                 Text(answer)
                     .font(.body)
+                    .foregroundStyle(LearningPalette.ink)
                     .textSelection(.enabled)
                     .lineSpacing(4)
                 if isRunning { ProgressView().controlSize(.small) }
@@ -125,8 +195,12 @@ public struct TutorView: View {
             .learningSurface()
 
             if !citations.isEmpty {
-                VStack(alignment: .leading, spacing: LHSpacing.xs) {
-                    Text("Grounding").font(.headline)
+                VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                    HStack(alignment: .firstTextBaseline) {
+                        SectionHeading("Evidence used", detail: "Open any source to inspect the exact page or timestamp.")
+                        Spacer()
+                        ProgressChip("Sources", value: "\(citations.count)", tint: LearningPalette.moss)
+                    }
                     ForEach(citations) { citation in
                         CitationRow(citation: citation) { openCitation(citation) }
                     }
@@ -136,31 +210,43 @@ public struct TutorView: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: LHSpacing.sm) {
-            TextField("Ask about this class…", text: $prompt, axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(.plain)
-                .padding(11)
-                .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.surface))
-                .overlay {
-                    RoundedRectangle(cornerRadius: LHRadius.surface)
-                        .stroke(LearningPalette.separator.opacity(0.7), lineWidth: 1)
+        VStack(alignment: .leading, spacing: LHSpacing.xs) {
+            HStack {
+                Label(space.title, systemImage: "book.closed")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(LearningPalette.mutedInk)
+                Spacer()
+                Text("Relevant passages only")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.moss)
+            }
+            HStack(alignment: .bottom, spacing: LHSpacing.sm) {
+                TextField("Ask about this class…", text: $prompt, axis: .vertical)
+                    .lineLimit(1...5)
+                    .textFieldStyle(.plain)
+                    .padding(11)
+                    .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                            .stroke(LearningPalette.hairline.opacity(0.85), lineWidth: 1)
+                    }
+                    .onSubmit { submit() }
+                Button(action: visualize) {
+                    Image(systemName: "point.3.filled.connected.trianglepath.dotted")
+                        .frame(width: 28, height: 28)
                 }
-                .onSubmit { submit() }
-            Button(action: submit) {
-                Image(systemName: isRunning ? "stop.fill" : "arrow.up")
-                    .frame(width: 28, height: 28)
+                .buttonStyle(.bordered)
+                .tint(LearningPalette.copper)
+                .help("Create a persistent Study Canvas from this prompt")
+                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRunning)
+                Button(action: submit) {
+                    Image(systemName: isRunning ? "stop.fill" : "arrow.up")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(LearningPalette.copper)
+                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRunning)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(hex: space.colorHex))
-            .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRunning)
-            Button(action: visualize) {
-                Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.bordered)
-            .help("Create a persistent Study Canvas from this prompt")
-            .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRunning)
         }
         .padding(LHSpacing.md)
         .background(LearningPalette.surface)
@@ -413,7 +499,7 @@ private struct CitationRow: View {
     }
 
     private var tint: Color {
-        citation.origin == .modelKnowledge ? LearningPalette.warning : LearningPalette.indigo
+        citation.origin == .modelKnowledge ? LearningPalette.warning : LearningPalette.copper
     }
 
     private var originLabel: String {

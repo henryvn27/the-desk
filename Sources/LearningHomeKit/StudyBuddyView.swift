@@ -19,11 +19,11 @@ public struct StudyBuddyView: View {
     public var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
             HSplitView {
-                capturePanel.frame(minWidth: 330)
-                tutorPanel.frame(minWidth: 310)
+                capturePanel.frame(minWidth: StudyBuddyLayout.minimumSplitWidth, idealWidth: 380)
+                tutorPanel.frame(minWidth: StudyBuddyLayout.minimumSplitWidth, idealWidth: 380)
             }
+            safetyFooter
         }
         .background(LearningPalette.appBackground)
         .task { await model.loadTargets() }
@@ -42,91 +42,181 @@ public struct StudyBuddyView: View {
     }
 
     private var header: some View {
-        HStack(spacing: LHSpacing.sm) {
-            Image(systemName: "cursorarrow.rays").foregroundStyle(LearningPalette.indigo)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Study Buddy").font(.headline)
-                Text("Confirm once · then hold ⌥Space to talk and release to capture").font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: LHSpacing.md) {
+            Image(systemName: "cursorarrow.rays")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(LearningPalette.primaryForeground)
+                .frame(width: 42, height: 42)
+                .background(LearningPalette.copper, in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
+            VStack(alignment: .leading, spacing: LHSpacing.xxs) {
+                Text("Study Buddy")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(LearningPalette.onGraphite)
+                Text("Screen-aware coaching, only when you ask")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.onGraphite.opacity(0.66))
             }
             Spacer()
-            if let space = store.space(id: store.selectedSpaceID) { SpaceIdentity(space: space, compact: true) }
+            if let space = store.space(id: store.selectedSpaceID) {
+                HStack(spacing: LHSpacing.xs) {
+                    Circle()
+                        .fill(Color(hex: space.colorHex))
+                        .frame(width: 8, height: 8)
+                    Text(space.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(LearningPalette.onGraphite)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, LHSpacing.sm)
+                .frame(minHeight: 30)
+                .background(LearningPalette.graphiteSoft, in: Capsule())
+            }
             Button("Done") {
                 if let onClose { onClose() } else { dismiss() }
             }
+            .buttonStyle(.bordered)
+            .tint(LearningPalette.copper)
+            .foregroundStyle(LearningPalette.onGraphite)
             .keyboardShortcut(.cancelAction)
         }
         .padding(LHSpacing.md)
-        .background(LearningPalette.surface)
+        .background(LearningPalette.graphite)
     }
 
     private var capturePanel: some View {
-        VStack(alignment: .leading, spacing: LHSpacing.md) {
-            HStack {
-                Picker("Capture", selection: $model.selectedTargetID) {
+        VStack(alignment: .leading, spacing: LHSpacing.lg) {
+            VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                Text("1 · Choose what I can see")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(LearningPalette.ink)
+                Text("Pick one window or display. The selection is not captured until you press the button below.")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                Picker("Window or display", selection: $model.selectedTargetID) {
                     if model.targets.isEmpty { Text("Choose a screen or window").tag("") }
                     ForEach(model.targets) { Text($0.title).tag($0.id) }
                 }
-                Picker("Area", selection: $model.regionMode) {
-                    Text("Whole selection").tag(StudyCaptureRegion.full)
-                    Text("Center region").tag(StudyCaptureRegion.center)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+
+                HStack(spacing: LHSpacing.sm) {
+                    Picker("Area", selection: $model.regionMode) {
+                        Text("Whole selection").tag(StudyCaptureRegion.full)
+                        Text("Center region").tag(StudyCaptureRegion.center)
+                    }
+                    .labelsHidden()
+
+                    Button {
+                        Task { _ = await model.capture() }
+                    } label: {
+                        Label(model.image == nil ? "Confirm and capture once" : "Capture once again", systemImage: "viewfinder")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(LearningPalette.copper)
+                    .controlSize(.large)
+                    .disabled(model.selectedTargetID.isEmpty || model.isCapturing)
                 }
-                .frame(width: 145)
             }
-            Button {
-                Task { _ = await model.capture() }
-            } label: {
-                Label(model.image == nil ? "Capture once" : "Capture again", systemImage: "viewfinder")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(model.selectedTargetID.isEmpty || model.isCapturing)
 
             if model.isCapturing {
-                VStack { ProgressView(); Text("Waiting for macOS screen permission…").font(.caption).foregroundStyle(.secondary) }
+                VStack(spacing: LHSpacing.sm) {
+                    ProgressView().tint(LearningPalette.copper)
+                    Text("Waiting for macOS screen permission…")
+                        .font(.caption)
+                        .foregroundStyle(LearningPalette.mutedInk)
+                }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let image = model.image {
                 ScreenshotOverlayPreview(image: image, cues: model.cues)
                     .clipShape(RoundedRectangle(cornerRadius: LHRadius.surface))
                     .overlay { RoundedRectangle(cornerRadius: LHRadius.surface).stroke(LearningPalette.separator) }
                 HStack {
-                    StatusPill("One-time capture", symbol: "checkmark", tone: .success)
+                    studyBuddyStatus(
+                        "Confirmed one-time capture",
+                        symbol: "checkmark.shield.fill",
+                        tint: LearningPalette.moss
+                    )
                     Spacer()
-                    Text("Not retained by default").font(.caption).foregroundStyle(.secondary)
+                    Text("Cleared when Study Buddy closes")
+                        .font(.caption)
+                        .foregroundStyle(LearningPalette.mutedInk)
                 }
             } else {
-                VStack(spacing: LHSpacing.sm) {
-                    Image(systemName: "rectangle.dashed.badge.record").font(.system(size: 38, weight: .light)).foregroundStyle(.secondary)
-                    Text("Nothing has been captured").font(.headline)
-                    Text("Choose a display or window, then activate a single snapshot. The Desk does not watch continuously.")
-                        .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                VStack(spacing: LHSpacing.md) {
+                    Image(systemName: "rectangle.dashed")
+                        .font(.system(size: 42, weight: .light))
+                        .foregroundStyle(LearningPalette.copper)
+                    VStack(spacing: LHSpacing.xs) {
+                        Text("Your screen is private")
+                            .font(.headline)
+                            .foregroundStyle(LearningPalette.ink)
+                        Text("Choose a target and confirm a single snapshot. Study Buddy never watches continuously.")
+                            .font(.caption)
+                            .foregroundStyle(LearningPalette.mutedInk)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(LHSpacing.lg)
-                .learningSurface(emphasized: false)
+                .background(LearningPalette.copperSoft, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                        .stroke(LearningPalette.copper.opacity(0.18), style: StrokeStyle(lineWidth: 0.75, dash: [6, 5]))
+                }
             }
         }
-        .padding(LHSpacing.md)
+        .padding(LHSpacing.lg)
     }
 
     private var tutorPanel: some View {
-        VStack(alignment: .leading, spacing: LHSpacing.md) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Ask about what you chose").font(.headline)
-                Text("Screenshot OCR joins the active class context. Overlay cues are validated data, not executable UI commands.")
-                    .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: LHSpacing.lg) {
+            VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                Text("2 · Ask naturally")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(LearningPalette.ink)
+                Text("Hold ⌥Space, speak, then release. Study Buddy captures the confirmed target once more and answers beside your cursor.")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack(alignment: .bottom, spacing: LHSpacing.xs) {
-                TextField("What am I missing on this graph?", text: $model.question, axis: .vertical)
-                    .lineLimit(2...5)
-                    .textFieldStyle(.roundedBorder)
-                Button { model.toggleListening() } label: {
-                    Image(systemName: model.isListening ? "stop.fill" : "mic.fill")
-                        .frame(width: 24, height: 24)
+            VStack(spacing: LHSpacing.sm) {
+                HStack(spacing: LHSpacing.sm) {
+                    Image(systemName: model.isListening ? "waveform" : "mic.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(model.isListening ? LearningPalette.primaryForeground : LearningPalette.onGraphite)
+                        .frame(width: 42, height: 42)
+                        .background(model.isListening ? LearningPalette.danger : LearningPalette.graphiteSoft, in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.isListening ? "Listening…" : "Hold ⌥Space to ask")
+                            .font(.headline)
+                            .foregroundStyle(LearningPalette.onGraphite)
+                        Text(model.image == nil ? "Confirm a capture first" : "Release to capture and explain")
+                            .font(.caption)
+                            .foregroundStyle(LearningPalette.onGraphite.opacity(0.62))
+                    }
+                    Spacer()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(model.isListening ? LearningPalette.danger : LearningPalette.indigo)
-                .help(model.isListening ? "Stop voice question" : "Speak your question")
+                .padding(LHSpacing.md)
+                .background(LearningPalette.graphite, in: RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous))
+
+                HStack(alignment: .bottom, spacing: LHSpacing.xs) {
+                    TextField("Or type a question…", text: $model.question, axis: .vertical)
+                        .lineLimit(2...5)
+                        .textFieldStyle(.roundedBorder)
+                    Button { model.toggleListening() } label: {
+                        Image(systemName: model.isListening ? "stop.fill" : "mic.fill")
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(model.isListening ? LearningPalette.danger : LearningPalette.copper)
+                    .help(model.isListening ? "Stop voice question" : "Speak your question")
+                }
             }
 
             HStack {
@@ -140,20 +230,31 @@ public struct StudyBuddyView: View {
                     Task { await model.ask(space: space, store: store) }
                 } label: { Label("Explain", systemImage: "waveform.and.magnifyingglass") }
                 .buttonStyle(.borderedProminent)
+                .tint(LearningPalette.copper)
                 .disabled(model.image == nil || model.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isAnswering)
             }
 
-            if model.isAnswering { ProgressView(model.status).controlSize(.small) }
+            if model.isAnswering {
+                ProgressView(model.status)
+                    .controlSize(.small)
+                    .tint(LearningPalette.copper)
+            }
             ScrollView {
                 Text(model.answer.isEmpty ? "The explanation will appear here with its provider and class grounding." : model.answer)
-                    .foregroundStyle(model.answer.isEmpty ? .secondary : .primary)
+                    .foregroundStyle(model.answer.isEmpty ? LearningPalette.mutedInk : LearningPalette.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
                     .padding(LHSpacing.md)
             }
             .learningSurface()
 
-            if !model.usedModel.isEmpty { StatusPill("\(model.usedProvider?.title ?? "Provider") · \(model.usedModel)", symbol: "cpu", tone: .info) }
+            if !model.usedModel.isEmpty {
+                studyBuddyStatus(
+                    "\(model.usedProvider?.title ?? "Provider") · \(model.usedModel)",
+                    symbol: "cpu",
+                    tint: LearningPalette.copper
+                )
+            }
 
             HStack {
                 Button { model.speak() } label: { Label("Read aloud", systemImage: "speaker.wave.2") }
@@ -164,11 +265,53 @@ public struct StudyBuddyView: View {
                     model.saveToCanvas(space: space, store: store)
                 } label: { Label("Save to Canvas", systemImage: "pin") }
                 .buttonStyle(.bordered)
+                .tint(LearningPalette.copper)
                 .disabled(model.answer.isEmpty)
             }
         }
-        .padding(LHSpacing.md)
+        .padding(LHSpacing.lg)
+        .background(LearningPalette.parchment.opacity(0.42))
     }
+
+    private var safetyFooter: some View {
+        HStack(spacing: LHSpacing.sm) {
+            Label("One-time capture", systemImage: "camera.metering.none")
+            Label("No clicking or typing", systemImage: "hand.raised")
+            Label("No screenshot history", systemImage: "trash.slash")
+            Spacer()
+            Text("⌥Space")
+                .font(.caption.monospaced().weight(.semibold))
+                .padding(.horizontal, LHSpacing.xs)
+                .padding(.vertical, LHSpacing.xxs)
+                .background(LearningPalette.secondarySurface, in: RoundedRectangle(cornerRadius: 6))
+        }
+        .font(.caption)
+        .foregroundStyle(LearningPalette.mutedInk)
+        .padding(.horizontal, LHSpacing.md)
+        .padding(.vertical, LHSpacing.xs)
+        .background(LearningPalette.surface)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private func studyBuddyStatus(_ title: String, symbol: String, tint: Color) -> some View {
+        HStack(spacing: LHSpacing.xxs) {
+            Image(systemName: symbol)
+                .foregroundStyle(tint)
+            Text(title)
+                .foregroundStyle(LearningPalette.ink)
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, LHSpacing.xs)
+        .padding(.vertical, LHSpacing.xxs)
+        .background(tint.opacity(0.12), in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+enum StudyBuddyLayout {
+    static let minimumSplitWidth: CGFloat = 340
+    static let minimumPanelWidth: CGFloat = 760
+    static let minimumPanelHeight: CGFloat = 520
 }
 
 public enum StudyCaptureRegion: String, CaseIterable { case full, center }
@@ -686,15 +829,15 @@ private struct ScreenshotOverlayPreview: View {
         switch cue.kind {
         case .highlight:
             RoundedRectangle(cornerRadius: 4)
-                .stroke(LearningPalette.warning, lineWidth: 2)
-                .background(LearningPalette.warning.opacity(0.08))
+                .stroke(LearningPalette.copper, lineWidth: 2)
+                .background(LearningPalette.copper.opacity(0.09))
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
                 .accessibilityLabel(cue.label)
         case .arrow:
             Image(systemName: "arrow.down.right.circle.fill")
                 .font(.title2)
-                .foregroundStyle(LearningPalette.warning)
+                .foregroundStyle(LearningPalette.copper)
                 .position(x: rect.minX, y: rect.minY)
                 .accessibilityLabel(cue.label)
         case .label:
@@ -703,7 +846,7 @@ private struct ScreenshotOverlayPreview: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
                 .background(.regularMaterial, in: Capsule())
-                .overlay { Capsule().stroke(LearningPalette.warning) }
+                .overlay { Capsule().stroke(LearningPalette.copper) }
                 .position(x: rect.midX, y: max(12, rect.minY - 10))
                 .accessibilityLabel(cue.label)
         }

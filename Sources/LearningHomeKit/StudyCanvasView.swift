@@ -44,7 +44,7 @@ public struct StudyCanvasView: View {
                     VStack(alignment: .leading, spacing: LHSpacing.lg) {
                         if artifact.isStale { staleBanner }
                         canvasHeader(spec)
-                        StudySceneRenderer(spec: spec, tint: Color(hex: space.colorHex), hideLabels: hideLabels, angle: $angle, speed: $speed)
+                        StudySceneRenderer(spec: spec, tint: LearningPalette.copper, hideLabels: hideLabels, angle: $angle, speed: $speed)
                             .frame(minHeight: 420)
                             .learningSurface()
                         practiceControls(spec)
@@ -62,7 +62,7 @@ public struct StudyCanvasView: View {
         .onAppear { store.selectedCanvasID = artifact.id }
         .sheet(isPresented: $showingEditor) {
             if let spec = artifact.spec {
-                CanvasEditorSheet(spec: spec, tint: Color(hex: space.colorHex)) { updated in
+                CanvasEditorSheet(spec: spec, tint: LearningPalette.copper) { updated in
                     do {
                         try store.updateCanvasSpec(id: artifact.id, spec: updated)
                         showingEditor = false
@@ -104,19 +104,63 @@ public struct StudyCanvasView: View {
     }
 
     private var canvasToolbar: some View {
-        HStack {
-            Label("Study Canvas", systemImage: "point.3.filled.connected.trianglepath.dotted")
-                .font(.headline)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: LHSpacing.sm) {
+                canvasToolbarIdentity
+                Spacer(minLength: LHSpacing.sm)
+                canvasToolbarActions
+            }
+            VStack(alignment: .leading, spacing: LHSpacing.sm) {
+                canvasToolbarIdentity
+                canvasToolbarActions
+            }
+        }
+        .padding(.horizontal, LHSpacing.md)
+        .padding(.vertical, LHSpacing.sm)
+        .background(LearningPalette.surface)
+    }
+
+    private var canvasToolbarIdentity: some View {
+        HStack(spacing: LHSpacing.sm) {
+            ZStack {
+                RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous)
+                    .fill(LearningPalette.copperSoft)
+                Image(systemName: "point.3.filled.connected.trianglepath.dotted")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(LearningPalette.copper)
+            }
+            .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Study Canvas")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LearningPalette.ink)
+                Text(space.title)
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+            }
             StatusPill("v\(artifact.version)", symbol: "clock.arrow.circlepath")
             if artifact.isPinned { StatusPill("Pinned", symbol: "pin.fill", tone: .info) }
-            Spacer()
-            Toggle("Practice", isOn: $practiceMode).toggleStyle(.switch)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var canvasToolbarActions: some View {
+        HStack(spacing: LHSpacing.xs) {
+            Toggle("Practice", isOn: $practiceMode)
+                .toggleStyle(.switch)
+                .tint(LearningPalette.moss)
             #if os(macOS)
             Button { showingEditor = true } label: { Label("Edit", systemImage: "pencil") }
                 .buttonStyle(.bordered)
             #endif
-            Button { showingAccessibility.toggle() } label: { Label("Accessible view", systemImage: "accessibility") }
-                .buttonStyle(.bordered)
+            Button { showingAccessibility.toggle() } label: {
+                Label(showingAccessibility ? "Hide accessible view" : "Accessible view", systemImage: "accessibility")
+            }
+            .buttonStyle(.bordered)
+            #if os(iOS)
+            .labelStyle(.iconOnly)
+            .accessibilityLabel(showingAccessibility ? "Hide accessible view" : "Show accessible view")
+            #endif
             Menu {
                 Button("Export image") { prepareExport(type: .png) }
                 Button("Export PDF") { prepareExport(type: .pdf) }
@@ -124,19 +168,47 @@ public struct StudyCanvasView: View {
                 Divider()
                 Button("View revision history") { showingHistory = true }
                 #endif
-            } label: { Image(systemName: "square.and.arrow.up") }
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+            #if os(iOS)
+            .labelStyle(.iconOnly)
+            .accessibilityLabel("Export canvas")
+            #endif
         }
-        .padding(.horizontal, LHSpacing.md)
-        .padding(.vertical, LHSpacing.sm)
-        .background(LearningPalette.surface)
+        .controlSize(.regular)
     }
 
     private func canvasHeader(_ spec: StudySceneSpec) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(spec.kind.title.uppercased()).font(.caption.weight(.bold)).tracking(0.8).foregroundStyle(Color(hex: space.colorHex))
-            Text(spec.title).font(.system(.title, design: .serif, weight: .semibold))
-            Text(spec.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .top, spacing: LHSpacing.lg) {
+            VStack(alignment: .leading, spacing: LHSpacing.xs) {
+                HStack(spacing: LHSpacing.xs) {
+                    Circle()
+                        .fill(Color(hex: space.colorHex))
+                        .frame(width: 8, height: 8)
+                    Text(spec.kind.title.uppercased())
+                        .font(.caption.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(LearningPalette.copper)
+                }
+                Text(spec.title)
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(LearningPalette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(spec.summary)
+                    .font(.body)
+                    .foregroundStyle(LearningPalette.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: LHSpacing.sm)
+            VStack(alignment: .trailing, spacing: LHSpacing.xs) {
+                ProgressChip("Sourced", value: "\(spec.citations.count)", tint: LearningPalette.moss)
+                Text("Saved learning artifact")
+                    .font(.caption)
+                    .foregroundStyle(LearningPalette.mutedInk)
+            }
         }
+        .padding(.vertical, LHSpacing.xs)
     }
 
     private var staleBanner: some View {
@@ -206,32 +278,57 @@ public struct StudyCanvasView: View {
     }
 
     private func practiceControls(_ spec: StudySceneSpec) -> some View {
-        VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            SectionHeading("Practice transformations", detail: "Change how you use the same sourced scene.")
-            HStack(spacing: LHSpacing.sm) {
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            HStack(alignment: .top, spacing: LHSpacing.sm) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous)
+                        .fill(LearningPalette.mossSoft)
+                    Image(systemName: "brain.head.profile")
+                        .foregroundStyle(LearningPalette.moss)
+                }
+                .frame(width: 38, height: 38)
+                SectionHeading("Practice this canvas", detail: "Transform the same sourced scene without losing its evidence.")
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: LHSpacing.xs)], alignment: .leading, spacing: LHSpacing.xs) {
                 ForEach(spec.interactions) { interaction in
-                    Button {
-                        if interaction.kind == .hideLabels { hideLabels.toggle() }
-                        if interaction.kind == .prediction { practiceMode = true }
-                    } label: {
-                        Label(interaction.label, systemImage: interactionSymbol(interaction.kind))
-                    }
-                    .buttonStyle(.bordered)
+                    practiceButton(interaction)
                 }
             }
             if practiceMode {
                 Text("Prediction: before changing the controls, explain which launch angle should maximize range and what assumptions your prediction needs.")
                     .font(.subheadline)
+                    .foregroundStyle(LearningPalette.ink)
                     .padding(LHSpacing.md)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(hex: space.colorHex).opacity(0.07), in: RoundedRectangle(cornerRadius: LHRadius.surface))
+                    .background(LearningPalette.mossSoft, in: RoundedRectangle(cornerRadius: LHRadius.control, style: .continuous))
             }
         }
+        .padding(LHSpacing.md)
+        .learningSurface(emphasized: false)
+    }
+
+    private func practiceButton(_ interaction: SceneInteraction) -> some View {
+        let isActive = interaction.kind == .hideLabels ? hideLabels : (interaction.kind == .prediction && practiceMode)
+        return Button {
+            if interaction.kind == .hideLabels { hideLabels.toggle() }
+            if interaction.kind == .prediction { practiceMode = true }
+        } label: {
+            Label(interaction.label, systemImage: interactionSymbol(interaction.kind))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 28)
+        }
+        .buttonStyle(.bordered)
+        .tint(isActive ? LearningPalette.moss : LearningPalette.copper)
+        .accessibilityValue(isActive ? "On" : "Off")
     }
 
     private func sourceSection(_ spec: StudySceneSpec) -> some View {
-        VStack(alignment: .leading, spacing: LHSpacing.sm) {
-            SectionHeading("Source anchors", detail: "Important claims remain traceable after export.")
+        VStack(alignment: .leading, spacing: LHSpacing.md) {
+            HStack(alignment: .firstTextBaseline) {
+                SectionHeading("Evidence", detail: "Every important claim stays traceable after editing or export.")
+                Spacer()
+                ProgressChip("Anchors", value: "\(spec.citations.count)", tint: LearningPalette.copper)
+            }
             ForEach(spec.citations) { citation in
                 if citation.anchor != nil || citation.url != nil {
                     Button { openCitation(citation) } label: {
@@ -248,12 +345,17 @@ public struct StudyCanvasView: View {
     private func sourceCitationContent(_ citation: StudyCitation) -> some View {
         HStack {
             Image(systemName: citationSymbol(citation.origin))
-                .foregroundStyle(citation.origin == .modelKnowledge ? LearningPalette.warning : Color(hex: space.colorHex))
+                .foregroundStyle(citation.origin == .modelKnowledge ? LearningPalette.warning : LearningPalette.copper)
+                .frame(width: 24)
             VStack(alignment: .leading) {
-                Text(citation.label).font(.subheadline.weight(.medium))
-                Text(citationOriginLabel(citation.origin)).font(.caption2).foregroundStyle(.secondary)
+                Text(citation.label)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(LearningPalette.ink)
+                Text(citationOriginLabel(citation.origin))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(citation.origin == .modelKnowledge ? LearningPalette.warning : LearningPalette.mutedInk)
                 if let excerpt = citation.anchor?.excerpt {
-                    Text(excerpt).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(excerpt).font(.caption).foregroundStyle(LearningPalette.mutedInk).lineLimit(2)
                 }
             }
             Spacer()
@@ -573,7 +675,7 @@ public struct StudyCanvasView: View {
         guard let spec = artifact.spec else { return }
         let exportView = CanvasExportView(
             spec: spec,
-            tint: Color(hex: space.colorHex),
+            tint: LearningPalette.copper,
             angle: angle,
             speed: speed
         )
@@ -690,7 +792,7 @@ private struct CanvasExportView: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(spec.kind.title.uppercased()).font(.caption.bold()).tracking(1).foregroundStyle(tint)
-                Text(spec.title).font(.system(size: 30, weight: .semibold, design: .serif))
+                Text(spec.title).font(.system(size: 30, weight: .semibold))
                 Text(spec.summary).font(.body).foregroundStyle(.secondary)
             }
             StudySceneRenderer(

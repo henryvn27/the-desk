@@ -19,7 +19,7 @@ public final class StudyBuddyResponseOverlayController {
     public func begin(spaceTitle: String) {
         hideTask?.cancel()
         state.spaceTitle = spaceTitle
-        state.text = "Listening to your question…"
+        state.text = "Listening… release ⌥Space when you’re done."
         state.isWorking = true
         createPanelIfNeeded()
         positionPanel()
@@ -57,7 +57,7 @@ public final class StudyBuddyResponseOverlayController {
 
     private func createPanelIfNeeded() {
         guard panel == nil else { return }
-        let initial = NSRect(x: 0, y: 0, width: 360, height: 96)
+        let initial = NSRect(x: 0, y: 0, width: 344, height: 96)
         let panel = NSPanel(
             contentRect: initial,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -86,7 +86,7 @@ public final class StudyBuddyResponseOverlayController {
     private func resizeToFit() {
         guard let panel, let content = panel.contentView else { return }
         let fit = content.fittingSize
-        let size = CGSize(width: min(max(fit.width, 260), 380), height: min(max(fit.height, 72), 260))
+        let size = CGSize(width: min(max(fit.width, 260), 364), height: min(max(fit.height, 72), 244))
         panel.setContentSize(size)
         content.frame = NSRect(origin: .zero, size: size)
     }
@@ -118,15 +118,28 @@ private struct StudyBuddyResponseOverlayView: View {
     @ObservedObject var state: StudyBuddyResponseOverlayState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: LHSpacing.xs) {
+            HStack(spacing: LHSpacing.xs) {
                 Image(systemName: "cursorarrow.rays")
-                    .foregroundStyle(Color(hex: "#C8F56A"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(LearningPalette.copper)
                 Text(state.spaceTitle)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                if state.isWorking { ProgressView().controlSize(.mini).tint(.white) }
+                if state.isWorking {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(LearningPalette.moss)
+                            .frame(width: 6, height: 6)
+                        Text("Working")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(LearningPalette.onGraphite.opacity(0.68))
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(LearningPalette.onGraphite)
+                    }
+                }
             }
             Text(state.text)
                 .font(.system(size: 13))
@@ -135,16 +148,26 @@ private struct StudyBuddyResponseOverlayView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.disabled)
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .frame(maxWidth: 360, alignment: .leading)
+        .foregroundStyle(LearningPalette.onGraphite)
+        .padding(.horizontal, LHSpacing.sm)
+        .padding(.vertical, 12)
+        .frame(maxWidth: 344, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(hex: "#101B4B").opacity(0.97))
-                .shadow(color: .black.opacity(0.24), radius: 18, y: 8)
+            RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                .fill(LearningPalette.graphite.opacity(0.98))
+                .overlay(alignment: .top) {
+                    Capsule()
+                        .fill(LearningPalette.copper)
+                        .frame(width: 54, height: 3)
+                        .padding(.top, 1)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: LHRadius.surface, style: .continuous)
+                        .stroke(LearningPalette.copper.opacity(0.28), lineWidth: 0.75)
+                }
+                .shadow(color: .black.opacity(0.22), radius: 16, y: 8)
         )
-        .padding(10)
+        .padding(LHSpacing.xs)
     }
 }
 #endif
