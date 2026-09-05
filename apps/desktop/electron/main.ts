@@ -10,10 +10,12 @@ import {
   screen,
   desktopCapturer,
   systemPreferences,
+  dialog,
 } from "electron";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdirSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { DeskStore } from "../../../packages/domain/store";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
@@ -159,6 +161,36 @@ app.whenReady().then(() => {
   ipcMain.handle("desk:canvas", (event, id) => {
     check(event);
     return store.canvas(z.string().uuid().parse(id));
+  });
+  ipcMain.handle("desk:canvas-export", async (event, id, raw) => {
+    check(event);
+    const board = store.canvas(z.string().uuid().parse(id));
+    if (
+      !(raw instanceof Uint8Array) ||
+      raw.byteLength > 20 * 1024 * 1024 ||
+      raw.byteLength < 24
+    )
+      throw Error("Invalid canvas PNG.");
+    const png = Buffer.from(raw);
+    if (
+      png.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" ||
+      png.toString("ascii", 12, 16) !== "IHDR"
+    )
+      throw Error("Invalid canvas PNG.");
+    const width = png.readUInt32BE(16),
+      height = png.readUInt32BE(20);
+    if (!width || !height || width * height > 30000000)
+      throw Error("Canvas image is too large to export.");
+    const owner = BrowserWindow.fromWebContents(event.sender)!;
+    const result = await dialog.showSaveDialog(owner, {
+      title: "Export canvas",
+      defaultPath:
+        board.title.replace(/[^\p{L}\p{N} _-]/gu, "_").slice(0, 100) + ".png",
+      filters: [{ name: "PNG image", extensions: ["png"] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    await writeFile(result.filePath, png);
+    return true;
   });
   ipcMain.handle("desk:command", (event, value) => {
     check(event);

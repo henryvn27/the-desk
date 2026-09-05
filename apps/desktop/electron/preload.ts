@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DeskAPI } from "../../../packages/domain/contracts";
 const api: DeskAPI = {
+  exportCanvas: (id, png) => ipcRenderer.invoke("desk:canvas-export", id, png),
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
   providerStatus: () => ipcRenderer.invoke("desk:provider-status"),

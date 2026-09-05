@@ -150,6 +150,7 @@ export type LensCapture = {
   capturedAt: string;
 };
 export interface DeskAPI {
+  exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
   canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   providerStatus(): Promise<{ configured: boolean; secureStorage: boolean }>;

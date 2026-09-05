@@ -703,9 +703,9 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities.",
-      "live": "Installed macOS Canvas smoke: ink, arrow, rectangle, undo/redo, close and exact scene across restart.",
+      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, PNG export and cancel with injected native-dialog result; written PNG visually inspected.",
       "mac": "Installed unsigned arm64 drawing/restart test passes; screenshot and operated video captured.",
-      "windows": "Current Canvas integration not yet checked on Windows.",
+      "windows": "Checks/build/package pass at 48d4619 (run 33998283212); later PNG export change and interactive Canvas unverified.",
       "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, crash journaling and Windows acceptance remain open."
     },
     {

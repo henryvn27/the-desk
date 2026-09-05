@@ -1,6 +1,9 @@
 import { useRef, useState, useEffect } from "react";
-import { Excalidraw } from "@excalidraw/excalidraw";
-import type { ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types";
+import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
+import type {
+  ExcalidrawInitialDataState,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
 import { canvasScene, type CanvasScene } from "../../../packages/canvas/scene";
 import type { CanvasRecord } from "../../../packages/domain/contracts";
@@ -21,6 +24,31 @@ export default function Canvas({
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const last = useRef(JSON.stringify(record.scene));
   const invalid = useRef(false);
+  const editor = useRef<ExcalidrawImperativeAPI | null>(null);
+  const [exporting, setExporting] = useState(false);
+  async function exportPNG() {
+    if (!editor.current) return;
+    setExporting(true);
+    setError("");
+    try {
+      await flush();
+      const png = await exportToBlob({
+        elements: editor.current.getSceneElements(),
+        files: editor.current.getFiles(),
+        appState: { ...editor.current.getAppState(), exportBackground: true },
+        mimeType: "image/png",
+      });
+      const saved = await window.desk.exportCanvas(
+        record.id,
+        new Uint8Array(await png.arrayBuffer()),
+      );
+      setStatus(saved ? "PNG exported" : "Export canceled");
+    } catch (e) {
+      setError(userError(e));
+    } finally {
+      setExporting(false);
+    }
+  }
   useEffect(() => () => clearTimeout(timer.current), []);
   async function flush(): Promise<void> {
     if (invalid.current)
@@ -64,6 +92,9 @@ export default function Canvas({
         <button onClick={() => void flush().catch(() => {})}>
           Save canvas
         </button>
+        <button disabled={exporting} onClick={() => void exportPNG()}>
+          Export PNG
+        </button>
         <button
           onClick={() => {
             clearTimeout(timer.current);
@@ -82,6 +113,9 @@ export default function Canvas({
       )}
       <div className="canvas-engine">
         <Excalidraw
+          excalidrawAPI={(api) => {
+            editor.current = api;
+          }}
           name={record.title}
           initialData={
             {

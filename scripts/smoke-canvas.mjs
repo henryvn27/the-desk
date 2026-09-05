@@ -1,5 +1,5 @@
 import { _electron as electron } from "playwright";
-import { mkdtemp, rm, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -86,6 +86,21 @@ try {
     .getByText("Saved", { exact: true })
     .waitFor();
   await page.screenshot({ path: join(output, "canvas.png") });
+  await app.evaluate(({ dialog }) => {
+    dialog.showSaveDialog = async () => ({ canceled: true, filePath: "" });
+  });
+  await page.getByRole("button", { name: "Export PNG", exact: true }).click();
+  await page.getByText("Export canceled", { exact: true }).waitFor();
+  const exported = join(data, "export.png");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+  }, exported);
+  await page.getByRole("button", { name: "Export PNG", exact: true }).click();
+  await page.getByText("PNG exported", { exact: true }).waitFor();
+  const bytes = await readFile(exported);
+  assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.ok(bytes.readUInt32BE(16) > 100 && bytes.readUInt32BE(20) > 100);
+  await copyFile(exported, join(output, "exported-board.png"));
   console.log(
     JSON.stringify({
       result: "PASS",
@@ -96,10 +111,11 @@ try {
         "undo/redo",
         "flush on close",
         "exact scene across restart",
+        "PNG export and canceled dialog result",
       ],
       limitations: [
         "not complete Canvas acceptance",
-        "export/PDF/math/Windows not tested",
+        "native save-dialog choice injected; PDF/math/Windows not tested",
       ],
     }),
   );
