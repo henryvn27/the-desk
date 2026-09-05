@@ -107,6 +107,7 @@ export type Snapshot = {
 };
 export const command = z.discriminatedUnion("type", [
   z.object({ type: z.literal("canvas.create"), taskId: id }),
+  z.object({ type: z.literal("canvas.recover"), id, scene: canvasScene }),
   z.object({
     type: z.literal("canvas.save"),
     id,

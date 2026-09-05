@@ -703,10 +703,10 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities.",
-      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, text and PNG image preserved exactly across restart, font loaded under local-only CSP; PNG export/cancel and image-picker file results injected. Rendered PNG and reopened media canvas inspected. Native Quit flushes a pending edit; stale-save failure prevents native window close and preserves stored scene.",
-      "mac": "Installed development-signed arm64 Canvas smoke passes; not notarized. Screenshot and operated videos captured.",
-      "windows": "Checks/build/package pass at 48d4619 (run 33998283212); subsequent PNG export and interactive Canvas acceptance unverified.",
-      "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, forced-termination recovery, conflict recovery and Windows acceptance remain open."
+      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, text and PNG image preserved exactly across restart, font loaded under local-only CSP; PNG export/cancel and image-picker file results injected. Rendered PNG and reopened media canvas inspected. Native Quit flushes a pending edit; stale-save failure prevents native window close and preserves stored scene. Recovery copy opens from Library, preserves unsaved drawing and original independently, and survives restart.",
+      "mac": "Installed local arm64 Canvas smoke passes with signing auto-discovery disabled; not notarized. Screenshot and operated videos captured.",
+      "windows": "Checks/build/package pass at 2b44688 (run 33999254685); subsequent recovery-copy change and interactive Canvas acceptance unverified.",
+      "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, forced-termination recovery and Windows acceptance remain open."
     },
     {
       "id": "CANVAS-002",
@@ -722,10 +722,10 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities.",
-      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, text and PNG image preserved exactly across restart, font loaded under local-only CSP; PNG export/cancel and image-picker file results injected. Rendered PNG and reopened media canvas inspected. Native Quit flushes a pending edit; stale-save failure prevents native window close and preserves stored scene.",
-      "mac": "Installed development-signed arm64 Canvas smoke passes; not notarized. Screenshot and operated videos captured.",
-      "windows": "Checks/build/package pass at 48d4619 (run 33998283212); subsequent PNG export and interactive Canvas acceptance unverified.",
-      "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, forced-termination recovery, conflict recovery and Windows acceptance remain open."
+      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, text and PNG image preserved exactly across restart, font loaded under local-only CSP; PNG export/cancel and image-picker file results injected. Rendered PNG and reopened media canvas inspected. Native Quit flushes a pending edit; stale-save failure prevents native window close and preserves stored scene. Recovery copy opens from Library, preserves unsaved drawing and original independently, and survives restart.",
+      "mac": "Installed local arm64 Canvas smoke passes with signing auto-discovery disabled; not notarized. Screenshot and operated videos captured.",
+      "windows": "Checks/build/package pass at 2b44688 (run 33999254685); subsequent recovery-copy change and interactive Canvas acceptance unverified.",
+      "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, forced-termination recovery and Windows acceptance remain open."
     },
     {
       "id": "ASSESS-001",

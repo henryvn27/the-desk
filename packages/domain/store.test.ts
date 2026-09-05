@@ -379,11 +379,20 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
         }),
       /changed elsewhere/,
     );
+    const recoveredScene = { ...scene, viewBackgroundColor: "#fefefe" };
+    const recovered = store
+      .execute({ type: "canvas.recover", id: board.id, scene: recoveredScene })
+      .canvases.at(-1)!;
+    assert.notEqual(recovered.id, board.id);
+    assert.equal(recovered.taskId, taskId);
+    assert.equal(recovered.title, "Sketch (recovery copy)");
+    assert.deepEqual(store.canvas(board.id).scene, scene);
     assert.equal("scene" in store.snapshot().canvases[0]!, false);
     store.close();
     store = new DeskStore(path);
     assert.deepEqual(store.canvas(board.id).scene, scene);
     assert.equal(store.canvas(board.id).revision, 1);
+    assert.deepEqual(store.canvas(recovered.id).scene, recoveredScene);
     assert.throws(() => store.execute({ type: "task.undo", id: taskId }));
   } finally {
     store.close();

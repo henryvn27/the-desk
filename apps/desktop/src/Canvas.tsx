@@ -27,6 +27,32 @@ export default function Canvas({
   const closing = useRef(false);
   const editor = useRef<ExcalidrawImperativeAPI | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  async function recover() {
+    if (invalid.current || !pending.current) return;
+    setRecovering(true);
+    clearTimeout(timer.current);
+    try {
+      if (running.current) await running.current.catch(() => {});
+      const scene = pending.current;
+      if (!scene) return;
+      await window.desk.command({
+        type: "canvas.recover",
+        id: record.id,
+        scene,
+      });
+      if (pending.current !== scene) {
+        setError("A recovery copy was saved. New edits are still open.");
+        return;
+      }
+      pending.current = null;
+      close();
+    } catch (e) {
+      setError(userError(e));
+    } finally {
+      setRecovering(false);
+    }
+  }
   async function exportPNG() {
     if (!editor.current) return;
     setExporting(true);
@@ -126,9 +152,16 @@ export default function Canvas({
         </button>
       </div>
       {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
+        <div className="error" role="alert">
+          <p>{error}</p>
+          {!invalid.current && pending.current && (
+            <button disabled={recovering} onClick={() => void recover()}>
+              {recovering
+                ? "Saving recovery copy…"
+                : "Save recovery copy and close"}
+            </button>
+          )}
+        </div>
       )}
       <div className="canvas-engine">
         <Excalidraw

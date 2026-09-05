@@ -107,22 +107,35 @@ export class DeskStore {
         const task = state.tasks.find((t) => t.id === c.taskId);
         if (!task) throw Error("Assignment no longer exists.");
         entityId = randomUUID();
+        this.db.prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)").run(
+          entityId,
+          task.id,
+          task.title,
+          timestamp,
+          timestamp,
+          0,
+          JSON.stringify({
+            engine: "excalidraw",
+            version: 1,
+            elements: [],
+            files: {},
+            viewBackgroundColor: "#ffffff",
+          }),
+        );
+      }
+      if (c.type === "canvas.recover") {
+        const original = this.canvas(c.id);
+        entityId = randomUUID();
         this.db
           .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
           .run(
             entityId,
-            task.id,
-            task.title,
+            original.taskId,
+            original.title + " (recovery copy)",
             timestamp,
             timestamp,
             0,
-            JSON.stringify({
-              engine: "excalidraw",
-              version: 1,
-              elements: [],
-              files: {},
-              viewBackgroundColor: "#ffffff",
-            }),
+            JSON.stringify(c.scene),
           );
       }
       if (c.type === "canvas.save") {

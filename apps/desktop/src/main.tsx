@@ -43,9 +43,11 @@ function App() {
   const [editing, setEditing] = useState<Task>();
   const [canvas, setCanvas] =
     useState<import("../../../packages/domain/contracts").CanvasRecord>();
-  async function openCanvas(taskId: string) {
+  async function openCanvas(taskId: string, canvasId?: string) {
     try {
-      const existing = data.canvases.find((c) => c.taskId === taskId);
+      const existing = data.canvases.find(
+        (c) => c.taskId === taskId && (!canvasId || c.id === canvasId),
+      );
       const id =
         existing?.id ??
         (await act({ type: "canvas.create", taskId }, true))?.canvases.at(-1)
@@ -526,7 +528,7 @@ function Library({
   saveSource: (
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
-  openCanvas: (taskId: string) => Promise<void>;
+  openCanvas: (taskId: string, canvasId?: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   return (
@@ -566,6 +568,17 @@ function Library({
               {t.notes && <p>{t.notes}</p>}
               <button onClick={() => edit(t)}>Edit assignment</button>
               <button onClick={() => void openCanvas(t.id)}>Open canvas</button>
+              {data.canvases
+                .filter((c) => c.taskId === t.id)
+                .slice(1)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => void openCanvas(t.id, c.id)}
+                  >
+                    Open {c.title}
+                  </button>
+                ))}
               {data.sessions.some((s) => s.taskId === t.id && s.endedAt) && (
                 <details>
                   <summary>Study history</summary>

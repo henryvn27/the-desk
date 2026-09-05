@@ -225,14 +225,47 @@ try {
     "Stale editor must not overwrite saved work",
   );
   await page.screenshot({ path: join(output, "canvas-close-error.png") });
-  // Only this disposable test process is force-closed after proving refusal.
-  const stopped = app.waitForEvent("close");
-  await app.evaluate(({ app }) => {
-    setImmediate(() => app.exit(0));
-  });
-  await stopped;
-  await page.video().saveAs(join(output, "canvas-close-error.webm"));
-  app = undefined;
+  await page
+    .getByRole("button", { name: "Save recovery copy and close", exact: true })
+    .click();
+  await page
+    .getByRole("button", {
+      name: "Open Vector sketch (recovery copy)",
+      exact: true,
+    })
+    .click();
+  await page.locator(".excalidraw canvas").first().waitFor();
+  const recoveredSnapshot = await page.evaluate(() => window.desk.snapshot());
+  const recovered = recoveredSnapshot.canvases.find((c) => c.id !== id);
+  assert.ok(recovered, "Recovery copy must be accessible from Library");
+  const recoveredRecord = await page.evaluate(
+    (id) => window.desk.canvas(id),
+    recovered.id,
+  );
+  assert.ok(
+    recoveredRecord.scene.elements.some(
+      (e) => !e.isDeleted && e.type === "diamond",
+    ),
+  );
+  assert.deepEqual(
+    (await page.evaluate((id) => window.desk.canvas(id), id)).scene,
+    afterQuit.scene,
+  );
+  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page
+    .locator(".canvas-header [role=status]")
+    .getByText("Saved", { exact: true })
+    .waitFor();
+  const savedRecovery = await page.evaluate(id => window.desk.canvas(id), recovered.id);
+  await page.screenshot({ path: join(output, "canvas-recovered.png") });
+  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await app.close();
+  await page.video().saveAs(join(output, "canvas-recovery.webm"));
+  await launch();
+  assert.deepEqual(
+    (await page.evaluate((id) => window.desk.canvas(id), recovered.id)).scene,
+    savedRecovery.scene,
+  );
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify({
@@ -249,6 +282,7 @@ try {
         "packaged text font loaded",
         "native Quit flushes a pending edit",
         "failed save prevents native window close and preserves stored scene",
+        "recovery copy preserves unsaved drawing without overwriting original and survives restart",
       ],
       limitations: [
         "not complete Canvas acceptance",
