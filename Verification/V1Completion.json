@@ -703,9 +703,9 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities. Invalid Canvas source references reject transactionally.",
-      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, text and PNG image preserved exactly across restart, font loaded under local-only CSP; PNG export/cancel and image-picker file results injected. Rendered PNG and reopened media canvas inspected. Native Quit flushes a pending edit; stale-save failure prevents native window close and preserves stored scene. Recovery copy opens from Library, preserves unsaved drawing and original independently, and survives restart. Canvas links and reads Library text; links survive restart/recovery and unlink preserves original source.",
+      "live": "Installed macOS smoke: ink, explicit pen/highlighter, arrow/rectangle, undo-redo, text/PNG, close/Quit flush, restart, recovery copies and Library source links/unlink. PNG export/cancel and image-picker results injected. Screenshot and operated videos inspected/captured.",
       "mac": "Installed local arm64 Canvas smoke passes with signing auto-discovery disabled; not notarized. Screenshot and operated videos captured.",
-      "windows": "Checks/build/package pass at 2b44688 (run 33999254685); subsequent recovery-copy change and interactive Canvas acceptance unverified.",
+      "windows": "Checks/build/package pass at e27e01a (run 33999701817); subsequent ink controls and interactive Canvas acceptance unverified.",
       "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, Lens primitives, forced-termination recovery and Windows acceptance remain open."
     },
     {
@@ -722,9 +722,9 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities. Invalid Canvas source references reject transactionally.",
-      "live": "Installed macOS smoke: ink/arrow/rectangle/undo-redo/restart, text and PNG image preserved exactly across restart, font loaded under local-only CSP; PNG export/cancel and image-picker file results injected. Rendered PNG and reopened media canvas inspected. Native Quit flushes a pending edit; stale-save failure prevents native window close and preserves stored scene. Recovery copy opens from Library, preserves unsaved drawing and original independently, and survives restart. Canvas links and reads Library text; links survive restart/recovery and unlink preserves original source.",
+      "live": "Installed macOS smoke: ink, explicit pen/highlighter, arrow/rectangle, undo-redo, text/PNG, close/Quit flush, restart, recovery copies and Library source links/unlink. PNG export/cancel and image-picker results injected. Screenshot and operated videos inspected/captured.",
       "mac": "Installed local arm64 Canvas smoke passes with signing auto-discovery disabled; not notarized. Screenshot and operated videos captured.",
-      "windows": "Checks/build/package pass at 2b44688 (run 33999254685); subsequent recovery-copy change and interactive Canvas acceptance unverified.",
+      "windows": "Checks/build/package pass at e27e01a (run 33999701817); subsequent ink controls and interactive Canvas acceptance unverified.",
       "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, Lens primitives, forced-termination recovery and Windows acceptance remain open."
     },
     {

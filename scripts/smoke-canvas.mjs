@@ -67,15 +67,51 @@ try {
   const modifier = process.platform === "darwin" ? "Meta" : "Control";
   await page.keyboard.press(modifier + "+z");
   await page.keyboard.press(modifier + "+Shift+z");
+  await page.getByRole("button", { name: "Highlighter", exact: true }).click();
+  await page.mouse.move(420, 400);
+  await page.mouse.down();
+  await page.mouse.move(610, 400);
+  await page.mouse.up();
+  await page.keyboard.press(modifier + "+z");
+  await page.keyboard.press(modifier + "+Shift+z");
+  await page.getByRole("button", { name: "Pen", exact: true }).click();
+  await page.mouse.move(420, 635);
+  await page.mouse.down();
+  await page.mouse.move(610, 635);
+  await page.mouse.up();
+  await page.keyboard.press(modifier + "+z");
+  await page.keyboard.press(modifier + "+Shift+z");
   await page.getByRole("button", { name: "Close canvas", exact: true }).click();
   let snapshot = await page.evaluate(() => window.desk.snapshot());
   const id = snapshot.canvases[0].id;
   const before = await page.evaluate((id) => window.desk.canvas(id), id);
-  assert.equal(before.scene.elements.filter((e) => !e.isDeleted).length, 3);
+  assert.equal(before.scene.elements.filter((e) => !e.isDeleted).length, 5);
   assert.ok(
     before.scene.elements.some(
       (e) => e.type === "freedraw" && e.points.length > 10,
     ),
+  );
+  assert.ok(
+    before.scene.elements.some(
+      (e) =>
+        !e.isDeleted &&
+        e.type === "freedraw" &&
+        e.opacity === 35 &&
+        e.strokeWidth === 8 &&
+        e.strokeColor === "#ffd43b",
+    ),
+    "Highlighter must retain broad translucent yellow ink",
+  );
+  assert.ok(
+    before.scene.elements.some(
+      (e) =>
+        !e.isDeleted &&
+        e.type === "freedraw" &&
+        e.opacity === 100 &&
+        e.strokeWidth === 2 &&
+        e.strokeColor === "#1e1e1e",
+    ),
+    "Pen must restore opaque dark ink",
   );
   await app.close();
   await page.video().saveAs(join(output, "canvas-drawing.webm"));
@@ -326,6 +362,7 @@ try {
       result: "PASS",
       flows: [
         "ink",
+        "explicit pen/highlighter, undo-redo and restart",
         "arrow",
         "rectangle",
         "undo/redo",

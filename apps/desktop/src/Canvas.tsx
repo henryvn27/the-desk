@@ -62,6 +62,16 @@ export default function Canvas({
   const closing = useRef(false);
   const editor = useRef<ExcalidrawImperativeAPI | null>(null);
   const [exporting, setExporting] = useState(false);
+  function inkTool(highlight: boolean) {
+    editor.current?.updateScene({
+      appState: {
+        currentItemStrokeColor: highlight ? "#ffd43b" : "#1e1e1e",
+        currentItemStrokeWidth: highlight ? 8 : 2,
+        currentItemOpacity: highlight ? 35 : 100,
+      },
+    });
+    editor.current?.setActiveTool({ type: "freedraw" });
+  }
   const [recovering, setRecovering] = useState(false);
   async function recover() {
     if (invalid.current || !pending.current) return;
@@ -169,6 +179,8 @@ export default function Canvas({
       <div className="canvas-header">
         <strong>{record.title}</strong>
         <span role="status">{status}</span>
+        <button onClick={() => inkTool(false)}>Pen</button>
+        <button onClick={() => inkTool(true)}>Highlighter</button>
         <button
           aria-expanded={showSources}
           onClick={() => setShowSources(!showSources)}
