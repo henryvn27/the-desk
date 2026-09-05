@@ -101,6 +101,68 @@ try {
   assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   assert.ok(bytes.readUInt32BE(16) > 100 && bytes.readUInt32BE(20) > 100);
   await copyFile(exported, join(output, "exported-board.png"));
+  await page.getByTestId("toolbar-text").locator("..").click();
+  await page.mouse.click(420, 520);
+  await page.keyboard.type("F = ma");
+  await page.keyboard.press("Escape");
+  // Chromium's File System Access picker does not emit Playwright filechooser.
+  // Supply its file result; the editor still decodes/imports the real exported PNG.
+  await page.evaluate(
+    (png) => {
+      window.showOpenFilePicker = async () => [
+        {
+          getFile: async () =>
+            new File([Uint8Array.from(png)], "board.png", {
+              type: "image/png",
+            }),
+        },
+      ];
+    },
+    [...bytes],
+  );
+  await page.getByTestId("toolbar-image").locator("..").click();
+  await page.waitForFunction(async (id) => {
+    const record = await window.desk.canvas(id);
+    return Object.keys(record.scene.files).length === 1;
+  }, id);
+  await page.mouse.click(900, 530);
+  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  const withMedia = await page.evaluate((id) => window.desk.canvas(id), id);
+  assert.ok(
+    withMedia.scene.elements.some(
+      (e) => !e.isDeleted && e.type === "text" && e.text === "F = ma",
+    ),
+  );
+  assert.ok(
+    withMedia.scene.elements.some((e) => !e.isDeleted && e.type === "image"),
+  );
+  assert.equal(Object.keys(withMedia.scene.files).length, 1);
+  await app.close();
+  await page.video().saveAs(join(output, "canvas-media.webm"));
+  await launch();
+  const restoredMedia = await page.evaluate((id) => window.desk.canvas(id), id);
+  assert.deepEqual(restoredMedia.scene, withMedia.scene);
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await page.locator(".excalidraw canvas").first().waitFor();
+  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page
+    .locator(".canvas-header [role=status]")
+    .getByText("Saved", { exact: true })
+    .waitFor();
+  // The desktop CSP permits only packaged fonts. Custom-protocol requests are
+  // not reliably represented in Chromium Resource Timing; inspect the font set.
+  const fontLoaded = await page.evaluate(async () => {
+    const faces = await document.fonts.load("20px Excalifont", "F = ma");
+    return faces.length > 0 && faces.every((face) => face.status === "loaded");
+  });
+  assert.equal(
+    fontLoaded,
+    true,
+    "Excalifont must load under the local-only CSP",
+  );
+  await page.screenshot({ path: join(output, "canvas-media.png") });
+  assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify({
       result: "PASS",
@@ -112,14 +174,15 @@ try {
         "flush on close",
         "exact scene across restart",
         "PNG export and canceled dialog result",
+        "text and PNG import survive restart",
+        "packaged text font loaded",
       ],
       limitations: [
         "not complete Canvas acceptance",
-        "native save-dialog choice injected; PDF/math/Windows not tested",
+        "native save-dialog and image-picker results injected; native picker interaction/PDF/math/Windows not tested",
       ],
     }),
   );
-  assert.equal(errors.length, 0, errors.join("\n"));
 } finally {
   if (app) await app.close();
   await rm(data, { recursive: true, force: true });
