@@ -1,0 +1,1933 @@
+{
+  "schemaVersion": 1,
+  "product": "The Desk",
+  "mapKind": "V1 completion map",
+  "contractSource": "docs/product/V1_PRODUCT_CONTRACT.md",
+  "contractSourceSha256": "7539cd89c6f739969b31207ccbbe21f373a0ba6e160804c4b698623d436ef4ca",
+  "originalContractSha256": "0a42454410cc25a42a52d9ac08569edb8066e8f5c6d46ed73c3606fcc9ebc0ce",
+  "createdAt": "2026-09-05",
+  "initialBaseline": "Full rebuild. Partial first-slice evidence recorded on 2026-09-05. All full product release gates remain unmet.",
+  "scope": {
+    "v1": "Full Electron + React + TypeScript desktop rebuild targeting macOS 14+ and Windows 11 with Chrome/Edge.",
+    "historicalSwiftPrototype": {
+      "role": "Historical Git context only; Swift/Apple implementation and architecture are not part of the V1 working tree or V1 completion evidence."
+    },
+    "electronV1": {
+      "paths": [
+        "apps/desktop",
+        "packages",
+        "services",
+        "package.json",
+        "vite.config.ts"
+      ],
+      "role": "Authoritative implementation target for this contract; each requirement still needs explicit evidence."
+    }
+  },
+  "statusVocabulary": {
+    "requirementStatus": [
+      "UNIMPLEMENTED",
+      "IN_PROGRESS",
+      "SOURCE_FIXED_UNVERIFIED",
+      "IMPLEMENTED_UNVERIFIED",
+      "VERIFIED",
+      "BLOCKED_EXTERNAL",
+      "DEFERRED_NON_V1"
+    ],
+    "verificationStatus": [
+      "UNVERIFIED",
+      "PARTIAL",
+      "VERIFIED"
+    ],
+    "evidenceFields": [
+      "implementation",
+      "automated",
+      "live",
+      "mac",
+      "windows",
+      "blocker"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "GOV-001",
+      "area": "Governance",
+      "contract": "\u00a70 (lines 31-253)",
+      "title": "Use deliberate, bounded execution and keep the root agent accountable",
+      "acceptance": [
+        "Use the cheapest model that can reliably complete a bounded task; escalate only for genuinely hard gates.",
+        "Avoid speculative swarms, duplicate investigations, and stopping at compilation, tests, plausible UI, or a status report.",
+        "Root ownership includes architecture, product interpretation, reconciliation, issue ledger, completion state, release gates, and final verification."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "PROD-001",
+      "area": "Product thesis",
+      "contract": "\u00a71 (lines 255-301)",
+      "title": "Deliver the intelligent academic layer around the student's existing systems",
+      "acceptance": [
+        "Support the loop: academic input -> understand -> organize -> prioritize -> plan -> prepare -> study anywhere -> assist in context -> record evidence -> retain -> adapt.",
+        "Serve high-school and college students; a student or parent may buy, with no automatic parent surveillance or academic-data access.",
+        "Make everything needed available when study starts, show whether the student is actually prepared, and make school feel under control."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "PLAT-001",
+      "area": "Platform",
+      "contract": "\u00a72 (lines 303-368)",
+      "title": "Target the V1 desktop platforms and browsers",
+      "acceptance": [
+        "V1 targets desktop first on macOS 14+ and Windows 11.",
+        "V1 browser support targets Chrome and Edge.",
+        "Full web, Chromebook optimization, iPad, iPhone, Safari, Firefox, and Android are later scope unless required by the core workflow."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "PLAT-002",
+      "area": "Platform",
+      "contract": "\u00a72 (lines 303-368)",
+      "title": "Use the canonical Electron V1 stack",
+      "acceptance": [
+        "Use Electron, React, TypeScript, Vite, Supabase/Postgres cloud, SQLite local-first desktop storage/cache, Chrome/Edge extension, Zod contracts, and testable service/repository boundaries.",
+        "Use TypeScript wherever technically reasonable."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "PLAT-003",
+      "area": "Platform",
+      "contract": "\u00a72 (lines 303-368)",
+      "title": "Keep native escape hatches narrow and make Electron V1 authoritative",
+      "acceptance": [
+        "Small macOS, Windows, or Python helpers may exist only where required; helpers must not own business logic.",
+        "Do not migrate the product back into Swift or build two independent native apps.",
+        "The V1 is a full rebuild; Swift/Apple implementation and architecture are historical Git context only, and the Electron/React/TypeScript desktop product is the sole V1 implementation target."
+      ],
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "verification": "UNVERIFIED",
+      "implementation": "Verification/IssueLedger.json; Verification/V1Completion.json; full rebuild branch",
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "Ongoing consistency and final release review required."
+    },
+    {
+      "id": "PILLAR-001",
+      "area": "Product pillars",
+      "contract": "\u00a73 (lines 370-391)",
+      "title": "Keep the five V1 pillars stable",
+      "acceptance": [
+        "Every significant V1 feature supports Capture, Plan, Session, Lens, or Canvas.",
+        "Do not add a sixth product pillar."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "DOMAIN-001",
+      "area": "Domain model",
+      "contract": "\u00a74 (lines 393-444)",
+      "title": "Represent the academic graph without flattening its real relationships",
+      "acceptance": [
+        "Support User, AcademicPeriod, Space, Class, Track, Unit/Module, Teacher, Task, Assessment, Source, Artifact, Concept, Attempt, Mistake, StudySession, StudyBlock, Plan, Grade, GradeCategory, Preference, Memory, Integration, ConnectionCapability, Provenance, and Confidence.",
+        "Use many-to-many relationships where reality requires them, including tasks/sources/concepts/assessments/sessions."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "DOMAIN-002",
+      "area": "Domain model",
+      "contract": "\u00a74 (lines 393-444)",
+      "title": "Make important inferred facts inspectable",
+      "acceptance": [
+        "Record value, confidence, source/provenance, timestamp, and authority for important AI or inferred academic facts.",
+        "Never turn uncertainty into fake certainty."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence; apps/desktop; packages/domain",
+      "automated": "npm run check: 27 tests including provider failure and migration contracts",
+      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
+      "mac": "Unsigned installed first-slice development smoke",
+      "windows": null,
+      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+    },
+    {
+      "id": "CAP-001",
+      "area": "Capture",
+      "contract": "\u00a75 (lines 446-495)",
+      "title": "Accept the contract's academic input types",
+      "acceptance": [
+        "Accept typed assignments, syllabi, PDF worksheets, screenshots, whiteboard photos, Classroom notifications, teacher email, Canvas/Schoology capture, websites, Khan pages, Quizlet/Knowt sets, textbooks, handwritten notes, Notability exports, Google Docs, calendar events, and spoken input."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "CAP-002",
+      "area": "Capture",
+      "contract": "\u00a75 (lines 446-495)",
+      "title": "Provide universal capture entry points",
+      "acceptance": [
+        "Support type, speak, paste, drop, screenshot, import, and email/forward where available.",
+        "Support batch capture and undo."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "CAP-003",
+      "area": "Capture",
+      "contract": "\u00a75 (lines 446-495)",
+      "title": "Interpret capture with compact, honest confirmation",
+      "acceptance": [
+        "Infer almost everything, show a compact confirmation, expose uncertain or important fields, and avoid turning filing into metadata homework.",
+        "Say I don't know when appropriate."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence; apps/desktop; packages/domain",
+      "automated": "npm run check: 27 tests including provider failure and migration contracts",
+      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
+      "mac": "Unsigned installed first-slice development smoke",
+      "windows": null,
+      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+    },
+    {
+      "id": "CAP-004",
+      "area": "Capture",
+      "contract": "\u00a75 (lines 446-495)",
+      "title": "Route uncertainty through Capture Inbox and automation policy",
+      "acceptance": [
+        "High-confidence captures may auto-file under the user's policy; uncertain captures go to Capture Inbox.",
+        "Expose Conservative, Balanced (default), and Autopilot confidence modes."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "AUTH-001",
+      "area": "Authority",
+      "contract": "\u00a76 (lines 497-518)",
+      "title": "Handle source authority and conflicts visibly",
+      "acceptance": [
+        "Prefer explicit teacher updates, live LMS assignments, syllabi, teacher email, board/photo, and Desk inference in contextual order.",
+        "Ask the user when important sources conflict, such as due dates; never silently overwrite with an uncertain guess."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "INT-001",
+      "area": "Integrations",
+      "contract": "\u00a77 (lines 520-584)",
+      "title": "Expose an honest connection ladder and capability state",
+      "acceptance": [
+        "Provide official API -> browser-assisted -> email ingestion -> generic capture/manual fallback.",
+        "Never bypass school administrator restrictions.",
+        "Connection UI reports actual capabilities such as Full sync, Browser-assisted, Browser context, or Experimental; never display Synced without genuine sync."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "INT-002",
+      "area": "Integrations",
+      "contract": "\u00a77 (lines 520-584)",
+      "title": "Implement declared integration classes with graceful fallback",
+      "acceptance": [
+        "Support deep structured integrations where permitted for Google Calendar, Gmail, Google Classroom, and Google Drive/Docs.",
+        "Support browser/context integrations for Khan, Quizlet, and generic websites.",
+        "Keep Gemini Notebook/NotebookLM experimental and replaceable."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "INT-003",
+      "area": "Integrations",
+      "contract": "\u00a77 (lines 520-584)",
+      "title": "Keep Gmail permissions and sending user-controlled",
+      "acceptance": [
+        "Request Gmail permissions progressively and default to school-related monitoring rather than indiscriminate inbox processing.",
+        "Do not send automatically in V1; drafts are allowed and the user sends."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "INT-004",
+      "area": "Integrations",
+      "contract": "\u00a77 (lines 520-584)",
+      "title": "Provide Classroom browser-assisted fallback",
+      "acceptance": [
+        "Allow the student to open Classroom normally; the extension may read academic information visible to the user.",
+        "Confirm large initial imports; allow obvious updates while browsing where safe.",
+        "Never manipulate or submit Classroom work."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "INT-005",
+      "area": "Integrations",
+      "contract": "\u00a77 (lines 520-584)",
+      "title": "Keep Khan, Quizlet, and generic page support honest",
+      "acceptance": [
+        "Use browser awareness, reliable DOM/page-state interpretation, deep links, and confidently observable completion evidence.",
+        "Ask when uncertain and do not depend on unsupported private APIs."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "EXT-001",
+      "area": "Browser extension",
+      "contract": "\u00a78 (lines 586-603)",
+      "title": "Ship a useful Chrome/Edge bridge without making scraping the product",
+      "acceptance": [
+        "Support current-page understanding, current-page/selection capture, structured context to Lens, Desk resource save/open, desktop-host communication, and optional site adapters.",
+        "Generic context remains useful when a site adapter breaks."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "PLAN-001",
+      "area": "Planner",
+      "contract": "\u00a79 (lines 605-745)",
+      "title": "Plan around grade impact, urgency, learning, and student priorities",
+      "acceptance": [
+        "Use expected grade impact relative to urgency as the starting priority, then learn real behavior/preferences.",
+        "Accept deadlines, assessments, grade weights, current grade, importance, duration, mastery, difficulty, available time, calendar constraints, sleep, history, time-of-day, priorities, teacher patterns, retention, prerequisites, and confidence.",
+        "Provide Suggest, Auto-plan (default), and Autopilot modes plus Deadline, Study Objective, and Session Action layers."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "PLAN-002",
+      "area": "Planner",
+      "contract": "\u00a79 (lines 605-745)",
+      "title": "Create realistic work units and explicit overload tradeoffs",
+      "acceptance": [
+        "Split tasks into realistic units; use context-aware minimum durations around 5-10 minutes for tiny review, 15 minutes for normal work, and 30+ minutes for deep work.",
+        "Model capacity honestly, state overload, protect deadlines/assessments/grade impact/prerequisites before lower-value and optional work, and say what cannot fit.",
+        "Shorten lower-value work, move flexible work, sacrifice optional study first, suggest an extension where appropriate, and allow student override."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "PLAN-003",
+      "area": "Planner",
+      "contract": "\u00a79 (lines 605-745)",
+      "title": "Respect buffer, sleep, spacing, and learned estimates",
+      "acceptance": [
+        "Leave buffer instead of filling all available time; respect preferred sleep cutoff and recommend stopping low-value studying.",
+        "Use practice -> feedback -> sleep -> revisit spacing instead of packing all preparation before a test.",
+        "Compare predicted/actual duration and learn task type, time-of-day, priorities, and confirmed preferences."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "PLAN-004",
+      "area": "Planner",
+      "contract": "\u00a79 (lines 605-745)",
+      "title": "Make planner decisions explainable and safely editable",
+      "acceptance": [
+        "Every meaningful recommendation supports Why? with its relevant evidence.",
+        "Support drag, locked blocks, automatic rebalance offers, and safe automatic replanning with a lightweight changelog.",
+        "Require confirmation before changing authoritative deadlines, dropping required work, cancelling locked sessions, moving knowingly beyond deadlines, or materially restructuring commitments."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "PLAN-005",
+      "area": "Planner",
+      "contract": "\u00a79 (lines 605-745)",
+      "title": "Control external calendar publishing",
+      "acceptance": [
+        "Auto-plan generally requires approval before publishing to an external calendar.",
+        "Autopilot may auto-publish only when the student enabled it."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "HOME-001",
+      "area": "Home",
+      "contract": "\u00a710 (lines 747-776)",
+      "title": "Keep Home focused on the next useful action",
+      "acceptance": [
+        "Home answers What should I do now? through Next, Today, Needs Attention, Upcoming, and Continue.",
+        "Avoid dashboard creep and giant analytics walls; keep grades off Home unless future evidence supports them."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "NAV-001",
+      "area": "Navigation",
+      "contract": "\u00a711 (lines 778-812)",
+      "title": "Provide the V1 navigation and command surface",
+      "acceptance": [
+        "Provide Home, Plan, Library, Classes, Tracks, Capture, and Settings; Canvas is a capability/artifact, Lens is global, and Tutor remains part of studying.",
+        "Cmd/Ctrl+K searches tasks, sources, textbook content, handwriting/indexed notes, opens classes, starts sessions, creates tasks, and asks The Desk."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "SESSION-001",
+      "area": "Study session",
+      "contract": "\u00a712 (lines 814-889)",
+      "title": "Make Study Session durable state with one active session",
+      "acceptance": [
+        "Starting creates an active StudySession, prepares a Session Kit, opens needed resources/apps/URLs, activates session-aware Lens, begins time tracking, and shows a compact controller.",
+        "The student may work in Chrome, PDFs, Google Docs, Calculator, Canvas, or other tools; only one academic Study Session is active at once."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "SESSION-002",
+      "area": "Study session",
+      "contract": "\u00a712 (lines 814-889)",
+      "title": "Prepare useful resources and a compact controller",
+      "acceptance": [
+        "Session Kit can include objective, checklist, worksheet, textbook section, Khan resource, notes, mistakes, Canvas, calculator, and generated artifacts.",
+        "Controller exposes class, elapsed time, current action, progress, Lens, resources, pause/resume, and end without gamified streaks."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "SESSION-003",
+      "area": "Study session",
+      "contract": "\u00a712 (lines 814-889)",
+      "title": "End sessions with credible evidence and low-friction correction",
+      "acceptance": [
+        "Infer completion as far as credible, present detected work and uncertainty, and allow Looks right/Edit.",
+        "Update duration estimates, task progress, attempts, mistakes, mastery evidence, preparedness, and future plan without a tedious questionnaire."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "LENS-001",
+      "area": "Lens",
+      "contract": "\u00a713 (lines 891-939)",
+      "title": "Support global voice/text Lens with first-class selection inputs",
+      "acceptance": [
+        "Hold Option/Alt+Space for push-to-talk over current context; tap for compact visual Lens near the center/cursor.",
+        "Support click, rectangle, freehand circle, multiple independent circles/selections, and no-selection current-screen questions.",
+        "Freehand circling is first-class input, not a reduced OCR rectangle."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "LENS-002",
+      "area": "Lens",
+      "contract": "\u00a713 (lines 891-939)",
+      "title": "Carry the right academic and screen context",
+      "acceptance": [
+        "During a Study Session inherit class, objectives, assessment, resources, current app/site, recent work, relevant concepts, and session history.",
+        "Outside sessions use foreground app, extension context, explicit capture, recent academic context, and class materials; ask when ambiguity matters."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "LENS-003",
+      "area": "Lens",
+      "contract": "\u00a714 (lines 941-1003)",
+      "title": "Teach visually through an ephemeral transparent overlay",
+      "acceptance": [
+        "Render freehand strokes, circles, arrows, highlights, labels, short equations, and visual pointing over the external screen.",
+        "Do not alter the underlying third-party app/page; annotations normally disappear when the interaction ends.",
+        "Keep follow-up screen selection/context until dismissed; offer Keep on screen and Save to Canvas; subtle drawing animation is desirable."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence; apps/desktop; packages/domain",
+      "automated": "npm run check: 27 tests including provider failure and migration contracts",
+      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
+      "mac": "Unsigned installed first-slice development smoke",
+      "windows": null,
+      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+    },
+    {
+      "id": "LENS-004",
+      "area": "Lens",
+      "contract": "\u00a714 (lines 941-1003)",
+      "title": "Provide bounded Lens actions",
+      "acceptance": [
+        "Lens may open URLs, launch apps, open Desk resources or Canvas, save a source, create a task/mistake/note/artifact, and prepare resources.",
+        "Defer deep arbitrary third-party UI puppeteering unless required for the core flow."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "LENS-005",
+      "area": "Academic integrity",
+      "contract": "\u00a714 (lines 941-1003)",
+      "title": "Keep academic assistance inside the explicit integrity boundary",
+      "acceptance": [
+        "Allow explaining, hinting, teaching, analogous examples, attempt checks, and a full method when explicitly requested.",
+        "Never autonomously type final answers into submitted work, submit assignments, send teacher messages, or perform academic work as the student."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "VOICE-001",
+      "area": "Voice",
+      "contract": "\u00a715 (lines 1005-1022)",
+      "title": "Make voice contextual while keeping text complete",
+      "acceptance": [
+        "Use push-to-talk and no always-listening wake word in V1.",
+        "Support voice questions with concise spoken/visual response, typed questions with visual response, configurable speech preference, and adaptive response length."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "CANVAS-001",
+      "area": "Canvas",
+      "contract": "\u00a716 (lines 1024-1078)",
+      "title": "Provide a genuinely useful paged and infinite Canvas",
+      "acceptance": [
+        "Support paged notebook and infinite canvas modes.",
+        "Support mouse/trackpad ink, pen, highlighter, eraser, lasso, selection/multi-select, move/resize, text, LaTeX/math, shapes, arrows, images, screenshots, PDF annotation, zoom/pan, undo/redo, export, source links, persistent artifacts, and shared Lens drawing primitives."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "CANVAS-002",
+      "area": "Canvas",
+      "contract": "\u00a716 (lines 1024-1078)",
+      "title": "Preserve Canvas source and renderer boundaries",
+      "acceptance": [
+        "Make handwriting conversion configurable and preserve original ink; index/search/understand handwriting/math where feasible.",
+        "Track createdBy=user|lens internally without noisy default labels.",
+        "Canvas may open in its own window; use a mature replaceable renderer behind a domain-owned Canvas abstraction and do not build a giant rich-text replacement."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ASSESS-001",
+      "area": "Assessments",
+      "contract": "\u00a717 (lines 1080-1145)",
+      "title": "Treat assessments and graded work as first-class evidence",
+      "acceptance": [
+        "Model quiz, test, exam, final, midterm, project, essay, lab, presentation, standardized test, and other stated assessment types as distinct from Task.",
+        "Ingest permitted photos of graded work/feedback and extract score, questions, answers, markings, comments, rubric, concepts, and mistake patterns."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ASSESS-002",
+      "area": "Assessments",
+      "contract": "\u00a717 (lines 1080-1145)",
+      "title": "Separate teacher evidence, Desk inference, and grade projections",
+      "acceptance": [
+        "Keep teacher evidence distinct from Desk inference; support teacher patterns, generated practice based on observed patterns, and student exclusion from teacher modeling.",
+        "Never claim certainty about what will be on a test; explain observed patterns instead.",
+        "Reconstruct gradebook where data supports it, allow manual scores and screenshot extraction, and use assumptions/ranges for projections."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "CONCEPT-001",
+      "area": "Academic intelligence",
+      "contract": "\u00a718 (lines 1147-1189)",
+      "title": "Keep completion, submission, understanding, mastery, preparedness, and retention distinct",
+      "acceptance": [
+        "Concepts survive individual assignments; support Not started, Learning, Developing, Strong, and Review due states.",
+        "Use NOT READY, DEVELOPING, MOSTLY READY, READY, and STRONG preparedness states with evidence such as unaided accuracy, weak concepts, attempts, recency, hints, and cumulative recall.",
+        "Support course and long-term retention and trigger cumulative planning for finals."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "MISTAKE-001",
+      "area": "Mistakes",
+      "contract": "\u00a719 (lines 1191-1212)",
+      "title": "Make mistakes durable, inspectable, and useful",
+      "acceptance": [
+        "Record concept, source, original attempt, what went wrong, correction, help used, confidence, and review due.",
+        "Mistakes influence future plans, appear in an inspectable view, feed practice generation, and persist beyond the assignment/test."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "TUTOR-001",
+      "area": "Tutor",
+      "contract": "\u00a720 (lines 1214-1250)",
+      "title": "Ground tutoring in class material with an honest hint ladder",
+      "acceptance": [
+        "Default progression is attempt -> small hint -> larger hint -> explanation -> analogous example -> new-attempt check, while honoring explicit requests for a full method.",
+        "Provide Guide me, Balanced (default), and Explain directly modes.",
+        "Prefer teacher/class material, assigned textbook, trusted educational source, then general web; distinguish class facts from supporting explanations and allow another explanation."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "MEMORY-001",
+      "area": "Academic memory",
+      "contract": "\u00a721 (lines 1252-1277)",
+      "title": "Make academic memory transparent and controllable",
+      "acceptance": [
+        "Expose What The Desk Knows for preferences, teacher policies, duration, planning patterns, and other stated memory examples.",
+        "Every memory is viewable, editable, and forgettable; support disabling inferred memory and clearing inferred memories.",
+        "Save explicit statements immediately; require repeated evidence and confirmation for durable behavioral inference."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "PRIV-001",
+      "area": "Privacy and trust",
+      "contract": "\u00a722 (lines 1279-1299)",
+      "title": "Enforce the privacy and trust hard rules",
+      "acceptance": [
+        "No continuous screen recording; capture screen content only for explicit Lens or permitted session behavior; active-app awareness in sessions is allowed; distraction monitoring defaults off.",
+        "Let students deny Lens app access; parent payment does not imply surveillance; do not train general-purpose models on academic data without separate opt-in.",
+        "Support user export and deletion; preserve both sync states on ambiguity; expose provenance/confidence for important inference.",
+        "Never show fake integration status, preparedness, sync, or certainty."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence; apps/desktop; packages/domain",
+      "automated": "npm run check: 27 tests including provider failure and migration contracts",
+      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
+      "mac": "Unsigned installed first-slice development smoke",
+      "windows": null,
+      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+    },
+    {
+      "id": "SYNC-001",
+      "area": "Local-first and sync",
+      "contract": "\u00a723 (lines 1301-1339)",
+      "title": "Keep the desktop useful offline and preserve conflicts",
+      "acceptance": [
+        "Use SQLite local -> asynchronous sync engine -> Supabase/Postgres cloud; writes save locally quickly.",
+        "Cache tasks, plans, Canvas, sources, session resources, and active academic graph portions.",
+        "Offline tasks, plan viewing, Canvas, local materials, Study Sessions, and basic capture continue where technically possible; AI/cloud features may degrade.",
+        "Queue offline changes and preserve both copies for ambiguous conflicts, then request resolution."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ACCOUNT-001",
+      "area": "Google account model",
+      "contract": "\u00a724 (lines 1341-1357)",
+      "title": "Separate Desk identity from school connections",
+      "acceptance": [
+        "Keep account/login identity separate from school connections.",
+        "Allow multiple Google identities for personal and school use and request Google permissions progressively."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "NOTEBOOK-001",
+      "area": "Notebook integration",
+      "contract": "\u00a725 (lines 1359-1408)",
+      "title": "Keep Gemini Notebook/NotebookLM optional, replaceable, and one-way enough",
+      "acceptance": [
+        "Keep The Desk canonical; send Desk sources to an adapter and import generated audio, video, study guide, mind map, flashcards, and quiz artifacts where possible.",
+        "Prioritize audio, video, study guide, mind map, flashcards, then quiz; map one notebook per Class + active Unit where sensible.",
+        "Support Desk -> Notebook source sync and Notebook artifact -> Desk import without full bidirectional sync.",
+        "Use replaceable interface, feature flag, capability status, and graceful degradation; failure must not break core study."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ECON-001",
+      "area": "Business model",
+      "contract": "\u00a726 (lines 1410-1484)",
+      "title": "Implement pricing as a measured hypothesis with user-controlled trial",
+      "acceptance": [
+        "Treat Free $0, Pro $19.99 monthly, Pro $149.99 annual as hypotheses, not proven willingness to pay.",
+        "Use a user-triggered 14-day Pro trial; do not start it automatically at signup.",
+        "Free is a real academic home with classes, tasks, Library, basic/manual planning, basic Canvas/Sessions, limited AI capture/auto-planning, and an experimental small Lens allowance.",
+        "Pro adds regular Lens, adaptive planning, richer replanning/automation, mastery/retention, richer tutoring, email/browser intelligence, advanced capture, Notebook integration, and higher limits.",
+        "BYOK may exist for power users; use fair-use limits for expensive media and do not expose raw token accounting to normal users."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ECON-002",
+      "area": "AI economics",
+      "contract": "\u00a726 (lines 1410-1484)",
+      "title": "Attribute and measure every AI run",
+      "acceptance": [
+        "Attribute user, feature, relevant session, provider, model, input/output usage, media cost, latency, and success/failure.",
+        "Measure actual cost and heavy-user tails before paid release; treat the contribution target as a measurement target, not a claim."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence; apps/desktop; packages/domain",
+      "automated": "npm run check: 27 tests including provider failure and migration contracts",
+      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
+      "mac": "Unsigned installed first-slice development smoke",
+      "windows": null,
+      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+    },
+    {
+      "id": "AI-001",
+      "area": "AI runtime",
+      "contract": "\u00a727 (lines 1486-1528)",
+      "title": "Route AI work by task and hide unnecessary model complexity",
+      "acceptance": [
+        "Use deterministic TypeScript for scheduling/math where possible; route classification, OCR, simple Lens, hard STEM, complex planning interpretation, long-context synthesis, and media to appropriate runtimes.",
+        "Abstract and measure provider/model selection; normal users see The Desk, while advanced/BYOK/debug views may disclose provider/model."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence; apps/desktop; packages/domain",
+      "automated": "npm run check: 27 tests including provider failure and migration contracts",
+      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
+      "mac": "Unsigned installed first-slice development smoke",
+      "windows": null,
+      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+    },
+    {
+      "id": "WINDOW-001",
+      "area": "Window model",
+      "contract": "\u00a728 (lines 1530-1551)",
+      "title": "Use a small, purposeful desktop window set",
+      "acceptance": [
+        "Provide Main Desk, temporary Lens overlay, floating Study controller, Canvas window, and compact Capture popover where justified.",
+        "Do not proliferate windows without a product reason."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "UX-001",
+      "area": "Visual direction",
+      "contract": "\u00a729 (lines 1553-1576)",
+      "title": "Keep a native, quiet, dense-enough, non-gamified desktop feel",
+      "acceptance": [
+        "Use precise desktop productivity hierarchy, subtle class color, tactile Canvas feel, calm Home, no mascot, no streak graphics, and no AI sparkle overload."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "NOTIF-001",
+      "area": "Notifications",
+      "contract": "\u00a730 (lines 1578-1598)",
+      "title": "Notify only for useful decisions and repair missed work without shame",
+      "acceptance": [
+        "Notify on material changes, decisions needed, study-block starts, and plans that no longer fit.",
+        "Avoid guilt, streak pressure, and excessive spam; missed sessions offer repair."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ACCEPT-001",
+      "area": "Acceptance",
+      "contract": "\u00a731 (lines 1600-1633)",
+      "title": "Judge features by end-to-end academic outcomes and honest capability labels",
+      "acceptance": [
+        "A feature participates through interpretation, confirmation, object creation, plan change, session resources, work, evidence, and future-plan response.",
+        "Label browser context, browser-assisted, insufficient evidence, and uncertainty honestly; do not count OAuth or plausible UI as an integration pass."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "CORE-001",
+      "area": "Core vertical",
+      "contract": "\u00a732 (lines 1635-1668)",
+      "title": "Prove the real Capture -> Plan -> Session -> Lens -> Evidence -> Replan vertical",
+      "acceptance": [
+        "Use real applications, browser pages, PDFs, realistic academic data, and installed desktop builds.",
+        "Cover input arrival, interpretation, confirmation, Task/Assessment/Source creation, exact plan, Home Next, Start, Session Kit, external work, session-aware Lens, freehand circle, voice, visual explanation/drawing, follow-up context, session evidence, durable state updates, tomorrow adaptation, and plan explanation.",
+        "Do not simulate success with fixtures only."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "ROAD-001",
+      "area": "Roadmap",
+      "contract": "\u00a733 (lines 1670-1814)",
+      "title": "Build in the contract's dependency order",
+      "acceptance": [
+        "Sequence Foundation; Academic Core; Real Planner; Study Session; Lens; Browser Bridge; Canvas; Academic Intelligence; Google Ecosystem Hardening; Gemini Notebook; and Business/Release.",
+        "Treat ordering as dependency guidance, not permission to stop after a phase."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ONBOARD-001",
+      "area": "Onboarding",
+      "contract": "\u00a735 (lines 1848-1876)",
+      "title": "Get a realistic new student to a useful first plan quickly",
+      "acceptance": [
+        "Flow: sign in -> add/import classes -> optional connections -> drop syllabus/assignments/material -> interpret -> confirm -> correct -> first plan.",
+        "Ask only high-value facts, use progressive Google permissions, and reach classes, obligations, one parsed source, and a useful plan in roughly 5-10 minutes."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "VALID-001",
+      "area": "Business validation",
+      "contract": "\u00a736 (lines 1878-1928)",
+      "title": "Instrument retention and staged rollout before optimizing conversion",
+      "acceptance": [
+        "Measure activation, time to first useful plan, session starts/completions, Lens, plan edits/acceptance/replans, capture corrections, weekly return, trusted inputs, integration/preparedness/retention usage, AI cost, heavy-user tails, trial, conversion, and cancellation.",
+        "Roll out Henry daily-drive -> 5-10 friends -> Paideia/known students -> invite beta -> public -> paid; do not call it validated from Henry alone."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "ENG-001",
+      "area": "Engineering quality",
+      "contract": "\u00a737 (lines 1930-1977)",
+      "title": "Keep TypeScript, security, database, and integration boundaries explicit",
+      "acceptance": [
+        "Before large changes inspect architecture/contracts/source of truth and required migrations/tests.",
+        "Use strict TypeScript, avoid broad any, validate trust-boundary schemas, and type IPC/integration contracts.",
+        "Treat Electron renderer as untrusted; minimize/validate IPC, use context isolation, protect secrets, avoid sensitive logs, and review extension/OAuth/local-service permissions.",
+        "Use explicit migrations, no silent destructive schema changes, tested upgrade paths, data preservation, adapter boundaries, retries/backoff, capability status, graceful degradation, and no core dependency on unofficial APIs."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "TEST-001",
+      "area": "Testing",
+      "contract": "\u00a738 (lines 1979-2066)",
+      "title": "Test domain and integration contracts with meaningful evidence",
+      "acceptance": [
+        "Use deterministic unit/property tests for important domain rules and contract tests/fixtures/live smoke where possible for integrations."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "TEST-002",
+      "area": "Testing",
+      "contract": "\u00a738 (lines 1979-2066)",
+      "title": "Exercise planner edge cases",
+      "acceptance": [
+        "Cover overloaded days, due-date conflicts, locked blocks, sleep, estimate learning, missed blocks, deadline changes, major-test/low-value-homework tradeoffs, impossible schedules, timezone/DST, no available time, and uncertain dates."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "TEST-003",
+      "area": "Testing",
+      "contract": "\u00a738 (lines 1979-2066)",
+      "title": "Exercise sync and migration failure modes",
+      "acceptance": [
+        "Cover offline edits, reconnect, simultaneous changes, conflict preservation, migrations, corrupt/partial state, and interrupted uploads."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "TEST-004",
+      "area": "Testing",
+      "contract": "\u00a738 (lines 1979-2066)",
+      "title": "Exercise Lens and overlay interaction states",
+      "acceptance": [
+        "Cover click, rectangle, freehand circle, figure-eight/crossed shape, multi-selection, no selection, multiple monitors, scaled displays, external browser/native app, follow-up, cleanup, save to Canvas, voice/text, denied permission, and capture failure."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "TEST-005",
+      "area": "Testing",
+      "contract": "\u00a738 (lines 1979-2066)",
+      "title": "Exercise Canvas, browser, and Google failure paths",
+      "acceptance": [
+        "Cover Canvas persistence/export/PDF/equations/ink/lasso/selection/Lens marks/undo-redo/reopen/migration.",
+        "Cover Chrome, Edge, generic pages, Khan, Quizlet, Classroom fallback, permission denial, extension disconnect, Google denial, admin block, expired token, multiple accounts, changed due dates, and conflicts."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "UI-001",
+      "area": "Real UI verification",
+      "contract": "\u00a739 (lines 2068-2104)",
+      "title": "Verify installed desktop builds on both declared platforms",
+      "acceptance": [
+        "macOS evidence covers installed canonical build, primary flows, shortcuts, overlays, extension, external app/context, permissions, windows, restart, and persistence.",
+        "Windows V1 cannot be called fully cross-platform verified without real Windows runtime evidence; CI/compile/package tests alone are insufficient for Lens/overlay/global-shortcut behavior."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "A11Y-001",
+      "area": "Accessibility and UX",
+      "contract": "\u00a740 (lines 2106-2128)",
+      "title": "Keep standard desktop UI accessible and overlays well behaved",
+      "acceptance": [
+        "Support keyboard navigation, focus, accessible labels, reduced motion, contrast, text scaling, and screen-reader semantics outside Canvas.",
+        "Preserve Escape/cancel, focus restoration, click-through behavior, underlying input after dismissal, useful density, laptop resolutions, and scaling."
+      ],
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages/domain; packages/planner",
+      "automated": "npm run check; see Verification/BASELINE.md",
+      "live": "npm run test:desktop: first slice only",
+      "mac": "Installed unsigned arm64 development build smoke passes",
+      "windows": null,
+      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+    },
+    {
+      "id": "LEDGER-001",
+      "area": "Issue ledger",
+      "contract": "\u00a741 (lines 2130-2164)",
+      "title": "Maintain one authoritative issue ledger",
+      "acceptance": [
+        "Record id, area, title, severity, status, discovered_at, source/evidence, root cause, fix, verification, verified_at, regression test, and notes.",
+        "Distinguish open, in_progress, source_fixed_unverified, verified, deferred_non_v1, and blocked_external; failed broader verification reopens issues."
+      ],
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "verification": "UNVERIFIED",
+      "implementation": "Verification/IssueLedger.json; Verification/V1Completion.json; full rebuild branch",
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "Ongoing consistency and final release review required."
+    },
+    {
+      "id": "MAP-001",
+      "area": "Completion map",
+      "contract": "\u00a742 (lines 2166-2191)",
+      "title": "Keep machine and human V1 completion maps authoritative",
+      "acceptance": [
+        "Map every V1 requirement to implementation location, automated evidence, live evidence, macOS evidence, Windows evidence, status, and blocker.",
+        "Do not use a vague percentage as a substitute for actual gates."
+      ],
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "verification": "UNVERIFIED",
+      "implementation": "Verification/IssueLedger.json; Verification/V1Completion.json; full rebuild branch",
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "Ongoing consistency and final release review required."
+    },
+    {
+      "id": "DAILY-001",
+      "area": "Daily-driver data",
+      "contract": "\u00a743 (lines 2193-2206)",
+      "title": "Use realistic, separable data and explicit external safety",
+      "acceptance": [
+        "Use realistic academic fixtures during development and permitted real data before release; keep test/sandbox data separate from real academic state.",
+        "Follow confirmation requirements and do not send, submit, delete, or materially alter external academic content without explicit authorization."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "STOP-001",
+      "area": "Completion",
+      "contract": "\u00a745 (lines 2295-2312)",
+      "title": "Stop only when completion evidence and release evidence agree",
+      "acceptance": [
+        "All completion-map requirements are verified or explicitly non-applicable; all gates pass; no critical/high blocker remains; installed build is live-tested; core vertical works; issue ledger agrees; Windows evidence is real; build/install is reproducible; Henry can daily-drive without development tooling; final adversarial audit is complete."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "BLOCKER-001",
+      "area": "External blockers",
+      "contract": "\u00a746 (lines 2314-2336)",
+      "title": "Contain external blockers without converting them into fake passes",
+      "acceptance": [
+        "Record the blocker precisely, implement required graceful fallback, continue independent lanes, reduce unverified surface, and report only the minimum concrete user action at the end."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "CADENCE-001",
+      "area": "Work cadence",
+      "contract": "\u00a747 (lines 2338-2377)",
+      "title": "Persist authoritative evidence through the build cadence",
+      "acceptance": [
+        "At start inspect environment/instructions, establish roadmap/completion map/issue ledger/build baseline/architecture records, then begin the first vertical.",
+        "After changes run narrow checks, broaden when shared behavior changes, reopen regressions, batch related inspection, use scripts for repeated checks, and reserve full-suite/audits for meaningful checkpoints."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "DECISION-001",
+      "area": "Product policy",
+      "contract": "\u00a748 (lines 2379-2398)",
+      "title": "Treat the contract as authoritative",
+      "acceptance": [
+        "Do not invent new navigation, pillars, gamification, pricing, platform strategy, customers, dashboards, or replacements for existing external tools.",
+        "For contradictions, document the issue and choose the smallest solution consistent with product intent unless it materially changes the product."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "DOC-001",
+      "area": "Durable documentation",
+      "contract": "\u00a749 (lines 2400-2439)",
+      "title": "Maintain one durable source of truth per major subject",
+      "acceptance": [
+        "Provide product contract, roadmap, architecture, domain model, sync model, Lens, integrations, AI routing, unit economics, completion map, and issue ledger artifacts without doc bloat."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "NAME-001",
+      "area": "Working name",
+      "contract": "\u00a750 (lines 2441-2453)",
+      "title": "Use The Desk as the V1 development name",
+      "acceptance": [
+        "Use The Desk in development; defer naming research and branding exploration until after V1 engineering."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "FIRST-001",
+      "area": "First vertical",
+      "contract": "\u00a751 (lines 2455-2478)",
+      "title": "Deepen one real vertical before broad independent feature work",
+      "acceptance": [
+        "Build Capture input -> interpretation -> confirmation -> academic object -> basic plan -> Home Next -> Start Session -> resource -> active context -> Lens -> completion -> plan feedback."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "FINISH-001",
+      "area": "Definition of finished",
+      "contract": "\u00a752 (lines 2480-2540)",
+      "title": "Meet daily-driver trust criteria",
+      "acceptance": [
+        "A student can install without development tooling, add classes, dump messy inputs, trust enough understanding, receive a useful plan, start with less setup, work externally, use cross-computer Lens/freehand circle, preserve context, finish without babysitting, and affect tomorrow.",
+        "Deadlines/uncertainty, restart/offline, browser/Google degradation, Canvas, planner explanations, evidence-backed preparedness, inspectable/removable memory, privacy controls, measured AI cost, and both desktop platforms all remain credible."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "AUDIT-001",
+      "area": "Final audit",
+      "contract": "\u00a753 (lines 2542-2584)",
+      "title": "Run an independent adversarial release audit",
+      "acceptance": [
+        "Audit the contract, completion map, issue ledger, installed app, core vertical, privacy/security, sync/offline, integrations, Canvas, Lens, planner, performance, cost accounting, and both macOS/Windows evidence.",
+        "Assume optimistic developers, stale claims, fixture-only evidence, shallow integrations, bad planner decisions, weak UX, inferred Windows parity, and incomplete cost capture; reopen V1 for valid release blockers."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "START-001",
+      "area": "First action",
+      "contract": "\u00a754 (lines 2586-2635)",
+      "title": "Start from environment inspection and build toward the real vertical",
+      "acceptance": [
+        "Determine whether the repository is clean/new, an Electron/TypeScript rebuild, or unexpected; establish baseline, maps, issue ledger, architecture sources of truth, then start the smallest real vertical."
+      ],
+      "status": "UNIMPLEMENTED",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    }
+  ],
+  "releaseGates": [
+    {
+      "id": "GATE-A",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "BUILD",
+      "acceptance": [
+        "Clean checkout installs dependencies; typecheck, lint, tests, packaging, extension build, migrations, and runtime-error checks pass."
+      ],
+      "status": "UNMET",
+      "verification": "PARTIAL",
+      "implementation": null,
+      "automated": "npm run check; unsigned macOS packaging",
+      "live": null,
+      "mac": "Installed development first-slice smoke passes",
+      "windows": null,
+      "blocker": "Full gate acceptance remains incomplete; no Windows or full V1 vertical proof."
+    },
+    {
+      "id": "GATE-B",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "CORE VERTICAL",
+      "acceptance": [
+        "Live academic input -> plan -> session -> external resource -> Lens circle/voice/draw -> completion -> plan adaptation passes end to end."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-C",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "PLANNER",
+      "acceptance": [
+        "Scenario/evidence suite passes and plan explanations are trustworthy."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-D",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "LENS",
+      "acceptance": [
+        "Real external-screen voice, text, click, rectangle, freehand circle, multi-selection, drawing, follow-up, cancel/cleanup, and Save to Canvas work."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-E",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "CANVAS",
+      "acceptance": [
+        "Core Canvas is genuinely usable and persistent."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-F",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "INTEGRATIONS",
+      "acceptance": [
+        "Declared V1 integration capabilities work honestly and degrade gracefully."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-G",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "OFFLINE/SYNC",
+      "acceptance": [
+        "Offline core works, reconnect works, conflict handling works, and no silent destructive data loss occurs."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-H",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "PRIVACY/SECURITY",
+      "acceptance": [
+        "Electron, OAuth, IPC, storage, extension permissions, local services, telemetry, and secrets receive deliberate review with no unresolved critical/high issue."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-I",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "PERFORMANCE",
+      "acceptance": [
+        "Normal interactions are responsive; Lens activates quickly enough; large sources do not freeze UI; CPU/memory behavior is measured."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-J",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "ACCESSIBILITY / RESPONSIVE DESKTOP",
+      "acceptance": [
+        "Primary flows remain usable across supported desktop sizes/scaling and keyboard navigation."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-K",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "INSTALL / UPDATE / RESTART",
+      "acceptance": [
+        "Install succeeds, restart preserves data, update path is verified, and crash/recovery is acceptable."
+      ],
+      "status": "UNMET",
+      "verification": "PARTIAL",
+      "implementation": null,
+      "automated": "npm run check; unsigned macOS packaging",
+      "live": null,
+      "mac": "Installed development first-slice smoke passes",
+      "windows": null,
+      "blocker": "Full gate acceptance remains incomplete; no Windows or full V1 vertical proof."
+    },
+    {
+      "id": "GATE-L",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "COST OBSERVABILITY",
+      "acceptance": [
+        "AI costs are measured by feature/user/model before paid release."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-M",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "MAC",
+      "acceptance": [
+        "Installed macOS app passes live acceptance."
+      ],
+      "status": "UNMET",
+      "verification": "PARTIAL",
+      "implementation": null,
+      "automated": "npm run check; unsigned macOS packaging",
+      "live": null,
+      "mac": "Installed development first-slice smoke passes",
+      "windows": null,
+      "blocker": "Full gate acceptance remains incomplete; no Windows or full V1 vertical proof."
+    },
+    {
+      "id": "GATE-N",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "WINDOWS",
+      "acceptance": [
+        "Real Windows automated validation and live acceptance pass before cross-platform V1 is claimed."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    },
+    {
+      "id": "GATE-O",
+      "area": "Release gate",
+      "contract": "\u00a744 (lines 2208-2293)",
+      "title": "NO OPEN RELEASE BLOCKERS",
+      "acceptance": [
+        "No critical issue, high-severity data loss/privacy/security defect, broken core vertical, fake integration, major planner/Lens defect, or sync corruption issue remains."
+      ],
+      "status": "UNMET",
+      "verification": "UNVERIFIED",
+      "implementation": null,
+      "automated": null,
+      "live": null,
+      "mac": null,
+      "windows": null,
+      "blocker": "No V1 implementation or verification evidence recorded."
+    }
+  ],
+  "deferredNonV1": [
+    {
+      "id": "DEFER-001",
+      "contract": "\u00a72/\u00a734",
+      "item": "Full web product",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-002",
+      "contract": "\u00a72/\u00a734",
+      "item": "Chromebook optimization",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-003",
+      "contract": "\u00a72/\u00a734",
+      "item": "iPad-specific app",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-004",
+      "contract": "\u00a72/\u00a734",
+      "item": "iPhone-specific app",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-005",
+      "contract": "\u00a72/\u00a734",
+      "item": "Safari",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-006",
+      "contract": "\u00a72/\u00a734",
+      "item": "Firefox",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-007",
+      "contract": "\u00a72/\u00a734",
+      "item": "Android",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-008",
+      "contract": "\u00a72/\u00a734",
+      "item": "Social features",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-009",
+      "contract": "\u00a72/\u00a734",
+      "item": "Teacher dashboards",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-010",
+      "contract": "\u00a72/\u00a734",
+      "item": "School admin tools",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-011",
+      "contract": "\u00a72/\u00a734",
+      "item": "Parent surveillance",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-012",
+      "contract": "\u00a72/\u00a734",
+      "item": "Collaboration",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-013",
+      "contract": "\u00a72/\u00a734",
+      "item": "Marketplace",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-014",
+      "contract": "\u00a72/\u00a734",
+      "item": "Custom sticker/template store",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-015",
+      "contract": "\u00a72/\u00a734",
+      "item": "Giant rich-text editor",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-016",
+      "contract": "\u00a72/\u00a734",
+      "item": "Full LMS replacement",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-017",
+      "contract": "\u00a72/\u00a734",
+      "item": "Full Drive replacement",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-018",
+      "contract": "\u00a72/\u00a734",
+      "item": "Calendar replacement",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-019",
+      "contract": "\u00a72/\u00a734",
+      "item": "Bespoke whiteboard renderer from scratch",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-020",
+      "contract": "\u00a72/\u00a734",
+      "item": "Gamification and study streaks",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-021",
+      "contract": "\u00a72/\u00a734",
+      "item": "Arbitrary deep desktop puppeteering",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-022",
+      "contract": "\u00a72/\u00a734",
+      "item": "Dozens of integrations",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-023",
+      "contract": "\u00a72/\u00a734",
+      "item": "Perfect handwriting recognition",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-024",
+      "contract": "\u00a72/\u00a734",
+      "item": "Ten pricing tiers",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    },
+    {
+      "id": "DEFER-025",
+      "contract": "\u00a72/\u00a734",
+      "item": "Family plans",
+      "status": "DEFERRED_NON_V1",
+      "reason": "Outside the V1 desktop-first scope unless technically required for the core vertical."
+    }
+  ],
+  "coverage": {
+    "contractSections": "\u00a70 through \u00a754 represented by requirements, gates, deferred scope, or policy records.",
+    "requirementCount": 79,
+    "releaseGateCount": 15,
+    "deferredCount": 25,
+    "unmappedSections": []
+  }
+}

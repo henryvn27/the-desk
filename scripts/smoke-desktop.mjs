@@ -1,0 +1,164 @@
+import { _electron as electron } from "playwright";
+import { mkdtemp, rm, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import assert from "node:assert/strict";
+const data = await mkdtemp(join(tmpdir(), "desk-ui-"));
+const output = resolve("artifacts/smoke");
+await mkdir(output, { recursive: true });
+let desktop;
+let page;
+const errors = [];
+async function launch() {
+  desktop = await electron.launch({
+    args: process.env.DESK_EXECUTABLE ? [] : ["."],
+    executablePath: process.env.DESK_EXECUTABLE,
+    env: { ...process.env, DESK_DATA_DIR: data },
+    recordVideo: { dir: output },
+  });
+  await desktop.firstWindow();
+  for (let attempt = 0; attempt < 100; attempt++) {
+    page = desktop.windows().find((w) => w.url().endsWith("#main"));
+    if (page) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(page, "Main Desk window opened");
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.getByText("Make room for focus.").waitFor();
+}
+try {
+  await launch();
+  await page.getByLabel("Class name", { exact: true }).fill("AP Physics C");
+  await page.getByRole("button", { name: "Add class", exact: true }).click();
+  await page
+    .getByRole("button", { name: "AP Physics C", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Capture assignment", exact: true })
+    .click();
+  await page
+    .getByLabel("What needs doing?")
+    .fill("Work through friction problems 8–14");
+  await page.getByLabel("Estimated minutes").fill("45");
+  await page.getByLabel("I have confirmed").check();
+  await page.getByRole("button", { name: "Save assignment" }).click();
+  await page.getByRole("button", { name: "Start session →" }).waitFor();
+  await page.screenshot({ path: join(output, "home.png") });
+  await page.getByRole("button", { name: "Start session →" }).click();
+  await page.getByRole("button", { name: "Pause", exact: true }).waitFor();
+  let snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.sessions.filter((s) => !s.endedAt).length, 1);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await desktop.close();
+  await launch();
+  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page.getByRole("button", { name: "Lens", exact: true }).click();
+  let lens;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    lens = desktop.windows().find((w) => w.url().endsWith("#lens"));
+    if (lens) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(lens, "Lens window opened");
+  await lens.getByLabel("Draw a freehand selection", { exact: true }).waitFor();
+  await lens.mouse.move(200, 200);
+  await lens.mouse.down();
+  for (let angle = 0; angle <= Math.PI * 2; angle += 0.2)
+    await lens.mouse.move(
+      250 + 80 * Math.cos(angle),
+      250 + 60 * Math.sin(angle),
+    );
+  await lens.mouse.up();
+  assert.equal(await lens.locator("svg > path").count(), 1);
+  await lens
+    .getByLabel("Ask The Desk", { exact: true })
+    .fill("Why does friction point this way?");
+  await lens.getByRole("button", { name: "Ask", exact: true }).click();
+  await lens
+    .getByText("Connect an AI provider in Settings first.", { exact: true })
+    .waitFor();
+  await lens.screenshot({ path: join(output, "lens-selection.png") });
+  await lens.getByRole("button", { name: "Dismiss · Esc" }).click();
+  await page.getByRole("button", { name: "Finish task", exact: true }).click();
+  await page.getByText("Ready when you are.", { exact: true }).waitFor();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.tasks[0].completed, true);
+  assert.ok(snapshot.sessions[0].endedAt);
+  await desktop.close();
+  await launch();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.tasks[0].completed, true);
+  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  const original = "AP Physics C: Friction review due 2026-09-09, 30 minutes";
+  await page
+    .getByLabel("Paste an assignment or a few clear assignment lines")
+    .fill(original);
+  await page
+    .getByRole("button", { name: "Interpret text", exact: true })
+    .click();
+  assert.equal(
+    await page.getByLabel("Due date", { exact: true }).inputValue(),
+    "2026-09-09",
+  );
+  assert.equal(
+    await page.getByLabel("Due time (local)", { exact: true }).inputValue(),
+    "",
+  );
+  await page.getByLabel("I have confirmed").check();
+  await page
+    .getByRole("button", { name: "Save assignment", exact: true })
+    .click();
+  await page
+    .getByText(
+      "Choose a due time to confirm this date. Desk will not invent one.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.getByLabel("Due time (local)", { exact: true }).fill("23:59");
+  await page.screenshot({ path: join(output, "capture-review.png") });
+  await page
+    .getByRole("button", { name: "Save assignment", exact: true })
+    .click();
+  await page.locator("dialog").waitFor({ state: "detached" });
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.tasks.at(-1).captureEvidence.originalText, original);
+  assert.equal(
+    snapshot.tasks.at(-1).dueAt,
+    new Date("2026-09-09T23:59").toISOString(),
+  );
+  assert.equal(errors.length, 0, errors.join("\n"));
+  console.log(
+    JSON.stringify(
+      {
+        result: "PASS",
+        flows: [
+          "class capture",
+          "task capture",
+          "Home Next",
+          "session start",
+          "pause restart resume",
+          "Lens freehand selection and dismiss",
+          "explicit completion",
+          "completed restart",
+          "pasted-text review with no invented due time and persisted provenance",
+        ],
+        limitations: [
+          process.env.DESK_EXECUTABLE
+            ? "installed development package, unsigned"
+            : "development executable, not installed package",
+          "no AI, voice or captured-screen interpretation",
+          "no external resource in this smoke",
+          "not full V1 acceptance",
+        ],
+        artifacts: output,
+      },
+      null,
+      2,
+    ),
+  );
+} finally {
+  if (desktop) await desktop.close().catch(() => {});
+  await rm(data, { recursive: true, force: true });
+}

@@ -1,35 +1,9 @@
 # Privacy model
 
-The Desk is designed as a local-first personal study app. The Mac is the only AI execution host. This document describes the intended source behavior; a self-built copy can be changed by its builder.
+The Electron V1 rebuild currently stores classes, tasks, notes and study-session records in a local SQLite database. Its separate development identity does not open the prototype's data. The local outbox records pending changes; remote sync is not implemented.
 
-## Stored locally
+Lens captures one still image only after the explicit Capture this screen action and only with screen permission. The image remains in interaction memory and is cleared when Lens closes. After a provider is configured, Ask sends the question and active-task context to OpenAI. The captured image is included only when the student checks the explicit share option. Follow-up history remains bounded and local to the Lens interaction. No microphone or screen permission is granted automatically. Opening an HTTPS resource sends the user to their normal browser.
 
-- Provider credentials stay in the Mac Keychain.
-- Original source files, extracted text, local search indexes, provider-run records, and temporary screen captures stay on the Mac unless the user chooses a connector or private iCloud sync.
-- One-time Study Buddy screenshots are not retained by default.
-- Logs should never contain credentials or full source documents.
+The V1 product contract requires explicit screen-capture activation, progressive connector permissions, inspectable memory, export/deletion, and no parent surveillance or academic submission. Those requirements are release gates, not claims that all are implemented.
 
-## Private iCloud sync
-
-The iPhone and iPad companion use the user's private CloudKit database for typed capture jobs, approved artifact metadata, and bounded assets. Provider keys and Codex sessions are not placed in CloudKit. A build without the matching signed CloudKit entitlement remains local and queues companion work instead of crashing.
-
-## AI providers
-
-The Desk sends only the passages needed for the selected task to the chosen AI provider. The result identifies the provider and model. Class citations, connector citations, web citations, and uncited model knowledge are kept distinct. A manual provider choice fails closed instead of silently switching.
-
-Each external provider processes data under its own terms. Do not connect a provider if its data policy is inappropriate for the material being studied.
-
-## Connectors
-
-- Apple Reminders and Calendar access is limited to user-approved or explicitly linked items.
-- Google Classroom and Wispr Flow are read-only boundaries in the current source; live adapters require separate configuration.
-- NotebookLM is optional, unofficial, and non-canonical. Sources are mirrored only when the user asks.
-- Khan Academy support stores links and manual check-ins; it does not scrape learner activity or automate answers.
-
-## Capture permissions
-
-Screen, camera, microphone, speech recognition, calendar, and reminder access are requested only for the feature the user starts. Study Buddy never captures a screen before explicit activation and never clicks, types, or submits work.
-
-## Reporting a concern
-
-Please use a private GitHub Security Advisory for a security or privacy issue. Do not include real credentials, private study material, or sensitive screenshots in a public issue.
+Report privacy concerns through a private repository security advisory. Never include private academic content or credentials in public reports.

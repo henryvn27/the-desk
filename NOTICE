@@ -1,13 +1,5 @@
 The Desk
 Copyright (c) 2026 Henry Van Ness
 
-The source code and project artwork in this repository are distributed under
-the MIT License in LICENSE.
-
-External projects, products, and services that informed the design or can be
-used as optional runtimes are identified in ATTRIBUTION.md. Unless that file
-explicitly says otherwise, their source code and assets are not included in
-this repository.
-
-The cursor-adjacent response overlay includes an MIT-licensed adaptation from
-Clicky by Farza. See THIRD_PARTY_NOTICES.md for the retained notice.
+Source is distributed under the MIT License in LICENSE.
+Dependency licenses remain applicable to distributed runtime packages.

@@ -1,0 +1,80 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DeskStore } from "./store";
+test("capture → session → completion survives restart, enforces one session and excludes pauses", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-test-"));
+  const path = join(directory, "test.sqlite");
+  let store = new DeskStore(path);
+  try {
+    let s = store.execute({ type: "class.create", name: "AP Physics C" });
+    s = store.execute({
+      type: "task.create",
+      input: {
+        title: "Problems 8–14",
+        classId: s.classes[0]!.id,
+        dueAt: null,
+        minutes: 45,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: true,
+      },
+    });
+    const id = s.tasks[0]!.id;
+    store.execute(
+      { type: "session.start", taskId: id },
+      new Date("2026-09-05T12:00:00Z"),
+    );
+    assert.throws(() => store.execute({ type: "session.start", taskId: id }));
+    store.execute({ type: "session.pause" }, new Date("2026-09-05T12:10:00Z"));
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(
+      store.snapshot().sessions[0]!.pausedAt,
+      "2026-09-05T12:10:00.000Z",
+    );
+    store.execute({ type: "session.resume" }, new Date("2026-09-05T12:20:00Z"));
+    s = store.execute(
+      { type: "session.end", completed: true },
+      new Date("2026-09-05T12:35:00Z"),
+    );
+    assert.equal(s.sessions[0]!.actualMinutes, 25);
+    assert.equal(s.tasks[0]!.completed, true);
+    assert.throws(() => store.execute({ type: "task.undo", id }));
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(store.snapshot().tasks[0]!.completed, true);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("schema 1 data survives the telemetry migration and future schema is rejected", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "desk-upgrade-"));
+  const path = join(directory, "legacy.sqlite");
+  try {
+    const old = new DatabaseSync(path);
+    old.exec(
+      `CREATE TABLE classes(id TEXT PRIMARY KEY,name TEXT NOT NULL,color TEXT NOT NULL);CREATE TABLE tasks(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL);CREATE TABLE sessions(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),data TEXT NOT NULL,active INTEGER NOT NULL);CREATE UNIQUE INDEX one_active_session ON sessions(active) WHERE active=1;CREATE TABLE outbox(id TEXT PRIMARY KEY,entity_id TEXT NOT NULL,operation TEXT NOT NULL,created_at TEXT NOT NULL);INSERT INTO classes VALUES('old-class','Physics','#50705A');PRAGMA user_version=1;`,
+    );
+    old.close();
+    const migrated = new DeskStore(path);
+    assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
+    migrated.close();
+    const check = new DatabaseSync(path);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 2);
+    assert.equal(
+      check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
+      0,
+    );
+    check.exec("PRAGMA user_version=99");
+    check.close();
+    assert.throws(() => new DeskStore(path), /newer Desk version/);
+  } finally {
+    rmSync(directory, { recursive: true });
+  }
+});

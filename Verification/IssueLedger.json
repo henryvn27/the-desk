@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "tracker": "CS-2165",
+  "issues": [
+    {
+      "id": "ENV-001",
+      "area": "environment",
+      "title": "Only 13 GB physical SSD free at baseline",
+      "severity": "high",
+      "status": "open",
+      "evidence": "df -k: 13299236 KB available, 2026-09-05",
+      "notes": "Bounded work; no unrelated deletion authorized."
+    },
+    {
+      "id": "V1-001",
+      "area": "core",
+      "title": "Full V1 vertical not yet implemented or live verified",
+      "severity": "high",
+      "status": "in_progress"
+    },
+    {
+      "id": "V1-002",
+      "area": "windows",
+      "title": "Windows interactive runtime unverified",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "BUILD-001",
+      "area": "build",
+      "title": "Vite 8 requires esbuild 0.27/0.28",
+      "severity": "medium",
+      "status": "verified",
+      "fix": "Set esbuild 0.28 without weakening dependency resolution.",
+      "verification": "npm install + npm run check pass 2026-09-05"
+    },
+    {
+      "id": "LENS-001",
+      "area": "lens",
+      "title": "Live AI grounding and overlay teaching require a configured provider and screen permission",
+      "severity": "high",
+      "status": "open",
+      "evidence": "Provider adapter and UI are implemented; only injected transport tests and no-key live fallback tested. No live API key consumed.",
+      "notes": "Configure provider through app Settings, never paste secrets into chat. Continue independent V1 lanes."
+    }
+  ]
+}
