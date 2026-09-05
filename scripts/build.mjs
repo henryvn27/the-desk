@@ -1,4 +1,6 @@
 import { build } from "esbuild";
+import { cp } from "node:fs/promises";
+await cp("node_modules/@excalidraw/excalidraw/dist/prod/fonts","dist/fonts",{recursive:true});
 await build({
   entryPoints: [
     "apps/desktop/electron/main.ts",

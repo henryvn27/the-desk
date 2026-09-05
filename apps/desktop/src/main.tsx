@@ -1,5 +1,6 @@
 import { userError } from "./errors";
 import React, { useEffect, useState } from "react";
+const Canvas = React.lazy(() => import("./Canvas"));
 import { createRoot } from "react-dom/client";
 import type {
   DeskAPI,
@@ -18,10 +19,13 @@ import { Lens } from "./Lens";
 import { SessionReview } from "./SessionReview";
 declare global {
   interface Window {
+    EXCALIDRAW_ASSET_PATH: string;
     desk: DeskAPI;
   }
 }
+window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  canvases: [],
   sources: [],
   classes: [],
   tasks: [],
@@ -37,6 +41,20 @@ function App() {
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
   const [editing, setEditing] = useState<Task>();
+  const [canvas, setCanvas] =
+    useState<import("../../../packages/domain/contracts").CanvasRecord>();
+  async function openCanvas(taskId: string) {
+    try {
+      const existing = data.canvases.find((c) => c.taskId === taskId);
+      const id =
+        existing?.id ??
+        (await act({ type: "canvas.create", taskId }, true))?.canvases.at(-1)
+          ?.id;
+      if (id) setCanvas(await window.desk.canvas(id));
+    } catch (e) {
+      setError(userError(e));
+    }
+  }
   const kind = location.hash.slice(1);
   const active = data.sessions.find((s) => !s.endedAt);
   const activeTask = data.tasks.find((t) => t.id === active?.taskId);
@@ -445,9 +463,15 @@ function App() {
             open={open}
             edit={setEditing}
             saveSource={(input) => act({ type: "source.create", input }, true)}
+            openCanvas={openCanvas}
           />
         )}
       </main>
+      {canvas && (
+        <React.Suspense fallback={<p>Opening canvas…</p>}>
+          <Canvas record={canvas} close={() => setCanvas(undefined)} />
+        </React.Suspense>
+      )}
       {editing && (
         <Capture
           classes={data.classes}
@@ -493,6 +517,7 @@ function Library({
   open,
   edit,
   saveSource,
+  openCanvas,
 }: {
   data: Snapshot;
   classId?: string;
@@ -501,6 +526,7 @@ function Library({
   saveSource: (
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
+  openCanvas: (taskId: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   return (
@@ -539,6 +565,7 @@ function Library({
               </p>
               {t.notes && <p>{t.notes}</p>}
               <button onClick={() => edit(t)}>Edit assignment</button>
+              <button onClick={() => void openCanvas(t.id)}>Open canvas</button>
               {data.sessions.some((s) => s.taskId === t.id && s.endedAt) && (
                 <details>
                   <summary>Study history</summary>

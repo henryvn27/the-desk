@@ -12,9 +12,11 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "package": "npm run build && electron-builder --dir",
     "lint": "eslint apps packages vite.config.ts",
-    "test:desktop": "node scripts/smoke-desktop.mjs"
+    "test:desktop": "node scripts/smoke-desktop.mjs",
+    "test:canvas": "node scripts/smoke-canvas.mjs"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "4.5.4"
@@ -52,8 +54,23 @@
     },
     "win": {
       "target": "nsis"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "licenses",
+        "to": "licenses"
+      }
+    ]
   },
   "description": "Local-first academic workspace",
-  "author": "Henry Van Ness"
+  "author": "Henry Van Ness",
+  "overrides": {
+    "lodash-es": "4.18.1",
+    "@excalidraw/excalidraw": {
+      "nanoid": "3.3.18"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "nanoid": "5.1.16"
+    }
+  }
 }

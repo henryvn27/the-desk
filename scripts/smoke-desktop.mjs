@@ -74,7 +74,19 @@ try {
       250 + 60 * Math.sin(angle),
     );
   await lens.mouse.up();
-  assert.equal(await lens.locator("svg > path").count(), 1);
+  const drawnPaths = lens.locator("svg > path");
+  if ((await drawnPaths.count()) !== 1) {
+    console.log(
+      await drawnPaths.evaluateAll((xs) =>
+        xs.map((x) => ({
+          d: x.getAttribute("d"),
+          parent: x.parentElement?.outerHTML.slice(0, 200),
+        })),
+      ),
+    );
+    await lens.screenshot({ path: join(output, "lens-failure.png") });
+  }
+  assert.equal(await drawnPaths.count(), 1);
   await lens
     .getByLabel("Ask The Desk", { exact: true })
     .fill("Why does friction point this way?");

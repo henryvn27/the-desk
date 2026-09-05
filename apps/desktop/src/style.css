@@ -360,3 +360,8 @@ button[aria-pressed="true"] {
 
 .source { border-bottom: 1px solid #d8d2c6; padding: 16px 0; }
 .source-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 480px; overflow-y: auto; }
+
+.canvas-workspace { position: fixed; inset: 0; z-index: 20; background: #f7f4ed; display: flex; flex-direction: column; }
+.canvas-header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; }
+.canvas-header strong { flex: 1; }
+.canvas-engine { flex: 1; min-height: 0; }

@@ -699,14 +699,14 @@
         "Support paged notebook and infinite canvas modes.",
         "Support mouse/trackpad ink, pen, highlighter, eraser, lasso, selection/multi-select, move/resize, text, LaTeX/math, shapes, arrows, images, screenshots, PDF annotation, zoom/pan, undo/redo, export, source links, persistent artifacts, and shared Lens drawing primitives."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
+      "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities.",
+      "live": "Installed macOS Canvas smoke: ink, arrow, rectangle, undo/redo, close and exact scene across restart.",
+      "mac": "Installed unsigned arm64 drawing/restart test passes; screenshot and operated video captured.",
+      "windows": "Current Canvas integration not yet checked on Windows.",
+      "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, crash journaling and Windows acceptance remain open."
     },
     {
       "id": "CANVAS-002",
@@ -718,14 +718,14 @@
         "Track createdBy=user|lens internally without noisy default labels.",
         "Canvas may open in its own window; use a mature replaceable renderer behind a domain-owned Canvas abstraction and do not build a giant rich-text replacement."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
+      "automated": "39 tests plus typecheck/lint/build; scene validation and stale-write rejection. npm audit: zero vulnerabilities.",
+      "live": "Installed macOS Canvas smoke: ink, arrow, rectangle, undo/redo, close and exact scene across restart.",
+      "mac": "Installed unsigned arm64 drawing/restart test passes; screenshot and operated video captured.",
+      "windows": "Current Canvas integration not yet checked on Windows.",
+      "blocker": "Partial Canvas only; remaining tooling, PDF/math/paged mode, source/Lens links, crash journaling and Windows acceptance remain open."
     },
     {
       "id": "ASSESS-001",

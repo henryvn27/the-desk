@@ -66,7 +66,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 4);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 5);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -322,6 +322,69 @@ test("shared sources preserve exact text, enforce links atomically and survive r
     store.execute({ type: "task.undo", id: t1 });
     assert.equal(store.snapshot().sources[0]!.text, input.text);
     assert.deepEqual(store.snapshot().sources[0]!.taskIds, [t2]);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("canvas revisions prevent stale overwrite and scenes persist separately from snapshots", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-board-"));
+  const path = join(directory, "db.sqlite");
+  let store = new DeskStore(path);
+  try {
+    const classId = store.execute({ type: "class.create", name: "Physics" })
+      .classes[0]!.id;
+    const taskId = store.execute({
+      type: "task.create",
+      input: {
+        title: "Sketch",
+        classId,
+        dueAt: null,
+        minutes: 30,
+        deadlineConfirmed: true,
+        resource: null,
+        notes: "",
+      },
+    }).tasks[0]!.id;
+    const board = store.execute({ type: "canvas.create", taskId }).canvases[0]!;
+    const scene = {
+      engine: "excalidraw" as const,
+      version: 1 as const,
+      elements: [
+        {
+          id: "ink",
+          type: "freedraw" as const,
+          x: 0,
+          y: 0,
+          width: 20,
+          height: 20,
+          points: [
+            [0, 0],
+            [20, 20],
+          ],
+        },
+      ],
+      files: {},
+      viewBackgroundColor: "#ffffff",
+    };
+    store.execute({ type: "canvas.save", id: board.id, revision: 0, scene });
+    assert.throws(
+      () =>
+        store.execute({
+          type: "canvas.save",
+          id: board.id,
+          revision: 0,
+          scene: { ...scene, elements: [] },
+        }),
+      /changed elsewhere/,
+    );
+    assert.equal("scene" in store.snapshot().canvases[0]!, false);
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.canvas(board.id).scene, scene);
+    assert.equal(store.canvas(board.id).revision, 1);
+    assert.throws(() => store.execute({ type: "task.undo", id: taskId }));
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

@@ -156,6 +156,10 @@ app.whenReady().then(() => {
     check(event);
     return store.snapshot();
   });
+  ipcMain.handle("desk:canvas", (event, id) => {
+    check(event);
+    return store.canvas(z.string().uuid().parse(id));
+  });
   ipcMain.handle("desk:command", (event, value) => {
     check(event);
     const state = store.execute(value);

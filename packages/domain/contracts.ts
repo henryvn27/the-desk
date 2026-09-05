@@ -1,5 +1,15 @@
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
 import { z } from "zod";
+import { canvasScene, type CanvasScene } from "../canvas/scene";
+export type CanvasRecord = {
+  id: string;
+  taskId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  scene: CanvasScene;
+};
 const id = z.string().uuid();
 export const sourceInput = z.object({
   title: z.string().trim().min(1).max(500),
@@ -88,6 +98,7 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type Snapshot = {
+  canvases: Omit<CanvasRecord, "scene">[];
   sources: Source[];
   classes: Class[];
   tasks: Task[];
@@ -95,6 +106,13 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("canvas.create"), taskId: id }),
+  z.object({
+    type: z.literal("canvas.save"),
+    id,
+    revision: z.number().int().nonnegative(),
+    scene: canvasScene,
+  }),
   z.object({ type: z.literal("source.create"), input: sourceInput }),
   z.object({
     type: z.literal("planning.preferences"),
@@ -132,6 +150,7 @@ export type LensCapture = {
   capturedAt: string;
 };
 export interface DeskAPI {
+  canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   providerStatus(): Promise<{ configured: boolean; secureStorage: boolean }>;
   saveProviderKey(key: string): Promise<void>;

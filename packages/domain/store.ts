@@ -11,6 +11,7 @@ import {
   type Class,
   type StudySession,
   type Source,
+  type CanvasRecord,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -20,7 +21,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 4) {
+    if (version > 5) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -46,6 +47,10 @@ export class DeskStore {
       CREATE TABLE source_classes(source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id),PRIMARY KEY(source_id,class_id));
       CREATE TABLE source_tasks(source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,PRIMARY KEY(source_id,task_id));
       PRAGMA user_version=4; COMMIT;`);
+    if (version <= 4)
+      this.db.exec(
+        "BEGIN; CREATE TABLE canvases(id TEXT PRIMARY KEY,taskId TEXT NOT NULL REFERENCES tasks(id),title TEXT NOT NULL,createdAt TEXT NOT NULL,updatedAt TEXT NOT NULL,revision INTEGER NOT NULL,scene TEXT NOT NULL); PRAGMA user_version=5; COMMIT;",
+      );
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -59,6 +64,11 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      canvases: this.db
+        .prepare(
+          "SELECT id,taskId,title,createdAt,updatedAt,revision FROM canvases",
+        )
+        .all() as Omit<CanvasRecord, "scene">[],
       sources: this.db
         .prepare("SELECT * FROM sources")
         .all()
@@ -93,6 +103,40 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "canvas.create") {
+        const task = state.tasks.find((t) => t.id === c.taskId);
+        if (!task) throw Error("Assignment no longer exists.");
+        entityId = randomUUID();
+        this.db
+          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
+          .run(
+            entityId,
+            task.id,
+            task.title,
+            timestamp,
+            timestamp,
+            0,
+            JSON.stringify({
+              engine: "excalidraw",
+              version: 1,
+              elements: [],
+              files: {},
+              viewBackgroundColor: "#ffffff",
+            }),
+          );
+      }
+      if (c.type === "canvas.save") {
+        const result = this.db
+          .prepare(
+            "UPDATE canvases SET scene=?,revision=revision+1,updatedAt=? WHERE id=? AND revision=?",
+          )
+          .run(JSON.stringify(c.scene), timestamp, c.id, c.revision);
+        if (!result.changes)
+          throw Error(
+            "This canvas changed elsewhere. Reopen it before saving.",
+          );
+        entityId = c.id;
+      }
       if (c.type === "source.create") {
         entityId = randomUUID();
         this.db
@@ -266,6 +310,11 @@ export class DeskStore {
     this.db
       .prepare("INSERT INTO outbox VALUES(?,?,?,?)")
       .run(randomUUID(), id, operation, at);
+  }
+  canvas(id: string): CanvasRecord {
+    const row = this.db.prepare("SELECT * FROM canvases WHERE id=?").get(id);
+    if (!row) throw Error("Canvas no longer exists.");
+    return { ...row, scene: JSON.parse(row.scene as string) } as CanvasRecord;
   }
   close() {
     this.db.close();
