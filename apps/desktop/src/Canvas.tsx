@@ -24,6 +24,7 @@ export default function Canvas({
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const last = useRef(JSON.stringify(record.scene));
   const invalid = useRef(false);
+  const closing = useRef(false);
   const editor = useRef<ExcalidrawImperativeAPI | null>(null);
   const [exporting, setExporting] = useState(false);
   async function exportPNG() {
@@ -50,6 +51,24 @@ export default function Canvas({
     }
   }
   useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!pending.current && !running.current && !invalid.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+      if (closing.current) return;
+      closing.current = true;
+      clearTimeout(timer.current);
+      void flush()
+        .then(() => window.desk.closeWindow())
+        .catch((e) => setError(userError(e)))
+        .finally(() => {
+          closing.current = false;
+        });
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  });
   async function flush(): Promise<void> {
     if (invalid.current)
       throw Error("Remove unsupported canvas content before saving.");

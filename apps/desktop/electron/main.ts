@@ -34,6 +34,10 @@ if (process.env.DESK_DATA_DIR)
   app.setPath("userData", resolve(process.env.DESK_DATA_DIR));
 if (!app.requestSingleInstanceLock()) app.exit(0);
 let store: DeskStore;
+let quitRequested = false;
+app.on("before-quit", () => {
+  quitRequested = true;
+});
 let main: BrowserWindow | null = null;
 let lens: BrowserWindow | null = null;
 let controller: BrowserWindow | null = null;
@@ -153,6 +157,16 @@ app.whenReady().then(() => {
     } finally {
       lensRequest = null;
     }
+  });
+  ipcMain.handle("desk:close-window", (event) => {
+    check(event);
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    // Reply before destroying the IPC sender. Preserve native Quit intent after
+    // the renderer canceled the first close to finish its pending save.
+    setImmediate(() => {
+      if (quitRequested) app.quit();
+      else if (owner && !owner.isDestroyed()) owner.close();
+    });
   });
   ipcMain.handle("desk:snapshot", (event) => {
     check(event);

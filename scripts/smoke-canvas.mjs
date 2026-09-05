@@ -18,6 +18,11 @@ async function launch() {
   page = await app.firstWindow();
   await page.getByText("Make room for focus.", { exact: true }).waitFor();
   page.on("pageerror", (e) => errors.push(e.message));
+  // Electron handles beforeunload without a browser dialog. Prevent Playwright
+  // from auto-dismissing a transient protocol event after the save closes it.
+  page.on("dialog", (dialog) => {
+    assert.equal(dialog.type(), "beforeunload");
+  });
 }
 try {
   await launch();
@@ -162,6 +167,72 @@ try {
     "Excalifont must load under the local-only CSP",
   );
   await page.screenshot({ path: join(output, "canvas-media.png") });
+  // Hold only the 500 ms autosave debounce so Quit deterministically races a
+  // pending edit. The close guard must flush it without waiting for the timer.
+  await page.evaluate(() => {
+    const schedule = window.setTimeout.bind(window);
+    window.setTimeout = (fn, delay, ...args) =>
+      schedule(fn, delay === 500 ? 60_000 : delay, ...args);
+  });
+  await page.getByTestId("toolbar-ellipse").locator("..").click();
+  await page.mouse.move(300, 300);
+  await page.mouse.down();
+  await page.mouse.move(360, 360);
+  await page.mouse.up();
+  await page
+    .locator(".canvas-header [role=status]")
+    .getByText("Unsaved changes", { exact: true })
+    .waitFor();
+  const quitting = app.waitForEvent("close");
+  await app.evaluate(({ app }) => {
+    setImmediate(() => app.quit());
+  });
+  await quitting;
+  await page.video().saveAs(join(output, "canvas-native-quit.webm"));
+  await launch();
+  const afterQuit = await page.evaluate((id) => window.desk.canvas(id), id);
+  assert.ok(
+    afterQuit.scene.elements.some((e) => !e.isDeleted && e.type === "ellipse"),
+    "Native Quit must flush the pending ellipse",
+  );
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await page.locator(".excalidraw canvas").first().waitFor();
+  // Simulate another writer advancing the revision while this editor is open.
+  await page.evaluate(async (id) => {
+    const record = await window.desk.canvas(id);
+    await window.desk.command({
+      type: "canvas.save",
+      id,
+      revision: record.revision,
+      scene: record.scene,
+    });
+  }, id);
+  await page.getByTestId("toolbar-diamond").locator("..").click();
+  await page.mouse.move(200, 300);
+  await page.mouse.down();
+  await page.mouse.move(260, 360);
+  await page.mouse.up();
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].close();
+  });
+  await page.getByRole("alert").waitFor();
+  assert.equal(page.isClosed(), false, "Failed save must keep the editor open");
+  const failedSave = await page.evaluate((id) => window.desk.canvas(id), id);
+  assert.deepEqual(
+    failedSave.scene,
+    afterQuit.scene,
+    "Stale editor must not overwrite saved work",
+  );
+  await page.screenshot({ path: join(output, "canvas-close-error.png") });
+  // Only this disposable test process is force-closed after proving refusal.
+  const stopped = app.waitForEvent("close");
+  await app.evaluate(({ app }) => {
+    setImmediate(() => app.exit(0));
+  });
+  await stopped;
+  await page.video().saveAs(join(output, "canvas-close-error.webm"));
+  app = undefined;
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify({
@@ -176,6 +247,8 @@ try {
         "PNG export and canceled dialog result",
         "text and PNG import survive restart",
         "packaged text font loaded",
+        "native Quit flushes a pending edit",
+        "failed save prevents native window close and preserves stored scene",
       ],
       limitations: [
         "not complete Canvas acceptance",
