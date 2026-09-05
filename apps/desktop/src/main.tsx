@@ -10,6 +10,7 @@ import type {
 import { plan, planWeek, todayWindow } from "../../../packages/planner";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
 import { PlanningSettings } from "./PlanningSettings";
+import { Sources } from "./Sources";
 import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
@@ -21,6 +22,7 @@ declare global {
   }
 }
 const empty: Snapshot = {
+  sources: [],
   classes: [],
   tasks: [],
   sessions: [],
@@ -122,6 +124,15 @@ function App() {
           <p>
             {Math.floor(elapsed)} min · {active.pausedAt ? "Paused" : "Working"}
           </p>
+          {kind === "main" &&
+            data.sources
+              .filter((s) => s.taskIds.includes(active.taskId))
+              .map((s) => (
+                <details key={s.id}>
+                  <summary>{s.title}</summary>
+                  <p className="source-text">{s.text}</p>
+                </details>
+              ))}
           <div className="actions">
             <button
               onClick={() =>
@@ -433,6 +444,7 @@ function App() {
             classId={data.classes.some((c) => c.id === page) ? page : undefined}
             open={open}
             edit={setEditing}
+            saveSource={(input) => act({ type: "source.create", input }, true)}
           />
         )}
       </main>
@@ -480,21 +492,31 @@ function Library({
   classId,
   open,
   edit,
+  saveSource,
 }: {
   data: Snapshot;
   classId?: string;
   open: (id: string) => Promise<void>;
   edit: (task: Task) => void;
+  saveSource: (
+    input: import("../../../packages/domain/contracts").SourceInput,
+  ) => Promise<unknown>;
 }) {
   const [search, setSearch] = useState("");
   return (
     <>
       <h1>{data.classes.find((c) => c.id === classId)?.name ?? "Library"}</h1>
-      <label htmlFor="search">Search tasks and notes</label>
+      <label htmlFor="search">Search tasks, notes and sources</label>
       <input
         id="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+      />
+      <Sources
+        data={data}
+        classId={classId}
+        search={search}
+        save={saveSource}
       />
       {data.tasks
         .filter(

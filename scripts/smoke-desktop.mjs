@@ -276,6 +276,42 @@ try {
   );
   await page.screenshot({ path: join(output, "weekly-plan.png") });
   assert.equal(errors.length, 0, errors.join("\n"));
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save text source", exact: true })
+    .click();
+  await page
+    .getByLabel("Source title", { exact: true })
+    .fill("Vector reference");
+  const passage =
+    "  Resolve a vector into perpendicular components.\nα = 30°\n";
+  await page.getByLabel("Original text", { exact: true }).fill(passage);
+  await page
+    .getByText("Link classes and assignments (optional)", { exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("AP Physics C", { exact: true })
+    .check();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Long practice packet", { exact: true })
+    .check();
+  await page.getByRole("button", { name: "Save source", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page
+    .getByLabel("Search tasks, notes and sources", { exact: true })
+    .fill("perpendicular");
+  await page.getByText("Vector reference", { exact: true }).click();
+  await page.screenshot({ path: join(output, "source-library.png") });
+  await desktop.close();
+  await page.video().saveAs(join(output, "source-library.webm"));
+  await launch();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.sources[0].text, passage);
+  assert.equal(snapshot.sources[0].taskIds[0], snapshot.tasks.at(-1).id);
+  assert.equal(snapshot.sources[0].classIds[0], snapshot.classes[0].id);
+  assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify(
       {
@@ -294,6 +330,7 @@ try {
           "session review notes and remaining work survive restart and appear in history",
           "study preferences survive restart and off-days have no automatic study blocks",
           "long assignment splits across future study days in Plan",
+          "text source capture, assignment link, content search and exact-text restart persistence",
         ],
         limitations: [
           process.env.DESK_EXECUTABLE

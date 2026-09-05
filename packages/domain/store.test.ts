@@ -66,7 +66,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 3);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 4);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -266,6 +266,62 @@ test("planning preferences persist and invalid window cannot overwrite them", ()
     store.close();
     store = new DeskStore(path);
     assert.deepEqual(store.snapshot().planning, input);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("shared sources preserve exact text, enforce links atomically and survive restart", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-source-"));
+  const path = join(directory, "db.sqlite");
+  let store = new DeskStore(path);
+  try {
+    const a = store.execute({ type: "class.create", name: "Physics" })
+      .classes[0]!.id;
+    const b = store.execute({ type: "class.create", name: "Math" }).classes[1]!
+      .id;
+    const make = (classId: string) =>
+      store
+        .execute({
+          type: "task.create",
+          input: {
+            title: "Vectors",
+            classId,
+            notes: "",
+            minutes: 30,
+            dueAt: null,
+            deadlineConfirmed: true,
+            resource: null,
+          },
+        })
+        .tasks.at(-1)!.id;
+    const t1 = make(a),
+      t2 = make(b);
+    const input = {
+      title: "Vector notes",
+      text: "  Original line\nα = 30°\n",
+      classIds: [a, b, a],
+      taskIds: [t1, t2],
+    };
+    assert.throws(() =>
+      store.execute({
+        type: "source.create",
+        input: { ...input, taskIds: ["00000000-0000-4000-8000-000000000000"] },
+      }),
+    );
+    assert.equal(store.snapshot().sources.length, 0);
+    store.execute({ type: "source.create", input });
+    store.close();
+    store = new DeskStore(path);
+    const source = store.snapshot().sources[0]!;
+    assert.equal(source.text, input.text);
+    assert.equal(source.authority, "user-provided-text");
+    assert.equal(source.classIds.length, 2);
+    assert.equal(source.taskIds.length, 2);
+    store.execute({ type: "task.undo", id: t1 });
+    assert.equal(store.snapshot().sources[0]!.text, input.text);
+    assert.deepEqual(store.snapshot().sources[0]!.taskIds, [t2]);
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

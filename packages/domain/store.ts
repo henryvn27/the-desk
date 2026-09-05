@@ -10,6 +10,7 @@ import {
   type Task,
   type Class,
   type StudySession,
+  type Source,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -19,7 +20,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 3) {
+    if (version > 4) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -39,6 +40,12 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE settings(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=3; COMMIT;",
       );
+    if (version <= 3)
+      this.db.exec(`BEGIN;
+      CREATE TABLE sources(id TEXT PRIMARY KEY,title TEXT NOT NULL,text TEXT NOT NULL,createdAt TEXT NOT NULL,authority TEXT NOT NULL);
+      CREATE TABLE source_classes(source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id),PRIMARY KEY(source_id,class_id));
+      CREATE TABLE source_tasks(source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,PRIMARY KEY(source_id,task_id));
+      PRAGMA user_version=4; COMMIT;`);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -46,10 +53,24 @@ export class DeskStore {
       .run(randomUUID(), "local", sessionId, "lens", JSON.stringify(event));
   }
   snapshot(): Snapshot {
+    const classLinks = this.db.prepare("SELECT * FROM source_classes").all();
+    const taskLinks = this.db.prepare("SELECT * FROM source_tasks").all();
     const settings = this.db
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      sources: this.db
+        .prepare("SELECT * FROM sources")
+        .all()
+        .map((r) => ({
+          ...r,
+          classIds: classLinks
+            .filter((l) => l.source_id === r.id)
+            .map((l) => l.class_id),
+          taskIds: taskLinks
+            .filter((l) => l.source_id === r.id)
+            .map((l) => l.task_id),
+        })) as Source[],
       planning: settings
         ? planningPreferences.parse(JSON.parse(settings.data as string))
         : { ...defaultPlanningPreferences },
@@ -72,6 +93,26 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "source.create") {
+        entityId = randomUUID();
+        this.db
+          .prepare("INSERT INTO sources VALUES(?,?,?,?,?)")
+          .run(
+            entityId,
+            c.input.title,
+            c.input.text,
+            timestamp,
+            "user-provided-text",
+          );
+        for (const classId of new Set(c.input.classIds))
+          this.db
+            .prepare("INSERT INTO source_classes VALUES(?,?)")
+            .run(entityId, classId);
+        for (const taskId of new Set(c.input.taskIds))
+          this.db
+            .prepare("INSERT INTO source_tasks VALUES(?,?)")
+            .run(entityId, taskId);
+      }
       if (c.type === "planning.preferences") {
         entityId = "planning";
         this.db

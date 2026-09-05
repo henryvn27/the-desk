@@ -172,11 +172,11 @@
       "status": "UNIMPLEMENTED",
       "verification": "UNVERIFIED",
       "implementation": null,
-      "automated": null,
-      "live": null,
+      "automated": "33 tests plus typecheck/lint/build: exact source text, many-to-many class/task links, invalid-link rollback, restart, task unlink without source deletion.",
+      "live": "Installed macOS smoke captures a text source, links class/task, searches original content and verifies exact text/links after restart.",
       "mac": null,
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Partial graph only. Text sources/classes/tasks/sessions/preferences exist; most required entities, source editing/imports and broader graph workflows remain incomplete."
     },
     {
       "id": "DOMAIN-002",

@@ -1,6 +1,18 @@
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
 import { z } from "zod";
 const id = z.string().uuid();
+export const sourceInput = z.object({
+  title: z.string().trim().min(1).max(500),
+  text: z.string().min(1).max(200000),
+  classIds: z.array(id).max(100),
+  taskIds: z.array(id).max(500),
+});
+export type SourceInput = z.infer<typeof sourceInput>;
+export type Source = SourceInput & {
+  id: string;
+  createdAt: string;
+  authority: "user-provided-text";
+};
 export const taskInput = z.object({
   captureEvidence: z
     .object({
@@ -76,12 +88,14 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type Snapshot = {
+  sources: Source[];
   classes: Class[];
   tasks: Task[];
   sessions: StudySession[];
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("source.create"), input: sourceInput }),
   z.object({
     type: z.literal("planning.preferences"),
     input: planningPreferences,
