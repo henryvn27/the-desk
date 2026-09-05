@@ -56,12 +56,36 @@ export type Block = {
   minutes: number;
   why: string;
 };
+const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+export const planningPreferences = z
+  .object({
+    studyStart: localTime,
+    sleepCutoff: localTime,
+    studyDays: z.array(z.number().int().min(0).max(6)).max(7),
+    bufferPercent: z.number().int().min(5).max(50),
+  })
+  .refine(
+    (p) => p.studyStart < p.sleepCutoff,
+    "Study time must start before the same-day sleep cutoff.",
+  );
+export type PlanningPreferences = z.infer<typeof planningPreferences>;
+export const defaultPlanningPreferences: PlanningPreferences = {
+  studyStart: "08:00",
+  sleepCutoff: "22:00",
+  studyDays: [0, 1, 2, 3, 4, 5, 6],
+  bufferPercent: 15,
+};
 export type Snapshot = {
   classes: Class[];
   tasks: Task[];
   sessions: StudySession[];
+  planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("planning.preferences"),
+    input: planningPreferences,
+  }),
   z.object({
     type: z.literal("class.create"),
     name: z.string().trim().min(1).max(100),

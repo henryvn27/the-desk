@@ -200,6 +200,43 @@ try {
   );
   assert.equal(snapshot.tasks.at(-1).captureEvidence.originalText, original);
   assert.equal(errors.length, 0, errors.join("\n"));
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByLabel("Study starts at", { exact: true }).fill("16:00");
+  await page.getByLabel("Sleep cutoff", { exact: true }).fill("21:00");
+  for (const day of [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ])
+    await page.getByLabel(day, { exact: true }).uncheck();
+  await page.getByLabel("Unscheduled buffer (%)", { exact: true }).fill("20");
+  await page
+    .getByRole("button", { name: "Save study preferences", exact: true })
+    .click();
+  await page.getByText("Study preferences saved.", { exact: true }).waitFor();
+  await page.getByRole("heading",{name:"Settings",exact:true}).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(output, "planning-settings.png") });
+  await desktop.close();
+  await page.video().saveAs(join(output, "planning-settings.webm"));
+  await launch();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.deepEqual(snapshot.planning, {
+    studyStart: "16:00",
+    sleepCutoff: "21:00",
+    studyDays: [],
+    bufferPercent: 20,
+  });
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Start session →", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify(
       {
@@ -216,6 +253,7 @@ try {
           "pasted-text review with no invented due time and persisted provenance",
           "confirmed deadline edit requires approval and survives restart",
           "session review notes and remaining work survive restart and appear in history",
+          "study preferences survive restart and off-days have no automatic study blocks",
         ],
         limitations: [
           process.env.DESK_EXECUTABLE

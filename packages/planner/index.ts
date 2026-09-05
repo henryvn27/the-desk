@@ -1,4 +1,25 @@
-import type { Block, Task } from "../domain/contracts";
+import {
+  planningPreferences,
+  type PlanningPreferences,
+  type Block,
+  type Task,
+} from "../domain/contracts";
+/** Local wall-clock boundaries use the OS timezone, including its DST rules. */
+export function todayWindow(now: Date, raw: PlanningPreferences) {
+  const prefs = planningPreferences.parse(raw);
+  if (!Number.isFinite(+now)) throw Error("Invalid planning date");
+  function at(time: string) {
+    const date = new Date(now);
+    const [hour, minute] = time.split(":").map(Number);
+    date.setHours(hour!, minute!, 0, 0);
+    return date;
+  }
+  const start = new Date(Math.max(+now, +at(prefs.studyStart)));
+  const cutoff = at(prefs.sleepCutoff);
+  const enabled = prefs.studyDays.includes(now.getDay());
+  const end = new Date(enabled ? Math.max(+start, +cutoff) : +start);
+  return { start, end, buffer: prefs.bufferPercent / 100 };
+}
 /** Explicit capacity interval; callers supply local calendar/sleep boundaries as instants. */
 export function plan(
   tasks: Task[],

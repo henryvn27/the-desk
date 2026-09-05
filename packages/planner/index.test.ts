@@ -56,3 +56,46 @@ test("completed work leaves the next plan and no capacity means no blocks", () =
   const at = new Date();
   assert.equal(plan([task("a", 30, null)], at, at).overloadMinutes, 30);
 });
+
+test("saved study window respects local start, cutoff, off-days and DST", async () => {
+  const { todayWindow } = await import("./index");
+  const { defaultPlanningPreferences } = await import("../domain/contracts");
+  const oldZone = process.env.TZ;
+  process.env.TZ = "America/New_York";
+  try {
+    const prefs = {
+      ...defaultPlanningPreferences,
+      studyStart: "16:00",
+      sleepCutoff: "21:30",
+    };
+    const morning = todayWindow(new Date("2026-09-05T10:00:00-04:00"), prefs);
+    assert.equal(morning.start.toISOString(), "2026-09-05T20:00:00.000Z");
+    assert.equal(morning.end.toISOString(), "2026-09-06T01:30:00.000Z");
+    const late = todayWindow(new Date("2026-09-05T23:00:00-04:00"), prefs);
+    assert.equal(+late.start, +late.end);
+    const off = todayWindow(new Date("2026-09-05T17:00:00-04:00"), {
+      ...prefs,
+      studyDays: [],
+    });
+    assert.equal(+off.start, +off.end);
+    const spring = todayWindow(new Date("2026-03-08T00:00:00-05:00"), {
+      ...prefs,
+      studyStart: "01:00",
+      sleepCutoff: "04:00",
+    });
+    assert.equal((+spring.end - +spring.start) / 3600000, 2);
+    const fall = todayWindow(new Date("2026-11-01T00:00:00-04:00"), {
+      ...prefs,
+      studyStart: "01:00",
+      sleepCutoff: "04:00",
+    });
+    assert.equal((+fall.end - +fall.start) / 3600000, 4);
+    assert.throws(
+      () => todayWindow(new Date(), { ...prefs, studyStart: "23:00" }),
+      /before/,
+    );
+  } finally {
+    if (oldZone === undefined) delete process.env.TZ;
+    else process.env.TZ = oldZone;
+  }
+});

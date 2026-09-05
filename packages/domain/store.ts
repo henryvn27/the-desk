@@ -3,6 +3,8 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import {
   command,
+  defaultPlanningPreferences,
+  planningPreferences,
   type Command,
   type Snapshot,
   type Task,
@@ -17,7 +19,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 2) {
+    if (version > 3) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -33,6 +35,10 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE ai_runs(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,session_id TEXT,feature TEXT NOT NULL,data TEXT NOT NULL); PRAGMA user_version=2; COMMIT;",
       );
+    if (version <= 2)
+      this.db.exec(
+        "BEGIN; CREATE TABLE settings(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=3; COMMIT;",
+      );
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -40,7 +46,13 @@ export class DeskStore {
       .run(randomUUID(), "local", sessionId, "lens", JSON.stringify(event));
   }
   snapshot(): Snapshot {
+    const settings = this.db
+      .prepare("SELECT data FROM settings WHERE id='planning'")
+      .get();
     return {
+      planning: settings
+        ? planningPreferences.parse(JSON.parse(settings.data as string))
+        : { ...defaultPlanningPreferences },
       classes: this.db.prepare("SELECT * FROM classes").all() as Class[],
       tasks: this.db
         .prepare("SELECT data FROM tasks")
@@ -60,6 +72,14 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "planning.preferences") {
+        entityId = "planning";
+        this.db
+          .prepare(
+            "INSERT INTO settings VALUES('planning',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(JSON.stringify(c.input));
+      }
       if (c.type === "class.create") {
         entityId = randomUUID();
         this.db

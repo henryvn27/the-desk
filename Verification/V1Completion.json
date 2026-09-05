@@ -447,11 +447,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
+      "automated": "31 tests plus typecheck/lint/build: saved capacity windows, off-days, cutoff, DST transitions, invalid-setting rollback, schema migration.",
+      "live": "Installed macOS smoke saves study start/cutoff/days/buffer, restarts and verifies zero automatic blocks on off-days.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": null,
-      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+      "blocker": "Partial only: learned estimates, spacing and multi-day planning are still missing."
     },
     {
       "id": "PLAN-004",

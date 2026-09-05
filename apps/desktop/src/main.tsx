@@ -7,7 +7,9 @@ import type {
   Command,
   Task,
 } from "../../../packages/domain/contracts";
-import { plan } from "../../../packages/planner";
+import { plan, todayWindow } from "../../../packages/planner";
+import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
+import { PlanningSettings } from "./PlanningSettings";
 import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
@@ -18,7 +20,12 @@ declare global {
     desk: DeskAPI;
   }
 }
-const empty: Snapshot = { classes: [], tasks: [], sessions: [] };
+const empty: Snapshot = {
+  classes: [],
+  tasks: [],
+  sessions: [],
+  planning: defaultPlanningPreferences,
+};
 function App() {
   const [data, setData] = useState(empty),
     [page, setPage] = useState("Home"),
@@ -84,11 +91,13 @@ function App() {
       setError(userError(e));
     }
   }
-  const start = new Date(tick);
-  const cutoff = new Date(tick);
-  cutoff.setHours(22, 0, 0, 0);
-  if (cutoff < start) cutoff.setTime(+start);
-  const schedule = plan(data.tasks, start, cutoff);
+  const capacity = todayWindow(new Date(tick), data.planning);
+  const schedule = plan(
+    data.tasks,
+    capacity.start,
+    capacity.end,
+    capacity.buffer,
+  );
   const next = data.tasks.find((t) => t.id === schedule.blocks[0]?.taskId);
   const elapsed = active
     ? Math.max(
@@ -374,6 +383,12 @@ function App() {
         ) : page === "Settings" ? (
           <>
             <h1>Settings</h1>
+            <PlanningSettings
+              preferences={data.planning}
+              save={(input) =>
+                act({ type: "planning.preferences", input }, true)
+              }
+            />
             <ProviderSettings />
             <h2>Connections</h2>
             <p>

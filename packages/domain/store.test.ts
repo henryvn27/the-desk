@@ -66,7 +66,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 2);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 3);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -239,6 +239,33 @@ test("session review survives restart, updates remaining work, and rejects stale
       remainingMinutes: null,
     });
     assert.ok(store.snapshot().sessions[1]!.review?.reviewedAt);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("planning preferences persist and invalid window cannot overwrite them", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-prefs-"));
+  const path = join(directory, "db.sqlite");
+  let store = new DeskStore(path);
+  try {
+    const input = {
+      studyStart: "16:00",
+      sleepCutoff: "21:00",
+      studyDays: [1, 3, 5],
+      bufferPercent: 20,
+    };
+    store.execute({ type: "planning.preferences", input });
+    assert.throws(() =>
+      store.execute({
+        type: "planning.preferences",
+        input: { ...input, sleepCutoff: "09:00" },
+      }),
+    );
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.snapshot().planning, input);
   } finally {
     store.close();
     rmSync(directory, { recursive: true });
