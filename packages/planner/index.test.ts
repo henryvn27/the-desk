@@ -99,3 +99,57 @@ test("saved study window respects local start, cutoff, off-days and DST", async 
     else process.env.TZ = oldZone;
   }
 });
+
+test("weekly plan carries remaining work across study days without duplication or late blocks", async () => {
+  const { planWeek } = await import("./index");
+  const now = new Date(2026, 8, 5, 8, 0); // local Saturday
+  const prefs = {
+    studyStart: "09:00",
+    sleepCutoff: "10:00",
+    studyDays: [0, 1, 2, 3, 4, 5, 6],
+    bufferPercent: 15,
+  };
+  const due = new Date(2026, 8, 7, 10, 0).toISOString();
+  const input = [
+    task("long", 130, due),
+    task("overflow", 80, due),
+    { ...task("uncertain", 30, due), deadlineConfirmed: false },
+  ];
+  const result = planWeek(input, now, prefs);
+  assert.equal(
+    result.blocks
+      .filter((b) => b.taskId === "long")
+      .reduce((sum, b) => sum + b.minutes, 0),
+    130,
+  );
+  for (const t of input)
+    assert.equal(
+      result.blocks
+        .filter((b) => b.taskId === t.id)
+        .reduce((sum, b) => sum + b.minutes, 0) +
+        (result.unscheduled.find((u) => u.taskId === t.id)?.minutes ?? 0),
+      t.minutes,
+    );
+  assert.equal(input[0]!.minutes, 130);
+  assert.ok(result.blocks.every((b) => Date.parse(b.end) <= Date.parse(due)));
+  assert.equal(
+    new Set(
+      result.blocks
+        .filter((b) => b.taskId === "long")
+        .map((b) => new Date(b.start).getDate()),
+    ).size,
+    3,
+  );
+  const off = planWeek([task("future", 30, null)], now, {
+    ...prefs,
+    studyDays: [1],
+  });
+  assert.equal(new Date(off.blocks[0]!.start).getDay(), 1);
+  assert.equal(off.unscheduled.length, 0);
+  const noDays = planWeek([task("future", 30, null)], now, {
+    ...prefs,
+    studyDays: [],
+  });
+  assert.equal(noDays.blocks.length, 0);
+  assert.equal(noDays.overloadMinutes, 30);
+});

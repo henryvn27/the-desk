@@ -447,11 +447,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "31 tests plus typecheck/lint/build: saved capacity windows, off-days, cutoff, DST transitions, invalid-setting rollback, schema migration.",
-      "live": "Installed macOS smoke saves study start/cutoff/days/buffer, restarts and verifies zero automatic blocks on off-days.",
+      "automated": "32 tests plus typecheck/lint/build: weekly residual-time conservation, deadlines, study days, cutoff, buffer and DST windows.",
+      "live": "Installed macOS smoke renders long assignment split across future study days; existing capture/session/preferences flows pass.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Partial only: learned estimates, spacing and multi-day planning are still missing."
+      "blocker": "Partial only: learned estimates, learning-based spacing, persistent plans and locks remain missing."
     },
     {
       "id": "PLAN-004",

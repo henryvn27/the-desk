@@ -12,7 +12,7 @@ The product contract §4 defines the required academic graph. This document desc
 | StudySession | `sessions.task_id` foreign key; tracked start/pause/end and elapsed minutes | Clock measurement is separate from student-reported completion |
 | Session review | Session payload with review time, notes and optional remaining minutes | Explicit student report; no submission or mastery inference |
 | Planning preference | `settings` row `planning`; local study window, weekdays and buffer | Explicit student configuration |
-| Proposed block | Computed planner output; not persisted | Deterministic same-day suggestion, not a calendar commitment |
+| Proposed block | Computed planner output; not persisted | Deterministic seven-day suggestion, not a calendar commitment |
 | AI run | `ai_runs`, feature and optional session id | Content-free provider usage and latency; unavailable usage is null |
 | Outbox operation | `outbox`, entity id, operation and timestamp | Local change intent only; not sufficient data for cloud replication |
 

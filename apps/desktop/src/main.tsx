@@ -7,7 +7,7 @@ import type {
   Command,
   Task,
 } from "../../../packages/domain/contracts";
-import { plan, todayWindow } from "../../../packages/planner";
+import { plan, planWeek, todayWindow } from "../../../packages/planner";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
 import { PlanningSettings } from "./PlanningSettings";
 import "./style.css";
@@ -99,6 +99,7 @@ function App() {
     capacity.buffer,
   );
   const next = data.tasks.find((t) => t.id === schedule.blocks[0]?.taskId);
+  const week = planWeek(data.tasks, new Date(tick), data.planning);
   const elapsed = active
     ? Math.max(
         0,
@@ -331,16 +332,16 @@ function App() {
             {!schedule.blocks.slice(1).length && (
               <p className="muted">No other blocks planned.</p>
             )}
-            {schedule.unscheduled.length > 0 && (
+            {week.unscheduled.length > 0 && (
               <>
                 <h2 className="section-title">Needs attention</h2>
-                {schedule.overloadMinutes > 0 && (
+                {week.overloadMinutes > 0 && (
                   <p>
-                    {schedule.overloadMinutes} minutes of required work cannot
-                    fit before the current cutoff.
+                    {week.overloadMinutes} minutes of required work remain
+                    outside this seven-day plan.
                   </p>
                 )}
-                {schedule.unscheduled.map((u) => (
+                {week.unscheduled.map((u) => (
                   <div className="attention" key={u.taskId}>
                     <strong>
                       {data.tasks.find((t) => t.id === u.taskId)?.title}
@@ -361,15 +362,28 @@ function App() {
         ) : page === "Plan" ? (
           <>
             <h1>Your plan</h1>
-            <p className="muted">Today until 10 PM · 15% breathing room</p>
-            {schedule.blocks.map((b) => (
-              <section className="row" key={b.taskId}>
+            <p className="muted">
+              Next seven days · {data.planning.studyStart}–
+              {data.planning.sleepCutoff} local time ·{" "}
+              {data.planning.bufferPercent}% breathing room
+            </p>
+            {!week.blocks.length && (
+              <p>
+                No study blocks fit in the next seven days. Check your study
+                days and deadlines.
+              </p>
+            )}
+            {week.blocks.map((b) => (
+              <section className="row" key={b.taskId + b.start}>
                 <div>
                   <strong>
                     {data.tasks.find((t) => t.id === b.taskId)?.title}
                   </strong>
                   <p>
-                    {new Date(b.start).toLocaleTimeString([], {
+                    {new Date(b.start).toLocaleString([], {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
                       hour: "numeric",
                       minute: "2-digit",
                     })}{" "}
@@ -379,6 +393,17 @@ function App() {
                 </div>
               </section>
             ))}
+            {week.unscheduled.length > 0 && (
+              <section>
+                <h2>Still needs time</h2>
+                {week.unscheduled.map((u) => (
+                  <p key={u.taskId}>
+                    {data.tasks.find((t) => t.id === u.taskId)?.title} ·{" "}
+                    {u.minutes} min · {u.reason}
+                  </p>
+                ))}
+              </section>
+            )}
           </>
         ) : page === "Settings" ? (
           <>

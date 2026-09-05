@@ -20,6 +20,53 @@ export function todayWindow(now: Date, raw: PlanningPreferences) {
   const end = new Date(enabled ? Math.max(+start, +cutoff) : +start);
   return { start, end, buffer: prefs.bufferPercent / 100 };
 }
+/** Seven local calendar days; each day's work consumes the task's remaining estimate once. */
+export function planWeek(
+  tasks: Task[],
+  now: Date,
+  preferences: PlanningPreferences,
+) {
+  const residual = tasks.filter((t) => !t.completed).map((t) => ({ ...t }));
+  const blocks: Block[] = [];
+  let horizon = new Date(now);
+  for (let day = 0; day < 7; day++) {
+    const date = new Date(now);
+    if (day) {
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() + day);
+    }
+    const capacity = todayWindow(date, preferences);
+    horizon = capacity.end;
+    const daily = plan(
+      residual.filter((t) => t.minutes > 0),
+      capacity.start,
+      capacity.end,
+      capacity.buffer,
+    );
+    for (const block of daily.blocks) {
+      blocks.push(block);
+      residual.find((t) => t.id === block.taskId)!.minutes -= block.minutes;
+    }
+  }
+  const unscheduled = residual
+    .filter((t) => t.minutes > 0)
+    .map((t) => ({
+      taskId: t.id,
+      minutes: t.minutes,
+      reason: !t.deadlineConfirmed
+        ? "Confirm the deadline before automatic scheduling."
+        : t.dueAt && Date.parse(t.dueAt) <= +horizon
+          ? "Cannot fit before its deadline within your available study time."
+          : "Not scheduled in the next seven days; required work remains.",
+    }));
+  return {
+    blocks,
+    unscheduled,
+    overloadMinutes: residual
+      .filter((t) => t.deadlineConfirmed && t.minutes > 0)
+      .reduce((sum, t) => sum + t.minutes, 0),
+  };
+}
 /** Explicit capacity interval; callers supply local calendar/sleep boundaries as instants. */
 export function plan(
   tasks: Task[],

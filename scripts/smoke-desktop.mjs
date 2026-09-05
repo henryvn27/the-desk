@@ -218,7 +218,9 @@ try {
     .getByRole("button", { name: "Save study preferences", exact: true })
     .click();
   await page.getByText("Study preferences saved.", { exact: true }).waitFor();
-  await page.getByRole("heading",{name:"Settings",exact:true}).scrollIntoViewIfNeeded();
+  await page
+    .getByRole("heading", { name: "Settings", exact: true })
+    .scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(output, "planning-settings.png") });
   await desktop.close();
   await page.video().saveAs(join(output, "planning-settings.webm"));
@@ -237,6 +239,43 @@ try {
     0,
   );
   assert.equal(errors.length, 0, errors.join("\n"));
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByLabel("Study starts at", { exact: true }).fill("09:00");
+  await page.getByLabel("Sleep cutoff", { exact: true }).fill("10:00");
+  for (const day of [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ])
+    await page.getByLabel(day, { exact: true }).check();
+  await page
+    .getByRole("button", { name: "Save study preferences", exact: true })
+    .click();
+  await page.getByText("Study preferences saved.", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Enter manually", exact: true })
+    .click();
+  await page.getByLabel("What needs doing?").fill("Long practice packet");
+  await page.getByLabel("Estimated minutes").fill("180");
+  await page.getByLabel("I have confirmed").check();
+  await page
+    .getByRole("button", { name: "Save assignment", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await page.getByRole("heading", { name: "Your plan", exact: true }).waitFor();
+  assert.ok(
+    (await page
+      .locator("section.row")
+      .filter({ hasText: "Long practice packet" })
+      .count()) > 1,
+  );
+  await page.screenshot({ path: join(output, "weekly-plan.png") });
+  assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify(
       {
@@ -254,6 +293,7 @@ try {
           "confirmed deadline edit requires approval and survives restart",
           "session review notes and remaining work survive restart and appear in history",
           "study preferences survive restart and off-days have no automatic study blocks",
+          "long assignment splits across future study days in Plan",
         ],
         limitations: [
           process.env.DESK_EXECUTABLE
