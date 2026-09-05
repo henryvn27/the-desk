@@ -1,0 +1,36 @@
+# Academic domain
+
+The product contract §4 defines the required academic graph. This document describes the implemented subset and the invariants that additions must preserve. SQLite is authoritative locally; no cloud graph is implemented.
+
+## Implemented objects
+
+| Object | Storage and relationships | Evidence or authority |
+|---|---|---|
+| Class | `classes`; one class has many tasks | Student-entered name |
+| Task | `tasks.class_id` foreign key; JSON payload; one task has many sessions | Student-confirmed title, due instant, estimate, optional HTTPS resource and notes |
+| Capture provenance | Optional task payload retaining original/source text, captured time, candidate dates, uncertainties and field confidence | Original user-provided text is retained through task corrections |
+| StudySession | `sessions.task_id` foreign key; tracked start/pause/end and elapsed minutes | Clock measurement is separate from student-reported completion |
+| Session review | Session payload with review time, notes and optional remaining minutes | Explicit student report; no submission or mastery inference |
+| Planning preference | `settings` row `planning`; local study window, weekdays and buffer | Explicit student configuration |
+| Proposed block | Computed planner output; not persisted | Deterministic same-day suggestion, not a calendar commitment |
+| AI run | `ai_runs`, feature and optional session id | Content-free provider usage and latency; unavailable usage is null |
+| Outbox operation | `outbox`, entity id, operation and timestamp | Local change intent only; not sufficient data for cloud replication |
+
+## Enforced invariants
+
+- UUID identities remain stable through corrections. Class/task and task/session foreign keys reject orphan records.
+- The database has at most one active session, enforced by a partial unique index. Command transactions include local outbox writes.
+- Paused time is excluded from measured duration, including an end while paused. Review notes do not rewrite measured duration.
+- Completion is the student's report. It proves neither submission nor understanding.
+- Changing a confirmed deadline or revoking its confirmation requires explicit approval. Capture provenance survives the edit.
+- Uncertain deadlines are excluded from automatic planning. Capacity respects the configured local same-day window and buffer.
+- Remaining-time review cannot modify completed work or overwrite an estimate after a newer session of the same task.
+- SQLite migrations are sequential and transactional. Schema 3 adds settings; opening a future schema fails closed.
+
+## Required graph still missing
+
+User identity, academic periods, tracks, units, teachers, assessments, first-class sources/artifacts/concepts, attempts, mistakes, persistent plans and study blocks, grades/categories, durable memory, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
+
+The current local profile is not a multi-user security boundary. JSON payload persistence is not evidence that absent objects, synchronization, provenance corrections or confidence history are supported.
+
+Verification: `packages/domain/store.test.ts`, `packages/planner/index.test.ts`, and installed smoke evidence described in `Verification/BASELINE.md`.
