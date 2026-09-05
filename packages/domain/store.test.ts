@@ -145,3 +145,102 @@ test("task correction preserves provenance and requires approval for authoritati
     store.close();
   }
 });
+
+test("session review survives restart, updates remaining work, and rejects stale estimate writes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-review-"));
+  const path = join(directory, "db.sqlite");
+  let store = new DeskStore(path);
+  try {
+    const classId = store.execute({ type: "class.create", name: "Physics" })
+      .classes[0]!.id;
+    const taskId = store.execute({
+      type: "task.create",
+      input: {
+        title: "Vectors",
+        classId,
+        dueAt: null,
+        minutes: 60,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: true,
+      },
+    }).tasks[0]!.id;
+    const sessionId = store.execute(
+      { type: "session.start", taskId },
+      new Date("2026-09-05T12:00:00Z"),
+    ).sessions[0]!.id;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "session.review",
+          id: sessionId,
+          notes: "",
+          remainingMinutes: 30,
+        }),
+      /End this session/,
+    );
+    store.execute(
+      { type: "session.end", completed: false },
+      new Date("2026-09-05T12:20:00Z"),
+    );
+    store.execute({
+      type: "session.review",
+      id: sessionId,
+      notes: "Worked on components; signs need review",
+      remainingMinutes: 35,
+    });
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(store.snapshot().tasks[0]!.minutes, 35);
+    assert.equal(store.snapshot().tasks[0]!.completed, false);
+    assert.equal(store.snapshot().sessions[0]!.actualMinutes, 20);
+    assert.equal(store.snapshot().sessions[0]!.completionReported, false);
+    assert.equal(
+      store.snapshot().sessions[0]!.review?.notes,
+      "Worked on components; signs need review",
+    );
+    store.execute(
+      { type: "session.start", taskId },
+      new Date("2026-09-05T13:00:00Z"),
+    );
+    assert.throws(
+      () =>
+        store.execute({
+          type: "session.review",
+          id: sessionId,
+          notes: "stale",
+          remainingMinutes: 15,
+        }),
+      /newer session/,
+    );
+    assert.equal(store.snapshot().tasks[0]!.minutes, 35);
+    assert.equal(
+      store.snapshot().sessions[0]!.review?.notes,
+      "Worked on components; signs need review",
+    );
+    const ended = store.execute(
+      { type: "session.end", completed: true },
+      new Date("2026-09-05T13:15:00Z"),
+    ).sessions[1]!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "session.review",
+          id: ended.id,
+          notes: "",
+          remainingMinutes: 10,
+        }),
+      /Completed work/,
+    );
+    store.execute({
+      type: "session.review",
+      id: ended.id,
+      notes: "",
+      remainingMinutes: null,
+    });
+    assert.ok(store.snapshot().sessions[1]!.review?.reviewedAt);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});

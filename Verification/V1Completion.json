@@ -574,11 +574,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
+      "automated": "npm run check: 29 tests. Review persists notes/remaining time, retains measured duration, rejects completed-task and stale-session estimate changes.",
+      "live": "Installed macOS smoke: accept finished-session summary, add unfinished-session notes/remaining time, restart, verify persisted history.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": null,
-      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+      "blocker": "Partial only: no automatic work detection, learned estimates, attempts/mistake/mastery/preparedness updates, or completion correction yet."
     },
     {
       "id": "LENS-001",

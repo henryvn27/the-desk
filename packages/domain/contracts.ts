@@ -42,6 +42,12 @@ export type StudySession = {
   pausedMs: number;
   endedAt: string | null;
   actualMinutes: number | null;
+  completionReported?: boolean;
+  review?: {
+    reviewedAt: string;
+    notes: string;
+    remainingMinutes: number | null;
+  };
 };
 export type Block = {
   taskId: string;
@@ -72,6 +78,12 @@ export const command = z.discriminatedUnion("type", [
   z.object({ type: z.literal("session.pause") }),
   z.object({ type: z.literal("session.resume") }),
   z.object({ type: z.literal("session.end"), completed: z.boolean() }),
+  z.object({
+    type: z.literal("session.review"),
+    id,
+    notes: z.string().trim().max(20000),
+    remainingMinutes: z.number().int().min(5).max(2400).nullable(),
+  }),
 ]);
 export type Command = z.infer<typeof command>;
 export type LensCapture = {

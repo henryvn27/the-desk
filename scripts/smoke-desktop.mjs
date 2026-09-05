@@ -36,7 +36,9 @@ try {
   await page
     .getByRole("button", { name: "Capture assignment", exact: true })
     .click();
-  await page.getByRole("button", { name: "Enter manually", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Enter manually", exact: true })
+    .click();
   await page
     .getByLabel("What needs doing?")
     .fill("Work through friction problems 8–14");
@@ -83,6 +85,7 @@ try {
   await lens.screenshot({ path: join(output, "lens-selection.png") });
   await lens.getByRole("button", { name: "Dismiss · Esc" }).click();
   await page.getByRole("button", { name: "Finish task", exact: true }).click();
+  await page.getByRole("button", { name: "Looks right", exact: true }).click();
   await page.getByText("Ready when you are.", { exact: true }).waitFor();
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.tasks[0].completed, true);
@@ -125,6 +128,40 @@ try {
   await page.locator("dialog").waitFor({ state: "detached" });
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.tasks.at(-1).captureEvidence.originalText, original);
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Start session →", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "End · keep unfinished", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Add details", exact: true }).click();
+  await page
+    .getByLabel("What did you work on, or what needs another look?")
+    .fill("Reviewed free-body diagrams; revisit friction direction.");
+  await page.getByLabel("Minutes still needed (optional)").fill("20");
+  await page.screenshot({ path: join(output, "session-review.png") });
+  await page.getByRole("button", { name: "Save review", exact: true }).click();
+  await page
+    .getByRole("region", { name: "Session wrap-up" })
+    .waitFor({ state: "detached" });
+  await desktop.close();
+  await page.video().saveAs(join(output, "session-review.webm"));
+  await launch();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.tasks.at(-1).minutes, 20);
+  assert.equal(snapshot.tasks.at(-1).completed, false);
+  assert.equal(
+    snapshot.sessions.at(-1).review.notes,
+    "Reviewed free-body diagrams; revisit friction direction.",
+  );
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page.getByText("Study history", { exact: true }).last().click();
+  await page
+    .getByText("Reviewed free-body diagrams; revisit friction direction.", {
+      exact: true,
+    })
+    .waitFor();
   assert.equal(
     snapshot.tasks.at(-1).dueAt,
     new Date("2026-09-09T23:59").toISOString(),
@@ -178,6 +215,7 @@ try {
           "completed restart",
           "pasted-text review with no invented due time and persisted provenance",
           "confirmed deadline edit requires approval and survives restart",
+          "session review notes and remaining work survive restart and appear in history",
         ],
         limitations: [
           process.env.DESK_EXECUTABLE

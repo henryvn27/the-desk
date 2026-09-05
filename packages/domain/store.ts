@@ -143,6 +143,7 @@ export class DeskStore {
               60000,
           );
           active.endedAt = timestamp;
+          active.completionReported = c.completed;
           const task = state.tasks.find((t) => t.id === active.taskId)!;
           // Completion is the student's explicit report, never a claim of submission or mastery.
           if (c.completed) {
@@ -156,6 +157,41 @@ export class DeskStore {
         this.db
           .prepare("UPDATE sessions SET data=?,active=? WHERE id=?")
           .run(JSON.stringify(active), active.endedAt ? 0 : 1, active.id);
+      }
+      if (c.type === "session.review") {
+        const session = state.sessions.find((s) => s.id === c.id);
+        if (!session?.endedAt)
+          throw Error("End this session before reviewing it.");
+        const task = state.tasks.find((t) => t.id === session.taskId)!;
+        if (c.remainingMinutes !== null) {
+          if (task.completed)
+            throw Error("Completed work cannot have remaining study time.");
+          if (
+            state.sessions.some(
+              (s) =>
+                s.taskId === task.id &&
+                s.id !== session.id &&
+                s.startedAt >= session.endedAt!,
+            )
+          )
+            throw Error(
+              "A newer session exists. Update the assignment estimate directly.",
+            );
+          task.minutes = c.remainingMinutes;
+          this.db
+            .prepare("UPDATE tasks SET data=? WHERE id=?")
+            .run(JSON.stringify(task), task.id);
+          this.queue(task.id, "task.remaining-time", timestamp);
+        }
+        session.review = {
+          reviewedAt: timestamp,
+          notes: c.notes,
+          remainingMinutes: c.remainingMinutes,
+        };
+        entityId = session.id;
+        this.db
+          .prepare("UPDATE sessions SET data=? WHERE id=?")
+          .run(JSON.stringify(session), session.id);
       }
       this.queue(entityId, c.type, timestamp);
       this.db.exec("COMMIT");

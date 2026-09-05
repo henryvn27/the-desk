@@ -12,6 +12,7 @@ import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
 import { Lens } from "./Lens";
+import { SessionReview } from "./SessionReview";
 declare global {
   interface Window {
     desk: DeskAPI;
@@ -30,6 +31,10 @@ function App() {
   const kind = location.hash.slice(1);
   const active = data.sessions.find((s) => !s.endedAt);
   const activeTask = data.tasks.find((t) => t.id === active?.taskId);
+  const unreviewed = [...data.sessions]
+    .reverse()
+    .find((s) => s.endedAt && s.completionReported !== undefined && !s.review);
+  const reviewTask = data.tasks.find((t) => t.id === unreviewed?.taskId);
   useEffect(() => {
     const refresh = () =>
       window.desk
@@ -248,6 +253,15 @@ function App() {
         {page === "Home" ? (
           <>
             <h1>Make room for focus.</h1>
+            {!active && unreviewed && reviewTask && (
+              <SessionReview
+                key={unreviewed.id}
+                session={unreviewed}
+                task={reviewTask}
+                save={act}
+                busy={busy}
+              />
+            )}
             {active ? (
               sessionPanel
             ) : next ? (
@@ -463,6 +477,28 @@ function Library({
               </p>
               {t.notes && <p>{t.notes}</p>}
               <button onClick={() => edit(t)}>Edit assignment</button>
+              {data.sessions.some((s) => s.taskId === t.id && s.endedAt) && (
+                <details>
+                  <summary>Study history</summary>
+                  {data.sessions
+                    .filter((s) => s.taskId === t.id && s.endedAt)
+                    .map((s) => (
+                      <div key={s.id}>
+                        <p>
+                          {new Date(s.endedAt!).toLocaleString()} ·{" "}
+                          {Math.round(s.actualMinutes ?? 0)} min tracked
+                        </p>
+                        {s.review?.notes && <p>{s.review.notes}</p>}
+                        {s.review?.remainingMinutes != null && (
+                          <p>
+                            {s.review.remainingMinutes} minutes remaining,
+                            reported at review
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                </details>
+              )}
               {t.resource && (
                 <button onClick={() => void open(t.id)}>Open resource</button>
               )}
