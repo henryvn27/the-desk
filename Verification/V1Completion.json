@@ -466,8 +466,8 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
+      "automated": "npm run check: 28 tests; task correction rejects unapproved confirmed-deadline changes and preserves capture provenance.",
+      "live": "Installed macOS smoke: reject unapproved date change, approve/save, restart and verify corrected deadline plus original source.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": null,
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."

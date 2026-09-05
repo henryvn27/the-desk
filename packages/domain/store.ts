@@ -78,6 +78,26 @@ export class DeskStore {
           .prepare("INSERT INTO tasks VALUES(?,?,?)")
           .run(entityId, task.classId, JSON.stringify(task));
       }
+      if (c.type === "task.update") {
+        const existing = state.tasks.find((t) => t.id === c.id);
+        if (!existing) throw Error("Task no longer exists.");
+        const changesAuthority =
+          existing.deadlineConfirmed &&
+          (existing.dueAt !== c.input.dueAt || !c.input.deadlineConfirmed);
+        if (changesAuthority && !c.deadlineChangeApproved)
+          throw Error(
+            "Approve the change to this confirmed deadline before saving.",
+          );
+        const updated: Task = {
+          ...existing,
+          ...c.input,
+          captureEvidence: existing.captureEvidence ?? c.input.captureEvidence,
+        };
+        entityId = existing.id;
+        this.db
+          .prepare("UPDATE tasks SET class_id=?,data=? WHERE id=?")
+          .run(updated.classId, JSON.stringify(updated), existing.id);
+      }
       if (c.type === "task.undo") {
         if (state.sessions.some((s) => s.taskId === c.id))
           throw Error("This task has study history and cannot be undone.");

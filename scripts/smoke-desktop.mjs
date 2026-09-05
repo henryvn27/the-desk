@@ -36,6 +36,7 @@ try {
   await page
     .getByRole("button", { name: "Capture assignment", exact: true })
     .click();
+  await page.getByRole("button", { name: "Enter manually", exact: true }).click();
   await page
     .getByLabel("What needs doing?")
     .fill("Work through friction problems 8–14");
@@ -128,6 +129,39 @@ try {
     snapshot.tasks.at(-1).dueAt,
     new Date("2026-09-09T23:59").toISOString(),
   );
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page
+    .locator("article")
+    .filter({ hasText: "AP Physics C: Friction review" })
+    .getByRole("button", { name: "Edit assignment", exact: true })
+    .click();
+  await page.getByLabel("Due date", { exact: true }).fill("2026-09-10");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByText("Approve the change to this confirmed deadline before saving.", {
+      exact: true,
+    })
+    .waitFor();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(
+    snapshot.tasks.at(-1).dueAt,
+    new Date("2026-09-09T23:59").toISOString(),
+  );
+  await page
+    .getByLabel("Approve any change to the confirmed deadline", { exact: true })
+    .check();
+  await page.screenshot({ path: join(output, "task-edit.png") });
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.locator("dialog").waitFor({ state: "detached" });
+  await desktop.close();
+  await launch();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(
+    snapshot.tasks.at(-1).dueAt,
+    new Date("2026-09-10T23:59").toISOString(),
+  );
+  assert.equal(snapshot.tasks.at(-1).captureEvidence.originalText, original);
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify(
@@ -143,6 +177,7 @@ try {
           "explicit completion",
           "completed restart",
           "pasted-text review with no invented due time and persisted provenance",
+          "confirmed deadline edit requires approval and survives restart",
         ],
         limitations: [
           process.env.DESK_EXECUTABLE

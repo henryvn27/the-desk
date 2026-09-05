@@ -5,6 +5,7 @@ import type {
   DeskAPI,
   Snapshot,
   Command,
+  Task,
 } from "../../../packages/domain/contracts";
 import { plan } from "../../../packages/planner";
 import "./style.css";
@@ -25,6 +26,7 @@ function App() {
     [capture, setCapture] = useState(false),
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
+  const [editing, setEditing] = useState<Task>();
   const kind = location.hash.slice(1);
   const active = data.sessions.find((s) => !s.endedAt);
   const activeTask = data.tasks.find((t) => t.id === active?.taskId);
@@ -56,7 +58,7 @@ function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [kind]);
-  async function act(c: Command) {
+  async function act(c: Command, reportToCaller = false) {
     setBusy(true);
     setError("");
     try {
@@ -64,6 +66,7 @@ function App() {
       setData(next);
       return next;
     } catch (e) {
+      if (reportToCaller) throw e;
       setError(userError(e));
     } finally {
       setBusy(false);
@@ -320,6 +323,13 @@ function App() {
                       {data.tasks.find((t) => t.id === u.taskId)?.title}
                     </strong>
                     <p>{u.reason}</p>
+                    <button
+                      onClick={() =>
+                        setEditing(data.tasks.find((t) => t.id === u.taskId))
+                      }
+                    >
+                      Review assignment
+                    </button>
                   </div>
                 ))}
               </>
@@ -359,7 +369,8 @@ function App() {
             <h2>Lens</h2>
             <p>
               Option/Alt + Space opens Lens. This build supports a local
-              selection overlay and explicit screen capture. Connect an AI provider above for typed assistance. Voice is not available yet.
+              selection overlay and explicit screen capture. Connect an AI
+              provider above for typed assistance. Voice is not available yet.
             </p>
           </>
         ) : (
@@ -367,16 +378,38 @@ function App() {
             data={data}
             classId={data.classes.some((c) => c.id === page) ? page : undefined}
             open={open}
+            edit={setEditing}
           />
         )}
       </main>
+      {editing && (
+        <Capture
+          classes={data.classes}
+          busy={busy}
+          existing={editing}
+          onClose={() => setEditing(undefined)}
+          onSave={async (input, deadlineChangeApproved) =>
+            Boolean(
+              await act(
+                {
+                  type: "task.update",
+                  id: editing.id,
+                  input,
+                  deadlineChangeApproved,
+                },
+                true,
+              ),
+            )
+          }
+        />
+      )}
       {capture && (
         <Capture
           classes={data.classes}
           busy={busy}
           onClose={() => setCapture(false)}
           onSave={async (input) => {
-            const next = await act({ type: "task.create", input });
+            const next = await act({ type: "task.create", input }, true);
             if (next) {
               setLastId(next.tasks.at(-1)!.id);
               return true;
@@ -392,10 +425,12 @@ function Library({
   data,
   classId,
   open,
+  edit,
 }: {
   data: Snapshot;
   classId?: string;
   open: (id: string) => Promise<void>;
+  edit: (task: Task) => void;
 }) {
   const [search, setSearch] = useState("");
   return (
@@ -427,6 +462,7 @@ function Library({
                     : "Deadline needs confirmation"}
               </p>
               {t.notes && <p>{t.notes}</p>}
+              <button onClick={() => edit(t)}>Edit assignment</button>
               {t.resource && (
                 <button onClick={() => void open(t.id)}>Open resource</button>
               )}

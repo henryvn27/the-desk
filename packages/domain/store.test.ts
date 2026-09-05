@@ -78,3 +78,70 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     rmSync(directory, { recursive: true });
   }
 });
+
+test("task correction preserves provenance and requires approval for authoritative deadline changes", () => {
+  const store = new DeskStore(":memory:");
+  try {
+    const course = store.execute({ type: "class.create", name: "Physics" })
+      .classes[0]!;
+    const input = {
+      title: "Friction",
+      classId: course.id,
+      dueAt: "2026-09-09T23:00:00.000Z",
+      minutes: 30,
+      resource: null,
+      notes: "Teacher handout",
+      deadlineConfirmed: true,
+      captureEvidence: {
+        originalText: "Friction due Wednesday",
+        sourceText: "Friction due Wednesday",
+        capturedAt: "2026-09-05T12:00:00.000Z",
+        authority: "user-provided-text" as const,
+        candidateDates: ["2026-09-09"],
+        uncertainties: ["Time unknown"],
+      },
+    };
+    const task = store.execute({ type: "task.create", input }).tasks[0]!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "task.update",
+          id: task.id,
+          input: { ...input, dueAt: "2026-09-10T23:00:00.000Z" },
+          deadlineChangeApproved: false,
+        }),
+      /Approve/,
+    );
+    assert.equal(store.snapshot().tasks[0]!.dueAt, input.dueAt);
+    const corrected = store.execute({
+      type: "task.update",
+      id: task.id,
+      input: {
+        ...input,
+        title: "Friction corrections",
+        dueAt: "2026-09-10T23:00:00.000Z",
+        captureEvidence: undefined,
+      },
+      deadlineChangeApproved: true,
+    }).tasks[0]!;
+    assert.equal(corrected.id, task.id);
+    assert.equal(corrected.createdAt, task.createdAt);
+    assert.equal(
+      corrected.captureEvidence?.originalText,
+      input.captureEvidence.originalText,
+    );
+    assert.equal(corrected.dueAt, "2026-09-10T23:00:00.000Z");
+    assert.throws(
+      () =>
+        store.execute({
+          type: "task.update",
+          id: task.id,
+          input: { ...input, deadlineConfirmed: false },
+          deadlineChangeApproved: false,
+        }),
+      /Approve/,
+    );
+  } finally {
+    store.close();
+  }
+});

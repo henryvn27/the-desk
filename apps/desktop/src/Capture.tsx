@@ -1,6 +1,10 @@
 import { userError } from "./errors";
 import { useEffect, useRef, useState } from "react";
-import type { Class, TaskInput } from "../../../packages/domain/contracts";
+import type {
+  Class,
+  TaskInput,
+  Task,
+} from "../../../packages/domain/contracts";
 import {
   interpretCapture,
   type CaptureDraft,
@@ -10,21 +14,26 @@ export function Capture({
   busy,
   onSave,
   onClose,
+  existing,
 }: {
   classes: Class[];
   busy: boolean;
-  onSave: (input: TaskInput) => Promise<boolean>;
+  onSave: (
+    input: TaskInput,
+    deadlineChangeApproved: boolean,
+  ) => Promise<boolean>;
+  existing?: Task;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const [manual, setManual] = useState(Boolean(existing));
   const [paste, setPaste] = useState("");
   const [drafts, setDrafts] = useState<CaptureDraft[]>([]);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState("");
   const draft = drafts[index];
-  const instant = draft?.deadline?.instant
-    ? new Date(draft.deadline.instant)
-    : null;
+  const instantValue = existing?.dueAt ?? draft?.deadline?.instant;
+  const instant = instantValue ? new Date(instantValue) : null;
   const two = (n: number) => String(n).padStart(2, "0");
   const localDate = instant
     ? `${instant.getFullYear()}-${two(instant.getMonth() + 1)}-${two(instant.getDate())}`
@@ -52,8 +61,10 @@ export function Capture({
   }
   return (
     <dialog ref={dialog} aria-labelledby="capture-title" onCancel={onClose}>
-      <h2 id="capture-title">Capture an assignment</h2>
-      {!draft && (
+      <h2 id="capture-title">
+        {existing ? "Edit assignment" : "Capture an assignment"}
+      </h2>
+      {!draft && !manual && (
         <section>
           <label>
             Paste an assignment or a few clear assignment lines
@@ -66,9 +77,10 @@ export function Capture({
           <button type="button" disabled={!paste.trim()} onClick={interpret}>
             Interpret text
           </button>
-          <p className="muted">
-            Or enter it below. Nothing is saved until you confirm.
-          </p>
+          <button type="button" onClick={() => setManual(true)}>
+            Enter manually
+          </button>
+          <p className="muted">Nothing is saved until you confirm.</p>
         </section>
       )}
       {draft && (
@@ -93,135 +105,171 @@ export function Capture({
           {error}
         </p>
       )}
-      <form
-        key={index + ":" + (draft?.title ?? "manual")}
-        onSubmit={(e) => {
-          e.preventDefault();
-          setError("");
-          const f = new FormData(e.currentTarget);
-          const date = String(f.get("date")),
-            time = String(f.get("time"));
-          const confirmed = f.get("confirmed") === "on";
-          if (date && !time && confirmed) {
-            setError(
-              "Choose a due time to confirm this date. Desk will not invent one.",
-            );
-            return;
-          }
-          const dateTime = date && time ? new Date(`${date}T${time}`) : null;
-          if (dateTime && !Number.isFinite(+dateTime)) {
-            setError("Check the due date and time.");
-            return;
-          }
-          void onSave({
-            title: String(f.get("title")),
-            classId: String(f.get("classId")),
-            minutes: Number(f.get("minutes")),
-            dueAt: dateTime?.toISOString() ?? null,
-            deadlineConfirmed: confirmed,
-            resource: String(f.get("resource")) || null,
-            notes: String(f.get("notes")),
-            ...(draft
-              ? {
-                  captureEvidence: {
-                    originalText: draft.provenance.originalText,
-                    sourceText: draft.provenance.sourceText,
-                    capturedAt: draft.provenance.capturedAt,
-                    authority: draft.provenance.authority,
-                    confidence: draft.confidence,
-                    candidateDates: draft.deadline?.candidates ?? [],
-                    uncertainties: draft.uncertainties.map((u) => u.message),
-                  },
+      {(draft || manual) && (
+        <form
+          key={index + ":" + (draft?.title ?? "manual")}
+          onInput={() => setError("")}
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError("");
+            const f = new FormData(e.currentTarget);
+            const date = String(f.get("date")),
+              time = String(f.get("time"));
+            const confirmed = f.get("confirmed") === "on";
+            if (date && !time && confirmed) {
+              setError(
+                "Choose a due time to confirm this date. Desk will not invent one.",
+              );
+              return;
+            }
+            const dateTime = date && time ? new Date(`${date}T${time}`) : null;
+            if (dateTime && !Number.isFinite(+dateTime)) {
+              setError("Check the due date and time.");
+              return;
+            }
+            void onSave(
+              {
+                title: String(f.get("title")),
+                classId: String(f.get("classId")),
+                minutes: Number(f.get("minutes")),
+                dueAt: dateTime?.toISOString() ?? null,
+                deadlineConfirmed: confirmed,
+                resource: String(f.get("resource")) || null,
+                notes: String(f.get("notes")),
+                ...(draft
+                  ? {
+                      captureEvidence: {
+                        originalText: draft.provenance.originalText,
+                        sourceText: draft.provenance.sourceText,
+                        capturedAt: draft.provenance.capturedAt,
+                        authority: draft.provenance.authority,
+                        confidence: draft.confidence,
+                        candidateDates: draft.deadline?.candidates ?? [],
+                        uncertainties: draft.uncertainties.map(
+                          (u) => u.message,
+                        ),
+                      },
+                    }
+                  : {}),
+              },
+              f.get("approveChange") === "on",
+            )
+              .then((saved) => {
+                if (saved) {
+                  if (index + 1 < drafts.length) setIndex(index + 1);
+                  else onClose();
                 }
-              : {}),
-          }).then((saved) => {
-            if (saved) {
-              if (index + 1 < drafts.length) setIndex(index + 1);
-              else onClose();
-            }
-          });
-        }}
-      >
-        <label>
-          What needs doing?
-          <input
-            name="title"
-            required
-            maxLength={500}
-            defaultValue={draft?.title ?? ""}
-          />
-        </label>
-        <label>
-          Class
-          <select
-            name="classId"
-            required
-            defaultValue={
-              draft?.classId ?? (draft ? "" : (classes[0]?.id ?? ""))
-            }
-          >
-            <option value="" disabled>
-              Choose a class
-            </option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+              })
+              .catch((e) => setError(userError(e)));
+          }}
+        >
+          <label>
+            What needs doing?
+            <input
+              name="title"
+              required
+              maxLength={500}
+              defaultValue={existing?.title ?? draft?.title ?? ""}
+            />
+          </label>
+          <label>
+            Class
+            <select
+              name="classId"
+              required
+              defaultValue={
+                existing?.classId ??
+                draft?.classId ??
+                (draft ? "" : (classes[0]?.id ?? ""))
+              }
+            >
+              <option value="" disabled>
+                Choose a class
               </option>
-            ))}
-          </select>
-        </label>
-        {!classes.length && <p>Add a class in the sidebar first.</p>}
-        <div className="fields">
-          <label>
-            Due date
-            <input type="date" name="date" defaultValue={localDate} />
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </label>
+          {!classes.length && <p>Add a class in the sidebar first.</p>}
+          <div className="fields">
+            <label>
+              Due date
+              <input type="date" name="date" defaultValue={localDate} />
+            </label>
+            <label>
+              Due time (local)
+              <input
+                type="time"
+                step="1"
+                name="time"
+                defaultValue={localTime}
+              />
+            </label>
+          </div>
           <label>
-            Due time (local)
-            <input type="time" step="1" name="time" defaultValue={localTime} />
+            Estimated minutes
+            <input
+              name="minutes"
+              type="number"
+              min="5"
+              max="2400"
+              defaultValue={existing?.minutes ?? draft?.minutes ?? 30}
+              required
+            />
           </label>
-        </div>
-        <label>
-          Estimated minutes
-          <input
-            name="minutes"
-            type="number"
-            min="5"
-            max="2400"
-            defaultValue={draft?.minutes ?? 30}
-            required
-          />
-        </label>
-        <label className="check">
-          <input type="checkbox" name="confirmed" />I have confirmed this
-          deadline, or this work has no deadline.
-        </label>
-        <label>
-          Resource link
-          <input
-            type="url"
-            name="resource"
-            defaultValue={draft?.resources[0] ?? ""}
-            placeholder="https://…"
-          />
-        </label>
-        <label>
-          Original text or notes
-          <textarea
-            name="notes"
-            maxLength={20000}
-            defaultValue={draft?.provenance.sourceText ?? ""}
-          />
-        </label>
-        <div className="actions">
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="primary" disabled={busy || !classes.length}>
-            {drafts.length > 1 ? "Save and continue" : "Save assignment"}
-          </button>
-        </div>
-      </form>
+          <label className="check">
+            <input
+              type="checkbox"
+              name="confirmed"
+              defaultChecked={existing?.deadlineConfirmed ?? false}
+            />
+            I have confirmed this deadline, or this work has no deadline.
+          </label>
+          {existing?.deadlineConfirmed && (
+            <label className="check">
+              <input type="checkbox" name="approveChange" />
+              Approve any change to the confirmed deadline
+            </label>
+          )}
+          <details>
+            <summary>Source and resource</summary>
+            <label>
+              Resource link
+              <input
+                type="url"
+                name="resource"
+                defaultValue={existing?.resource ?? draft?.resources[0] ?? ""}
+                placeholder="https://…"
+              />
+            </label>
+            <label>
+              Original text or notes
+              <textarea
+                name="notes"
+                maxLength={20000}
+                defaultValue={
+                  existing?.notes ?? draft?.provenance.sourceText ?? ""
+                }
+              />
+            </label>
+          </details>
+          <div className="actions">
+            <button type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="primary" disabled={busy || !classes.length}>
+              {existing
+                ? "Save changes"
+                : drafts.length > 1
+                  ? "Save and continue"
+                  : "Save assignment"}
+            </button>
+          </div>
+        </form>
+      )}
     </dialog>
   );
 }

@@ -62,6 +62,12 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("task.create"), input: taskInput }),
   z.object({ type: z.literal("task.undo"), id }),
+  z.object({
+    type: z.literal("task.update"),
+    id,
+    input: taskInput,
+    deadlineChangeApproved: z.boolean(),
+  }),
   z.object({ type: z.literal("session.start"), taskId: id }),
   z.object({ type: z.literal("session.pause") }),
   z.object({ type: z.literal("session.resume") }),
