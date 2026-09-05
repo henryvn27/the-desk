@@ -123,6 +123,12 @@ export class DeskStore {
           }),
         );
       }
+      if (c.type === "canvas.save" || c.type === "canvas.recover") {
+        for (const sourceId of c.scene.sourceIds ?? []) {
+          if (!state.sources.some((source) => source.id === sourceId))
+            throw Error("A linked source no longer exists.");
+        }
+      }
       if (c.type === "canvas.recover") {
         const original = this.canvas(c.id);
         entityId = randomUUID();

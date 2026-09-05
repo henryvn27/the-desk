@@ -471,7 +471,11 @@ function App() {
       </main>
       {canvas && (
         <React.Suspense fallback={<p>Opening canvas…</p>}>
-          <Canvas record={canvas} close={() => setCanvas(undefined)} />
+          <Canvas
+            record={canvas}
+            sources={data.sources}
+            close={() => setCanvas(undefined)}
+          />
         </React.Suspense>
       )}
       {editing && (

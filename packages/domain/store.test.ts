@@ -379,7 +379,34 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
         }),
       /changed elsewhere/,
     );
-    const recoveredScene = { ...scene, viewBackgroundColor: "#fefefe" };
+    const source = store.execute({
+      type: "source.create",
+      input: {
+        title: "Newton",
+        text: "F = ma",
+        classIds: [classId],
+        taskIds: [taskId],
+      },
+    }).sources[0]!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "canvas.save",
+          id: board.id,
+          revision: 1,
+          scene: {
+            ...scene,
+            sourceIds: ["00000000-0000-4000-8000-000000000001"],
+          },
+        }),
+      /linked source/,
+    );
+    assert.equal(store.canvas(board.id).revision, 1);
+    const recoveredScene = {
+      ...scene,
+      sourceIds: [source.id],
+      viewBackgroundColor: "#fefefe",
+    };
     const recovered = store
       .execute({ type: "canvas.recover", id: board.id, scene: recoveredScene })
       .canvases.at(-1)!;

@@ -167,6 +167,36 @@ try {
     "Excalifont must load under the local-only CSP",
   );
   await page.screenshot({ path: join(output, "canvas-media.png") });
+  const sourceId = await page.evaluate(async () => {
+    const state = await window.desk.snapshot();
+    const next = await window.desk.command({
+      type: "source.create",
+      input: {
+        title: "Newton's second law",
+        text: "The net force equals mass times acceleration. Preserve this original passage.",
+        classIds: [state.classes[0].id],
+        taskIds: [state.tasks[0].id],
+      },
+    });
+    return next.sources[0].id;
+  });
+  await page.getByRole("button", { name: "Sources", exact: true }).click();
+  await page.getByLabel("Link a Library source").selectOption(sourceId);
+  await page
+    .getByRole("complementary", { name: "Canvas sources" })
+    .getByText(
+      "The net force equals mass times acceleration. Preserve this original passage.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page
+    .locator(".canvas-header [role=status]")
+    .getByText("Saved", { exact: true })
+    .waitFor();
+  await page.screenshot({ path: join(output, "canvas-sources.png") });
+  await page.getByRole("button", { name: "Sources", exact: true }).click();
+
   // Hold only the 500 ms autosave debounce so Quit deterministically races a
   // pending edit. The close guard must flush it without waiting for the timer.
   await page.evaluate(() => {
@@ -256,7 +286,10 @@ try {
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
     .waitFor();
-  const savedRecovery = await page.evaluate(id => window.desk.canvas(id), recovered.id);
+  const savedRecovery = await page.evaluate(
+    (id) => window.desk.canvas(id),
+    recovered.id,
+  );
   await page.screenshot({ path: join(output, "canvas-recovered.png") });
   await page.getByRole("button", { name: "Close canvas", exact: true }).click();
   await app.close();
@@ -265,6 +298,27 @@ try {
   assert.deepEqual(
     (await page.evaluate((id) => window.desk.canvas(id), recovered.id)).scene,
     savedRecovery.scene,
+  );
+  assert.deepEqual(
+    (await page.evaluate((id) => window.desk.canvas(id), recovered.id)).scene
+      .sourceIds,
+    [sourceId],
+  );
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Sources", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Unlink Newton's second law", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  assert.deepEqual(
+    (await page.evaluate((id) => window.desk.canvas(id), id)).scene.sourceIds,
+    [],
+  );
+  assert.equal(
+    (await page.evaluate(() => window.desk.snapshot())).sources[0].id,
+    sourceId,
+    "Unlink must preserve the Library source",
   );
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
@@ -280,6 +334,7 @@ try {
         "PNG export and canceled dialog result",
         "text and PNG import survive restart",
         "packaged text font loaded",
+        "Canvas source links persist through restart/recovery; unlink preserves Library source",
         "native Quit flushes a pending edit",
         "failed save prevents native window close and preserves stored scene",
         "recovery copy preserves unsaved drawing without overwriting original and survives restart",

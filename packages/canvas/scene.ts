@@ -54,6 +54,7 @@ export const canvasScene = z
   .strictObject({
     engine: z.literal("excalidraw"),
     version: z.literal(1),
+    sourceIds: z.array(z.string().uuid()).max(100).optional(),
     elements: z.array(element).max(10_000),
     files: z.record(id, binaryFile),
     viewBackgroundColor: z.string(),

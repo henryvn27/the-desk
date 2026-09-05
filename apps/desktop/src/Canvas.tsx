@@ -6,14 +6,16 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
 import { canvasScene, type CanvasScene } from "../../../packages/canvas/scene";
-import type { CanvasRecord } from "../../../packages/domain/contracts";
+import type { CanvasRecord, Source } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 
 export default function Canvas({
   record,
+  sources,
   close,
 }: {
   record: CanvasRecord;
+  sources: Source[];
   close: () => void;
 }) {
   const [status, setStatus] = useState("Saved"),
@@ -23,6 +25,39 @@ export default function Canvas({
     running = useRef<Promise<void> | null>(null),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const last = useRef(JSON.stringify(record.scene));
+  const sourceIds = useRef(record.scene.sourceIds ?? []);
+  const [showSources, setShowSources] = useState(false);
+  const [links, setLinks] = useState(sourceIds.current);
+  function queueScene(value: unknown) {
+    try {
+      const scene = canvasScene.parse(value);
+      invalid.current = false;
+      const serialized = JSON.stringify(scene);
+      if (serialized === last.current) return;
+      last.current = serialized;
+      pending.current = scene;
+      setStatus("Unsaved changes");
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => void flush().catch(() => {}), 500);
+    } catch (e) {
+      invalid.current = true;
+      setError(userError(e));
+      setStatus("Not saved");
+    }
+  }
+  function changeLinks(next: string[]) {
+    if (!editor.current) return;
+    sourceIds.current = next;
+    setLinks(next);
+    queueScene({
+      engine: "excalidraw",
+      version: 1,
+      sourceIds: next,
+      elements: editor.current.getSceneElementsIncludingDeleted(),
+      files: editor.current.getFiles(),
+      viewBackgroundColor: editor.current.getAppState().viewBackgroundColor,
+    });
+  }
   const invalid = useRef(false);
   const closing = useRef(false);
   const editor = useRef<ExcalidrawImperativeAPI | null>(null);
@@ -134,6 +169,12 @@ export default function Canvas({
       <div className="canvas-header">
         <strong>{record.title}</strong>
         <span role="status">{status}</span>
+        <button
+          aria-expanded={showSources}
+          onClick={() => setShowSources(!showSources)}
+        >
+          Sources
+        </button>
         <button onClick={() => void flush().catch(() => {})}>
           Save canvas
         </button>
@@ -163,51 +204,83 @@ export default function Canvas({
           )}
         </div>
       )}
-      <div className="canvas-engine">
-        <Excalidraw
-          excalidrawAPI={(api) => {
-            editor.current = api;
-          }}
-          name={record.title}
-          initialData={
-            {
-              elements: record.scene.elements,
-              files: record.scene.files,
-              appState: {
-                viewBackgroundColor: record.scene.viewBackgroundColor,
-              },
-            } as unknown as ExcalidrawInitialDataState
-          }
-          aiEnabled={false}
-          validateEmbeddable={false}
-          onLinkOpen={(_, event) => event.preventDefault()}
-          onChange={(elements, state, files) => {
-            try {
-              const scene = canvasScene.parse({
+      <div className="canvas-body">
+        {showSources && (
+          <aside className="canvas-sources" aria-label="Canvas sources">
+            <h2>Sources</h2>
+            <label htmlFor="canvas-source">Link a Library source</label>
+            <select
+              id="canvas-source"
+              value=""
+              onChange={(event) => {
+                if (event.target.value)
+                  changeLinks([...links, event.target.value]);
+              }}
+            >
+              <option value="">Choose a source…</option>
+              {sources
+                .filter((source) => !links.includes(source.id))
+                .map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.title}
+                  </option>
+                ))}
+            </select>
+            {!links.length && (
+              <p>
+                No sources linked yet. Save material in Library to use it here.
+              </p>
+            )}
+            {links.map((id) => {
+              const source = sources.find((source) => source.id === id);
+              return (
+                <section key={id}>
+                  <h3>{source?.title ?? "Source unavailable"}</h3>
+                  <p className="source-text">{source?.text}</p>
+                  <button
+                    onClick={() =>
+                      changeLinks(links.filter((link) => link !== id))
+                    }
+                  >
+                    Unlink {source?.title ?? "source"}
+                  </button>
+                </section>
+              );
+            })}
+          </aside>
+        )}
+        <div className="canvas-engine">
+          <Excalidraw
+            excalidrawAPI={(api) => {
+              editor.current = api;
+            }}
+            name={record.title}
+            initialData={
+              {
+                elements: record.scene.elements,
+                files: record.scene.files,
+                appState: {
+                  viewBackgroundColor: record.scene.viewBackgroundColor,
+                },
+              } as unknown as ExcalidrawInitialDataState
+            }
+            aiEnabled={false}
+            validateEmbeddable={false}
+            onLinkOpen={(_, event) => event.preventDefault()}
+            onChange={(elements, state, files) =>
+              queueScene({
                 engine: "excalidraw",
                 version: 1,
                 elements,
                 files,
+                ...(sourceIds.current.length || record.scene.sourceIds
+                  ? { sourceIds: sourceIds.current }
+                  : {}),
                 viewBackgroundColor: state.viewBackgroundColor,
-              });
-              invalid.current = false;
-              const serialized = JSON.stringify(scene);
-              if (serialized === last.current) return;
-              last.current = serialized;
-              pending.current = scene;
-              setStatus("Unsaved changes");
-              clearTimeout(timer.current);
-              timer.current = setTimeout(
-                () => void flush().catch(() => {}),
-                500,
-              );
-            } catch (e) {
-              invalid.current = true;
-              setError(userError(e));
-              setStatus("Not saved");
+              })
             }
-          }}
-        />
+          />
+        </div>
       </div>
     </div>
   );

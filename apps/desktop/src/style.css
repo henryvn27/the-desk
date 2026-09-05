@@ -365,3 +365,10 @@ button[aria-pressed="true"] {
 .canvas-header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; }
 .canvas-header strong { flex: 1; }
 .canvas-engine { flex: 1; min-height: 0; }
+
+.canvas-body { display: flex; flex: 1; min-height: 0; }
+.canvas-body .canvas-engine { min-width: 0; }
+.canvas-sources { width: 280px; flex-shrink: 0; overflow: auto; padding: 16px; border-right: 1px solid #d7d2c7; }
+.canvas-sources select { width: 100%; }
+.canvas-sources section { border-top: 1px solid #d7d2c7; margin-top: 16px; padding-top: 8px; }
+.canvas-header { flex-wrap: wrap; }
