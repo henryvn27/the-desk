@@ -258,14 +258,14 @@
         "High-confidence captures may auto-file under the user's policy; uncertain captures go to Capture Inbox.",
         "Expose Conservative, Balanced (default), and Autopilot confidence modes."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/domain/contracts.ts, store.ts; apps/desktop/src/CaptureInbox.tsx, Capture.tsx, main.tsx",
+      "automated": "79 tests plus typecheck/lint/build; durable batch capture, no premature planning, atomic revision-checked review, invalid-input rollback and undo restoration.",
+      "live": "Development and installed Electron smoke operate capture, archive/restore, review, undo, stale rejection and restart. Installed broader Capture/Session/Review regression passes with explicit UTC study-window fixtures.",
+      "mac": "Unsigned packaged and installed schema-18 build; matching app archives; screenshot inspected and operated video captured.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Conservative/Balanced/Autopilot capture automation and automatic high-confidence filing remain unimplemented; broader capture types and Windows UI proof remain open."
     },
     {
       "id": "AUTH-001",

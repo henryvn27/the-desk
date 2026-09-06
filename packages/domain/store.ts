@@ -1,3 +1,4 @@
+import { interpretCapture } from "../intelligence/capture";
 import { planWeek } from "../planner";
 import { startNotebook } from "../canvas/notebook";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
@@ -8,6 +9,7 @@ import {
   defaultPlanningPreferences,
   planningPreferences,
   type Command,
+  type CaptureInboxItem,
   type GradeCategory,
   type GradeEntry,
   type RebalancePreview,
@@ -29,7 +31,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 17) {
+    if (version > 18) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -83,6 +85,10 @@ export class DeskStore {
     if (version <= 14) this.db.exec("BEGIN; PRAGMA user_version=15; COMMIT;");
     if (version <= 15) this.db.exec("BEGIN; PRAGMA user_version=16; COMMIT;");
     if (version <= 16) this.db.exec("BEGIN; PRAGMA user_version=17; COMMIT;");
+    if (version <= 17)
+      this.db.exec(
+        "BEGIN; CREATE TABLE capture_inbox(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=18; COMMIT;",
+      );
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -148,6 +154,10 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      captureInbox: this.db
+        .prepare("SELECT data FROM capture_inbox ORDER BY rowid")
+        .all()
+        .map((r) => JSON.parse(r.data as string) as CaptureInboxItem),
       planningMode: mode === '"suggest"' ? "suggest" : "auto-plan",
       gradeCategories: this.db
         .prepare("SELECT data FROM grade_categories")
@@ -209,6 +219,53 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "inbox.capture") {
+        const drafts = interpretCapture(c.text, {
+          classes: state.classes,
+          now,
+          timeZone: c.timeZone,
+        });
+        if (
+          !drafts.length ||
+          drafts.length > 50 ||
+          state.captureInbox.filter((i) => i.status === "pending").length +
+            drafts.length >
+            500
+        )
+          throw Error(
+            "Capture up to 50 items at once and review your pending inbox before adding more.",
+          );
+        for (const draft of drafts) {
+          entityId = randomUUID();
+          const item: CaptureInboxItem = {
+            id: entityId,
+            revision: 0,
+            status: "pending",
+            taskId: null,
+            draft,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare("INSERT INTO capture_inbox VALUES(?,?)")
+            .run(entityId, JSON.stringify(item));
+          this.queue(entityId, "inbox.created", timestamp);
+        }
+      }
+      if (c.type === "inbox.archive") {
+        const item = state.captureInbox.find((i) => i.id === c.id);
+        if (!item || item.revision !== c.revision || item.status === "accepted")
+          throw Error("This capture changed. Reopen the inbox and try again.");
+        entityId = item.id;
+        this.db.prepare("UPDATE capture_inbox SET data=? WHERE id=?").run(
+          JSON.stringify({
+            ...item,
+            status: c.archived ? "archived" : "pending",
+            revision: item.revision + 1,
+            updatedAt: timestamp,
+          }),
+          item.id,
+        );
+      }
       if (c.type === "planning.mode") {
         entityId = "planning-mode";
         this.db
@@ -521,7 +578,9 @@ export class DeskStore {
           .run(entityId, c.name, "#50705A");
       }
       if (
-        (c.type === "task.create" || c.type === "task.update") &&
+        (c.type === "task.create" ||
+          c.type === "task.update" ||
+          c.type === "inbox.accept") &&
         c.input.gradeContext
       ) {
         const category = state.gradeCategories.find(
@@ -575,10 +634,32 @@ export class DeskStore {
           .prepare("UPDATE tasks SET data=? WHERE id=?")
           .run(JSON.stringify(task), task.id);
       }
-      if (c.type === "task.create") {
+      if (c.type === "task.create" || c.type === "inbox.accept") {
+        const item =
+          c.type === "inbox.accept"
+            ? state.captureInbox.find((i) => i.id === c.id)
+            : undefined;
+        if (
+          c.type === "inbox.accept" &&
+          (!item || item.status !== "pending" || item.revision !== c.revision)
+        )
+          throw Error("This capture changed. Reopen the inbox and try again.");
         entityId = randomUUID();
         const task: Task = {
           ...c.input,
+          ...(item
+            ? {
+                captureEvidence: {
+                  originalText: item.draft.provenance.originalText,
+                  sourceText: item.draft.provenance.sourceText,
+                  capturedAt: item.draft.provenance.capturedAt,
+                  authority: item.draft.provenance.authority,
+                  confidence: item.draft.confidence,
+                  candidateDates: item.draft.deadline?.candidates ?? [],
+                  uncertainties: item.draft.uncertainties.map((u) => u.message),
+                },
+              }
+            : {}),
           id: entityId,
           completed: false,
           revision: 0,
@@ -593,6 +674,19 @@ export class DeskStore {
           .prepare("INSERT INTO tasks VALUES(?,?,?)")
           .run(entityId, task.classId, JSON.stringify(task));
         if (!active) this.reserveCapturedTask(task, now);
+        if (item) {
+          this.db.prepare("UPDATE capture_inbox SET data=? WHERE id=?").run(
+            JSON.stringify({
+              ...item,
+              taskId: task.id,
+              status: "accepted",
+              revision: item.revision + 1,
+              updatedAt: timestamp,
+            }),
+            item.id,
+          );
+          this.queue(item.id, "inbox.accepted", timestamp);
+        }
       }
       if (c.type === "task.update") {
         const existing = state.tasks.find((t) => t.id === c.id);
@@ -636,6 +730,21 @@ export class DeskStore {
         entityId = c.id;
         this.db.prepare("DELETE FROM study_blocks WHERE task_id=?").run(c.id);
         this.db.prepare("DELETE FROM tasks WHERE id=?").run(c.id);
+        for (const item of state.captureInbox.filter(
+          (i) => i.taskId === c.id,
+        )) {
+          this.db.prepare("UPDATE capture_inbox SET data=? WHERE id=?").run(
+            JSON.stringify({
+              ...item,
+              taskId: null,
+              status: "pending",
+              revision: item.revision + 1,
+              updatedAt: timestamp,
+            }),
+            item.id,
+          );
+          this.queue(item.id, "inbox.restored", timestamp);
+        }
       }
       if (c.type === "session.start") {
         if (active) throw Error("End the current study session first.");

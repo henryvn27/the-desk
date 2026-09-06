@@ -1,3 +1,5 @@
+import { CaptureInbox } from "./CaptureInbox";
+import type { CaptureInboxItem } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 import React, { useEffect, useState } from "react";
 const Canvas = React.lazy(() => import("./Canvas"));
@@ -30,6 +32,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  captureInbox: [],
   planningMode: "auto-plan",
   gradeCategories: [],
   gradeEntries: [],
@@ -51,6 +54,7 @@ function App() {
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
   const [editing, setEditing] = useState<Task>();
+  const [reviewingCapture, setReviewingCapture] = useState<CaptureInboxItem>();
   const [canvas, setCanvas] =
     useState<import("../../../packages/domain/contracts").CanvasRecord>();
   async function openCanvas(taskId: string, canvasId?: string) {
@@ -291,7 +295,7 @@ function App() {
       <aside>
         <div className="brand">The Desk</div>
         <nav aria-label="Main">
-          {["Home", "Plan", "Library"].map((p) => (
+          {["Home", "Plan", "Library", "Capture Inbox"].map((p) => (
             <button
               key={p}
               aria-current={page === p ? "page" : undefined}
@@ -510,6 +514,13 @@ function App() {
               provider above for typed assistance. Voice is not available yet.
             </p>
           </>
+        ) : page === "Capture Inbox" ? (
+          <CaptureInbox
+            items={data.captureInbox}
+            busy={busy}
+            review={setReviewingCapture}
+            change={(c) => act(c, true)}
+          />
         ) : (
           <Library
             data={data}
@@ -557,6 +568,32 @@ function App() {
           }
         />
       )}
+      {reviewingCapture && (
+        <Capture
+          key={reviewingCapture.id}
+          classes={data.classes}
+          gradeCategories={data.gradeCategories}
+          tasks={data.tasks}
+          sessions={data.sessions}
+          busy={busy}
+          initialDraft={reviewingCapture.draft}
+          onClose={() => setReviewingCapture(undefined)}
+          onSave={async (input) => {
+            const next = await act(
+              {
+                type: "inbox.accept",
+                id: reviewingCapture.id,
+                revision: reviewingCapture.revision,
+                input,
+              },
+              true,
+            );
+            if (!next) return false;
+            setLastId(next.tasks.at(-1)!.id);
+            return true;
+          }}
+        />
+      )}
       {capture && (
         <Capture
           classes={data.classes}
@@ -564,6 +601,18 @@ function App() {
           tasks={data.tasks}
           sessions={data.sessions}
           busy={busy}
+          onQueue={async (text) => {
+            await act(
+              {
+                type: "inbox.capture",
+                text,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              },
+              true,
+            );
+            setCapture(false);
+            setPage("Capture Inbox");
+          }}
           onClose={() => setCapture(false)}
           onSave={async (input) => {
             const next = await act({ type: "task.create", input }, true);

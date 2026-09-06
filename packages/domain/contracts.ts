@@ -1,3 +1,4 @@
+import type { CaptureDraft } from "../intelligence/capture";
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
 import { z } from "zod";
 import { canvasScene, type CanvasScene } from "../canvas/scene";
@@ -187,7 +188,16 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type PlanningMode = "suggest" | "auto-plan";
+export type CaptureInboxItem = {
+  id: string;
+  revision: number;
+  status: "pending" | "archived" | "accepted";
+  taskId: string | null;
+  draft: CaptureDraft;
+  updatedAt: string;
+};
 export type Snapshot = {
+  captureInbox: CaptureInboxItem[];
   planningMode: PlanningMode;
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
@@ -201,6 +211,27 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("inbox.capture"),
+    text: z
+      .string()
+      .min(1)
+      .max(20000)
+      .refine((value) => value.trim().length > 0, "Paste some text first."),
+    timeZone: z.string().min(1).max(100),
+  }),
+  z.object({
+    type: z.literal("inbox.archive"),
+    id,
+    revision: z.number().int().nonnegative(),
+    archived: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("inbox.accept"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: taskInput,
+  }),
   z.object({
     type: z.literal("checklist.add"),
     taskId: id,

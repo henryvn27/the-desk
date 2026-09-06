@@ -13,7 +13,7 @@ async function launch() {
   desktop = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
     executablePath: process.env.DESK_EXECUTABLE,
-    env: { ...process.env, DESK_DATA_DIR: data },
+    env: { ...process.env, DESK_DATA_DIR: data, TZ: "UTC", DESK_ENABLE_DEVELOPMENT_KEY: "0" },
     recordVideo: { dir: output },
   });
   await desktop.firstWindow();
@@ -28,6 +28,10 @@ async function launch() {
 }
 try {
   await launch();
+  await page.evaluate(async () => {
+    await window.desk.command({ type: "planning.mode", mode: "suggest" });
+    await window.desk.command({ type: "planning.preferences", input: { studyStart: "00:00", sleepCutoff: "23:59", studyDays: [0,1,2,3,4,5,6], bufferPercent: 15 } });
+  });
   await page.getByLabel("Class name", { exact: true }).fill("AP Physics C");
   await page.getByRole("button", { name: "Add class", exact: true }).click();
   await page
@@ -107,16 +111,18 @@ try {
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.tasks[0].completed, true);
   await page.getByRole("button", { name: "Capture", exact: true }).click();
-  const original = "AP Physics C: Friction review due 2026-09-09, 30 minutes";
+  const futureDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  const original = `AP Physics C: Friction review due ${futureDate}, 30 minutes`;
   await page
     .getByLabel("Paste an assignment or a few clear assignment lines")
     .fill(original);
   await page
     .getByRole("button", { name: "Interpret text", exact: true })
     .click();
+  await page.getByRole("button", { name: "Review capture", exact: true }).click();
   assert.equal(
     await page.getByLabel("Due date", { exact: true }).inputValue(),
-    "2026-09-09",
+    futureDate,
   );
   assert.equal(
     await page.getByLabel("Due time (local)", { exact: true }).inputValue(),
@@ -176,7 +182,7 @@ try {
     .waitFor();
   assert.equal(
     snapshot.tasks.at(-1).dueAt,
-    new Date("2026-09-09T23:59").toISOString(),
+    new Date(`${futureDate}T23:59Z`).toISOString(),
   );
   await page.getByRole("button", { name: "Library", exact: true }).click();
   await page
@@ -184,7 +190,8 @@ try {
     .filter({ hasText: "AP Physics C: Friction review" })
     .getByRole("button", { name: "Edit assignment", exact: true })
     .click();
-  await page.getByLabel("Due date", { exact: true }).fill("2026-09-10");
+  const updatedDate = new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10);
+  await page.getByLabel("Due date", { exact: true }).fill(updatedDate);
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page
     .getByRole("dialog")
@@ -195,7 +202,7 @@ try {
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(
     snapshot.tasks.at(-1).dueAt,
-    new Date("2026-09-09T23:59").toISOString(),
+    new Date(`${futureDate}T23:59Z`).toISOString(),
   );
   await page
     .getByLabel("Approve any change to the confirmed deadline", { exact: true })
@@ -208,7 +215,7 @@ try {
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(
     snapshot.tasks.at(-1).dueAt,
-    new Date("2026-09-10T23:59").toISOString(),
+    new Date(`${updatedDate}T23:59Z`).toISOString(),
   );
   assert.equal(snapshot.tasks.at(-1).captureEvidence.originalText, original);
   assert.equal(errors.length, 0, errors.join("\n"));

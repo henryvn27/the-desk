@@ -21,7 +21,11 @@ export function Capture({
   onSave,
   onClose,
   existing,
+  initialDraft,
+  onQueue,
 }: {
+  initialDraft?: CaptureDraft;
+  onQueue?: (text: string) => Promise<void>;
   classes: Class[];
   gradeCategories: GradeCategory[];
   tasks: Task[];
@@ -37,7 +41,9 @@ export function Capture({
   const dialog = useRef<HTMLDialogElement>(null);
   const [manual, setManual] = useState(Boolean(existing));
   const [paste, setPaste] = useState("");
-  const [drafts, setDrafts] = useState<CaptureDraft[]>([]);
+  const [drafts, setDrafts] = useState<CaptureDraft[]>(
+    initialDraft ? [initialDraft] : [],
+  );
   const [index, setIndex] = useState(0);
   const [error, setError] = useState("");
   const draft = drafts[index];
@@ -76,6 +82,10 @@ export function Capture({
   }, []);
   function interpret() {
     setError("");
+    if (onQueue) {
+      void onQueue(paste).catch((e) => setError(userError(e)));
+      return;
+    }
     try {
       setDrafts(
         interpretCapture(paste, {
@@ -104,13 +114,20 @@ export function Capture({
               maxLength={20000}
             />
           </label>
-          <button type="button" disabled={!paste.trim()} onClick={interpret}>
+          <button
+            type="button"
+            disabled={busy || !paste.trim()}
+            onClick={interpret}
+          >
             Interpret text
           </button>
           <button type="button" onClick={() => setManual(true)}>
             Enter manually
           </button>
-          <p className="muted">Nothing is saved until you confirm.</p>
+          <p className="muted">
+            Interpreted text is saved to Capture Inbox for review. Manual
+            assignments are saved only when you confirm.
+          </p>
         </section>
       )}
       {draft && (
