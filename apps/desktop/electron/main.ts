@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  Menu,
   ipcMain,
   protocol,
   net,
@@ -96,6 +97,47 @@ function showLens() {
   });
 }
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
+      { role: "fileMenu" },
+      {
+        label: "Edit",
+        submenu: [
+          {
+            id: "desk-undo",
+            label: "Undo",
+            accelerator: "CmdOrCtrl+Z",
+            registerAccelerator: false,
+            click: (_item, window) => {
+              if (window instanceof BrowserWindow)
+                window.webContents.send("desk:edit", "undo");
+            },
+          },
+          {
+            id: "desk-redo",
+            label: "Redo",
+            accelerator: "CmdOrCtrl+Shift+Z",
+            registerAccelerator: false,
+            click: (_item, window) => {
+              if (window instanceof BrowserWindow)
+                window.webContents.send("desk:edit", "redo");
+            },
+          },
+          { type: "separator" },
+          { role: "cut" },
+          { role: "copy" },
+          { role: "paste" },
+          { role: "pasteAndMatchStyle" },
+          { role: "delete" },
+          { type: "separator" },
+          { role: "selectAll" },
+        ],
+      },
+      { role: "viewMenu" },
+      { role: "windowMenu" },
+    ]),
+  );
   const root = resolve(__dirname, "../dist");
   protocol.handle("desk", (request) => {
     const url = new URL(request.url);

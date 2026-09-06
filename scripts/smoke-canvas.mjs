@@ -1,3 +1,4 @@
+import { waitFor } from "./wait-for.mjs";
 import { _electron as electron } from "playwright";
 import { mkdtemp, rm, mkdir, readFile, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -162,10 +163,10 @@ try {
     [...bytes],
   );
   await page.getByTestId("toolbar-image").locator("..").click();
-  await page.waitForFunction(async (id) => {
-    const record = await window.desk.canvas(id);
+  await waitFor(async () => {
+    const record = await page.evaluate((id) => window.desk.canvas(id), id);
     return Object.keys(record.scene.files).length === 1;
-  }, id);
+  }, "Imported image was not saved");
   await page.mouse.click(900, 530);
   await page.getByRole("button", { name: "Close canvas", exact: true }).click();
   const withMedia = await page.evaluate((id) => window.desk.canvas(id), id);
@@ -264,8 +265,15 @@ try {
   await page.getByRole("button", { name: "Library", exact: true }).click();
   await page.getByRole("button", { name: "Open canvas", exact: true }).click();
   await page.locator(".excalidraw canvas").first().waitFor();
+  // Let engine hydration normalization settle before recording the scene that
+  // another writer owns. Compare the failed save to this exact stored baseline.
+  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page
+    .locator(".canvas-header [role=status]")
+    .getByText("Saved", { exact: true })
+    .waitFor();
   // Simulate another writer advancing the revision while this editor is open.
-  await page.evaluate(async (id) => {
+  const staleBaseline = await page.evaluate(async (id) => {
     const record = await window.desk.canvas(id);
     await window.desk.command({
       type: "canvas.save",
@@ -273,6 +281,7 @@ try {
       revision: record.revision,
       scene: record.scene,
     });
+    return record.scene;
   }, id);
   await page.getByTestId("toolbar-diamond").locator("..").click();
   await page.mouse.move(200, 300);
@@ -287,7 +296,7 @@ try {
   const failedSave = await page.evaluate((id) => window.desk.canvas(id), id);
   assert.deepEqual(
     failedSave.scene,
-    afterQuit.scene,
+    staleBaseline,
     "Stale editor must not overwrite saved work",
   );
   await page.screenshot({ path: join(output, "canvas-close-error.png") });
@@ -315,7 +324,7 @@ try {
   );
   assert.deepEqual(
     (await page.evaluate((id) => window.desk.canvas(id), id)).scene,
-    afterQuit.scene,
+    staleBaseline,
   );
   await page.getByRole("button", { name: "Save canvas", exact: true }).click();
   await page
@@ -382,6 +391,12 @@ try {
       ],
     }),
   );
+} catch (error) {
+  // A deliberately failed save prevents graceful close. Terminate only this
+  // isolated fixture app so teardown cannot hide the original assertion.
+  if (app) await app.evaluate(({ app }) => app.exit(1)).catch(() => {});
+  app = undefined;
+  throw new Error(error.message);
 } finally {
   if (app) await app.close();
   await rm(data, { recursive: true, force: true });

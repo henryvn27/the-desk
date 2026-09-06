@@ -1,3 +1,4 @@
+import { waitFor } from "./wait-for.mjs";
 import { _electron as electron } from "playwright";
 import { mkdtemp, rm, mkdir, readFile, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -103,6 +104,66 @@ try {
     ).scene.elements.find((e) => !e.isDeleted).customData.deskMath.latex,
     original,
   );
+  if (process.env.DESK_NATIVE_EDIT_CHECK === "1") {
+    console.log("Awaiting native Undo menu selection");
+    await waitFor(
+      async () =>
+        (
+          await page.evaluate((id) => window.desk.canvas(id), id)
+        ).scene.elements.filter((e) => !e.isDeleted).length === 0,
+      "Canvas did not reach the expected element count",
+      60_000,
+    );
+    console.log("Awaiting native Redo menu selection");
+    await waitFor(
+      async () =>
+        (
+          await page.evaluate((id) => window.desk.canvas(id), id)
+        ).scene.elements.filter((e) => !e.isDeleted).length === 1,
+      "Canvas did not reach the expected element count",
+      60_000,
+    );
+  }
+  await app.evaluate(({ Menu, BrowserWindow }) => {
+    const item = Menu.getApplicationMenu().getMenuItemById("desk-undo");
+    item.click(item, BrowserWindow.getAllWindows()[0]);
+  });
+  await waitFor(
+    async () =>
+      (
+        await page.evaluate((id) => window.desk.canvas(id), id)
+      ).scene.elements.filter((e) => !e.isDeleted).length === 0,
+    "Canvas did not reach the expected element count",
+    30_000,
+  );
+  await save();
+  assert.equal(
+    (
+      await page.evaluate((id) => window.desk.canvas(id), id)
+    ).scene.elements.filter((e) => !e.isDeleted).length,
+    0,
+    "Edit-menu Undo must reach Canvas",
+  );
+  await app.evaluate(({ Menu, BrowserWindow }) => {
+    const item = Menu.getApplicationMenu().getMenuItemById("desk-redo");
+    item.click(item, BrowserWindow.getAllWindows()[0]);
+  });
+  await waitFor(
+    async () =>
+      (
+        await page.evaluate((id) => window.desk.canvas(id), id)
+      ).scene.elements.filter((e) => !e.isDeleted).length === 1,
+    "Canvas did not reach the expected element count",
+    30_000,
+  );
+  await save();
+  assert.equal(
+    (
+      await page.evaluate((id) => window.desk.canvas(id), id)
+    ).scene.elements.filter((e) => !e.isDeleted).length,
+    1,
+    "Edit-menu Redo must reach Canvas",
+  );
   await page.screenshot({ path: join(output, "canvas-math.png") });
   await page.getByRole("button", { name: "Close canvas", exact: true }).click();
   await app.close();
@@ -128,6 +189,20 @@ try {
       await page.evaluate((id) => window.desk.canvas(id), id)
     ).scene.elements.filter((e) => !e.isDeleted).length,
     1,
+  );
+  await page.keyboard.type("1");
+  await app.evaluate(({ Menu, BrowserWindow }) => {
+    const item = Menu.getApplicationMenu().getMenuItemById("desk-undo");
+    item.click(item, BrowserWindow.getAllWindows()[0]);
+  });
+  await page.waitForFunction(
+    (expected) => document.querySelector("#math-latex").value === expected,
+    original,
+  );
+  assert.equal(
+    await page.getByLabel("LaTeX equation").inputValue(),
+    original,
+    "Edit-menu Undo must stay in text field",
   );
   await page.getByLabel("LaTeX equation").fill(revised);
   await page
@@ -176,6 +251,10 @@ try {
         "insert rendered equation with source",
         "keyboard undo/redo with intermediate scene verification",
         "text undo remains local to math editor",
+        "native Edit-menu callbacks route Canvas and text undo/redo",
+        ...(process.env.DESK_NATIVE_EDIT_CHECK === "1"
+          ? ["native Undo/Redo menu selections observed"]
+          : []),
         ...(process.env.DESK_NATIVE_QUIT_CHECK === "1"
           ? ["native Quit observed"]
           : []),
@@ -185,9 +264,13 @@ try {
       ],
       limitations: [
         "not full math/Canvas acceptance",
-        process.env.DESK_NATIVE_QUIT_CHECK === "1"
-          ? "native export dialog result injected; Windows interaction and native Edit-menu actions not verified"
-          : "native export dialog result injected; Windows interaction, native Quit shortcut and Edit-menu actions not verified",
+        "native export dialog result injected; Windows interaction unverified",
+        ...(process.env.DESK_NATIVE_EDIT_CHECK === "1"
+          ? []
+          : ["native Edit-menu selection not exercised in this run"]),
+        ...(process.env.DESK_NATIVE_QUIT_CHECK === "1"
+          ? []
+          : ["native Quit shortcut not exercised in this run"]),
       ],
     }),
   );

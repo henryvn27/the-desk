@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DeskAPI } from "../../../packages/domain/contracts";
 const api: DeskAPI = {
+  onEdit: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, action: unknown) => {
+      if (action === "undo" || action === "redo") listener(action);
+    };
+    ipcRenderer.on("desk:edit", receive);
+    return () => ipcRenderer.removeListener("desk:edit", receive);
+  },
   closeWindow: () => ipcRenderer.invoke("desk:close-window"),
   exportCanvas: (id, png) => ipcRenderer.invoke("desk:canvas-export", id, png),
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),

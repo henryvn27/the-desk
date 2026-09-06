@@ -57,6 +57,28 @@ function App() {
       setError(userError(e));
     }
   }
+  useEffect(
+    () =>
+      window.desk.onEdit((action) => {
+        const target = document.activeElement;
+        const writable =
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          (target instanceof HTMLElement && target.isContentEditable);
+        if (canvas && !writable && !document.querySelector("dialog[open]")) {
+          // The engine exposes undo/redo through its accessible toolbar, not its
+          // imperative API. Keep this adapter-specific mapping inside the renderer.
+          document
+            .querySelector<HTMLButtonElement>(
+              `.canvas-engine button[aria-label="${action === "undo" ? "Undo" : "Redo"}"]`,
+            )
+            ?.click();
+        } else if (writable) {
+          document.execCommand(action);
+        }
+      }),
+    [canvas],
+  );
   const kind = location.hash.slice(1);
   const active = data.sessions.find((s) => !s.endedAt);
   const activeTask = data.tasks.find((t) => t.id === active?.taskId);

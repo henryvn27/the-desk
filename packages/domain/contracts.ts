@@ -151,6 +151,7 @@ export type LensCapture = {
   capturedAt: string;
 };
 export interface DeskAPI {
+  onEdit(listener: (action: "undo" | "redo") => void): () => void;
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
   canvas(id: string): Promise<CanvasRecord>;

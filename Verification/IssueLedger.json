@@ -60,6 +60,15 @@
       "status": "resolved",
       "evidence": "Installed macOS math smoke verifies Cmd+Z removes the equation and Cmd+Shift+Z restores it, including when the Desk Save button had focus. Native text undo stays in the LaTeX editor.",
       "notes": "Root cause: Electron native menu accelerator consumed Z before the renderer. before-input-event now passes Z/Y edit shortcuts to renderer editors; Canvas handles keys globally except during its Math dialog. Native Command-Q separately verified through CUA. Windows interaction and direct native Edit-menu actions remain separate unverified paths."
+    },
+    {
+      "id": "QA-CANVAS-002",
+      "area": "canvas",
+      "title": "First native Undo selection after automation activation had no observed effect",
+      "severity": "medium",
+      "status": "open",
+      "evidence": "Installed macOS menu smoke passed with repeated Undo selection followed by Redo; first selection did not change stored scene.",
+      "notes": "Menu callbacks now use the supplied window. Distinguish automation activation from product focus behavior before closing. Windows interactive menu behavior remains unverified."
     }
   ]
 }
