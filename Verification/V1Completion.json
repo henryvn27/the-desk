@@ -832,12 +832,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "What The Desk Knows: local explicit statements with categories/class scope; revision-checked edit/forget. Active-session tutoring receives bounded global/current-class notes with explicit provenance.",
-      "automated": "97 tests pass including memory persistence, stale edit/forget rejection, invalid class rejection, forgotten-state restart and scoped/bounded tutoring context.",
+      "implementation": "Explicit editable/forgettable notes plus duration-pattern candidates from repeated session evidence. Store-validated confirmation persists provenance; disable and clear-inferred controls affect Capture learning and tutoring context without deleting explicit notes or study history.",
+      "automated": "99 tests pass including repeated-evidence threshold, confirmation/disabled/stale rejection, clear preservation, restart exclusions, full-task exclusion, explicit CRUD and scoped context.",
       "live": "No provider request; actual tutoring use of notes unverified.",
-      "mac": "Unsigned installed UI smoke passes explicit create/edit/restart/forget and forgotten-state restart; screenshot inspected and operated video retained.",
+      "mac": "Unsigned installed UI smoke passes duration confirmation/evidence inspection, learning toggle, explicit edits, inferred clearing with explicit/history preservation, and cleared/disabled state after restart. Timing synthetic; screenshot/video retained.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Behavioral memory inference, confirmation, disable/clear inferred-memory controls and integration of all existing learned preferences remain unimplemented. Live tutoring use and Windows UI unverified."
+      "blocker": "Broader preference inference and integration of existing settings/learned preferences remain incomplete. Live tutoring use and Windows UI unverified."
     },
     {
       "id": "PRIV-001",

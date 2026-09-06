@@ -1,18 +1,12 @@
 import type { StudySession, Task, TaskInput } from "../domain/contracts";
 
 /** Conservative local evidence: a reviewed, unchanged task finished in one session. */
-export function durationSuggestion(
+export function durationEvidence(
   tasks: Task[],
   sessions: StudySession[],
   input: Pick<TaskInput, "classId" | "workKind" | "minutes">,
 ) {
-  if (
-    !Number.isFinite(input.minutes) ||
-    input.minutes < 5 ||
-    input.minutes > 2400
-  )
-    return null;
-  const ratios: number[] = [];
+  const evidence: { sessionId: string; ratio: number; revision: number }[] = [];
   for (const task of tasks) {
     if (
       !task.completed ||
@@ -40,8 +34,28 @@ export function durationSuggestion(
       session.actualMinutes < 5
     )
       continue;
-    ratios.push(session.actualMinutes / estimate.minutes);
+    evidence.push({
+      sessionId: session.id,
+      ratio: session.actualMinutes / estimate.minutes,
+      revision: session.revision ?? 0,
+    });
   }
+  return evidence;
+}
+export function durationSuggestion(
+  tasks: Task[],
+  sessions: StudySession[],
+  input: Pick<TaskInput, "classId" | "workKind" | "minutes">,
+) {
+  if (
+    !Number.isFinite(input.minutes) ||
+    input.minutes < 5 ||
+    input.minutes > 2400
+  )
+    return null;
+  const ratios = durationEvidence(tasks, sessions, input).map(
+    (item) => item.ratio,
+  );
   if (ratios.length < 3) return null;
   ratios.sort((a, b) => a - b);
   const middle = Math.floor(ratios.length / 2);

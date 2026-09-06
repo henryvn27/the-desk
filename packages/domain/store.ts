@@ -1,3 +1,4 @@
+import { durationMemories } from "../learning/memory";
 import { tutoringMode } from "../intelligence/tutoring";
 import { decideCapture } from "../intelligence/capture-policy";
 import { interpretCapture } from "../intelligence/capture";
@@ -35,7 +36,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 23) {
+    if (version > 24) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -104,6 +105,7 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE memories(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=23; COMMIT;",
       );
+    if (version <= 23) this.db.exec("BEGIN; PRAGMA user_version=24; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -169,6 +171,13 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      inference: JSON.parse(
+        String(
+          this.db
+            .prepare("SELECT data FROM settings WHERE id='inference'")
+            .get()?.data ?? '{"enabled":true,"excludedSessionIds":[]}',
+        ),
+      ),
       memories: this.db
         .prepare("SELECT data FROM memories ORDER BY rowid")
         .all()
@@ -625,6 +634,58 @@ export class DeskStore {
           );
         entityId = c.id;
       }
+      if (c.type === "memory.inference" || c.type === "memory.clear-inferred") {
+        entityId = "inference";
+        const inference = { ...state.inference };
+        if (c.type === "memory.inference") inference.enabled = c.enabled;
+        else {
+          inference.excludedSessionIds = [
+            ...new Set([
+              ...inference.excludedSessionIds,
+              ...state.sessions.map((session) => session.id),
+            ]),
+          ];
+          for (const memory of state.memories.filter(
+            (memory) => memory.origin === "inferred",
+          ))
+            this.db.prepare("DELETE FROM memories WHERE id=?").run(memory.id);
+        }
+        this.db
+          .prepare(
+            "INSERT INTO settings VALUES('inference',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(JSON.stringify(inference));
+      }
+      if (c.type === "memory.confirm") {
+        const candidate = durationMemories(state).find(
+          (item) =>
+            item.classId === c.classId &&
+            item.workKind === c.workKind &&
+            item.basis === c.basis,
+        );
+        if (!candidate)
+          throw Error(
+            "This pattern changed or learning is disabled. Review the current evidence.",
+          );
+        if (state.memories.length >= 200)
+          throw Error("Forget an old note before adding another memory.");
+        entityId = randomUUID();
+        const memory = {
+          id: entityId,
+          text: candidate.text,
+          category: "duration",
+          classId: c.classId,
+          origin: "inferred",
+          inferenceKey: candidate.key,
+          evidence: candidate.evidence,
+          revision: 0,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        this.db
+          .prepare("INSERT INTO memories VALUES(?,?)")
+          .run(entityId, JSON.stringify(memory));
+      }
       if (
         c.type === "memory.create" ||
         c.type === "memory.update" ||
@@ -652,14 +713,36 @@ export class DeskStore {
             "Keep up to 200 memories. Forget an old note before adding another.",
           );
         entityId = previous?.id ?? randomUUID();
-        if (c.type === "memory.forget")
+        if (c.type === "memory.forget") {
           this.db.prepare("DELETE FROM memories WHERE id=?").run(entityId);
-        else {
+          if (previous?.origin === "inferred")
+            this.db
+              .prepare(
+                "INSERT INTO settings VALUES('inference',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+              )
+              .run(
+                JSON.stringify({
+                  ...state.inference,
+                  excludedSessionIds: [
+                    ...new Set([
+                      ...state.inference.excludedSessionIds,
+                      ...(previous.evidence?.sessionIds ?? []),
+                    ]),
+                  ],
+                }),
+              );
+        } else {
           const memory = {
             ...c.input,
             id: entityId,
             revision: (previous?.revision ?? -1) + 1,
-            origin: "explicit",
+            origin: previous?.origin ?? "explicit",
+            ...(previous?.inferenceKey
+              ? {
+                  inferenceKey: previous.inferenceKey,
+                  evidence: previous.evidence,
+                }
+              : {}),
             createdAt: previous?.createdAt ?? timestamp,
             updatedAt: timestamp,
           };

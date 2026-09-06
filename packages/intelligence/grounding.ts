@@ -38,7 +38,7 @@ export function lensContext(state: Snapshot, question = ""): string {
       id: string;
       text: string;
       category: string;
-      origin: "explicit";
+      origin: "explicit" | "inferred";
     }[],
     omittedMemories: 0,
     sources: [] as (ReturnType<typeof sourcePassage> & {
@@ -60,7 +60,9 @@ export function lensContext(state: Snapshot, question = ""): string {
     context.resourceOmitted = task.resource !== null;
   }
   const memories = (state.memories ?? []).filter(
-    (memory) => !memory.classId || memory.classId === task.classId,
+    (memory) =>
+      (!memory.classId || memory.classId === task.classId) &&
+      (memory.origin === "explicit" || state.inference?.enabled),
   );
   context.omittedMemories = memories.length;
   for (const memory of memories) {

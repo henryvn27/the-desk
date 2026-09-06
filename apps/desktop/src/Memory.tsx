@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { durationMemories } from "../../../packages/learning/memory";
+import { useEffect, useState } from "react";
 import {
   memoryCategory,
   type AcademicMemory,
@@ -24,14 +25,23 @@ export function Memory({
   const [editing, setEditing] = useState<AcademicMemory | null>(),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [learningEnabled, setLearningEnabled] = useState(
+    data.inference.enabled,
+  );
+  useEffect(
+    () => setLearningEnabled(data.inference.enabled),
+    [data.inference.enabled],
+  );
   async function change(command: Command) {
     setBusy(true);
     setError("");
     try {
       await save(command);
       setEditing(undefined);
+      return true;
     } catch (error) {
       setError(userError(error));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -40,9 +50,64 @@ export function Memory({
     <section>
       <h1>What The Desk Knows</h1>
       <p>
-        Notes you have explicitly asked Desk to remember. Tutoring can use them
-        for context; planning settings are managed in Settings.
+        Notes you have saved and patterns you have confirmed. Tutoring can use
+        them for context; planning settings are managed in Settings.
       </p>
+      <h2>Learning from sessions</h2>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={learningEnabled}
+          disabled={busy || editing !== undefined}
+          onChange={async (e) => {
+            const enabled = e.target.checked;
+            setLearningEnabled(enabled);
+            if (!(await change({ type: "memory.inference", enabled })))
+              setLearningEnabled(data.inference.enabled);
+          }}
+        />
+        Learn from reviewed sessions
+      </label>
+      <p className="muted">
+        Patterns need repeated evidence and your confirmation before saving.
+        Turning learning off pauses learned estimates and inferred notes in
+        tutoring.
+      </p>
+      <button
+        disabled={busy || editing !== undefined}
+        onClick={() => void change({ type: "memory.clear-inferred" })}
+      >
+        Clear inferred memories
+      </button>
+      <p className="muted">
+        Clearing keeps your explicit notes and session history, but excludes
+        past sessions from new learning.
+      </p>
+      {durationMemories(data).map((candidate) => (
+        <article className="source" key={candidate.key}>
+          <h3>Pattern to review</h3>
+          <p>{candidate.text}</p>
+          <p className="muted">
+            Based on {candidate.evidence.samples} reviewed, unchanged tasks
+            finished in one session. This estimate may change with more
+            evidence.
+          </p>
+          <button
+            disabled={busy || editing !== undefined}
+            onClick={() =>
+              void change({
+                type: "memory.confirm",
+                classId: candidate.classId,
+                workKind: candidate.workKind,
+                basis: candidate.basis,
+              })
+            }
+          >
+            Confirm memory
+          </button>
+        </article>
+      ))}
+      <h2>Saved memories</h2>
       <button
         onClick={() => {
           setEditing(null);
@@ -137,9 +202,29 @@ export function Memory({
             {labels[memory.category]} ·{" "}
             {data.classes.find((c) => c.id === memory.classId)?.name ??
               "All classes"}{" "}
-            · Stated by you
+            ·{" "}
+            {memory.origin === "explicit"
+              ? "Stated by you"
+              : "Confirmed pattern"}
           </p>
           <p className="source-text">{memory.text}</p>
+          {memory.evidence && (
+            <details>
+              <summary>
+                Evidence · {memory.evidence.samples} reviewed tasks
+              </summary>
+              {memory.evidence.sessionIds.map((id) => {
+                const session = data.sessions.find((s) => s.id === id);
+                const task = data.tasks.find((t) => t.id === session?.taskId);
+                return (
+                  <p key={id}>
+                    {task?.title ?? "Original task unavailable"} ·{" "}
+                    {session?.actualMinutes ?? "Unknown"} minutes recorded
+                  </p>
+                );
+              })}
+            </details>
+          )}
           <div className="actions">
             <button
               disabled={busy}

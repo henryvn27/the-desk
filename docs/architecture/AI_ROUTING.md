@@ -51,3 +51,6 @@ Grounding uses bounded lexical passage selection from the validated current ques
 
 
 Active-session Lens context now includes explicit global and current-class memory statements, bounded to 4,000 serialized characters within the existing overall context limit. It excludes other-class notes and discloses omitted count. Statements carry explicit origin and do not override current requests, source evidence or integrity boundaries. Forgetting excludes a note from subsequent assembled context; already-sent requests/conversation replies are not retroactively erased.
+
+
+Learning controls apply to both Capture duration suggestions and inferred notes in active-session Lens context. Disabled learning retains notes for inspection/edit/forget but stops using inferred notes for tutoring. Explicit notes remain available. Confirmed duration patterns are tentative estimates based on recorded sessions, not proof of mastery or future outcomes. Clearing retains source session history but excludes it from new learning; re-enabling does not undo that exclusion.

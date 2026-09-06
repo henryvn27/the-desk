@@ -1,3 +1,4 @@
+import { learningSessions } from "../../../packages/learning/memory";
 import { Memory } from "./Memory";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
@@ -35,6 +36,7 @@ declare global {
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
   memories: [],
+  inference: { enabled: true, excludedSessionIds: [] },
   tutoringMode: "balanced",
   capturePolicy: "balanced",
   captureInbox: [],
@@ -565,7 +567,7 @@ function App() {
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
-          sessions={data.sessions}
+          sessions={learningSessions(data)}
           busy={busy}
           existing={editing}
           onClose={() => setEditing(undefined)}
@@ -591,7 +593,7 @@ function App() {
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
-          sessions={data.sessions}
+          sessions={learningSessions(data)}
           busy={busy}
           initialDraft={reviewingCapture.draft}
           onClose={() => setReviewingCapture(undefined)}
@@ -617,7 +619,7 @@ function App() {
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
-          sessions={data.sessions}
+          sessions={learningSessions(data)}
           busy={busy}
           onImport={async () => {
             setBusy(true);

@@ -225,12 +225,15 @@ export const memoryInput = z.object({
 export type AcademicMemory = z.infer<typeof memoryInput> & {
   id: string;
   revision: number;
-  origin: "explicit";
+  origin: "explicit" | "inferred";
+  inferenceKey?: string;
+  evidence?: { sessionIds: string[]; ratio: number; samples: number };
   createdAt: string;
   updatedAt: string;
 };
 export type Snapshot = {
   memories: AcademicMemory[];
+  inference: { enabled: boolean; excludedSessionIds: string[] };
   tutoringMode: TutoringMode;
   capturePolicy: CapturePolicy;
   captureInbox: CaptureInboxItem[];
@@ -361,6 +364,14 @@ export const command = z.discriminatedUnion("type", [
     id,
     revision: z.number().int().nonnegative(),
     scene: canvasScene,
+  }),
+  z.object({ type: z.literal("memory.inference"), enabled: z.boolean() }),
+  z.object({ type: z.literal("memory.clear-inferred") }),
+  z.object({
+    type: z.literal("memory.confirm"),
+    classId: id,
+    workKind: z.enum(["assignment", "assessment", "optional-review"]),
+    basis: z.string().max(100000),
   }),
   z.object({ type: z.literal("memory.create"), input: memoryInput }),
   z.object({
