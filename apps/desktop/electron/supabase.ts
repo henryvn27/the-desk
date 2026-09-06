@@ -46,14 +46,24 @@ export class SupabaseAccount {
     this.config = readConfig(developmentPath);
   }
 
-  status(): SupabaseAccountStatus {
+  /**
+   * The sync status poll runs during every local-first launch. Do not touch
+   * macOS Keychain merely to report that no account session exists; probing
+   * safeStorage can open an OS authority prompt before the student asks to
+   * connect an account. Settings and auth operations pass true when they need
+   * an authoritative secure-storage capability check.
+   */
+  status(probeSecureStorage = false): SupabaseAccountStatus {
     const session = this.activeSession();
     return {
       configured: this.config !== null,
       authenticated: session !== null,
       email: session?.email ?? null,
       userId: session?.userId ?? null,
-      secureStorage: safeStorage.isEncryptionAvailable(),
+      secureStorage:
+        probeSecureStorage || session !== null
+          ? safeStorage.isEncryptionAvailable()
+          : false,
       source: this.config?.source ?? null,
     };
   }
@@ -77,7 +87,10 @@ export class SupabaseAccount {
       supabaseAuthResponse,
     );
     this.saveSession(sessionFromAuthResponse(response));
-    return { ...this.status(), message: "Signed in to the Desk account." };
+    return {
+      ...this.status(true),
+      message: "Signed in to the Desk account.",
+    };
   }
 
   async signUp(email: unknown, password: unknown): Promise<SupabaseAccountResult> {
@@ -93,10 +106,13 @@ export class SupabaseAccount {
           }),
         ),
       );
-      return { ...this.status(), message: "Desk account created and signed in." };
+      return {
+        ...this.status(true),
+        message: "Desk account created and signed in.",
+      };
     }
     return {
-      ...this.status(),
+      ...this.status(true),
       message: "Account created. Check your email to confirm it, then sign in.",
     };
   }
@@ -112,7 +128,7 @@ export class SupabaseAccount {
     } else {
       this.removeSession();
     }
-    return { ...this.status(), message: "Desk account signed out." };
+    return { ...this.status(true), message: "Desk account signed out." };
   }
 
   private async request<T extends z.ZodTypeAny>(

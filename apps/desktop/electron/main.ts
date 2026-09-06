@@ -205,7 +205,10 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("desk:account-status", (event) => {
     check(event);
-    return account.status();
+    // Account settings are an explicit request for secure-storage capability;
+    // the background sync poll uses the lazy non-probing status path so a
+    // fresh local-first launch does not open a macOS Keychain prompt.
+    return account.status(true);
   });
   ipcMain.handle("desk:account-sign-in", async (event, email, password) => {
     check(event);
