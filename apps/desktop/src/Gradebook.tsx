@@ -1,3 +1,4 @@
+import { GradeProjection } from "./GradeProjection";
 import { useState } from "react";
 import type {
   Command,
@@ -61,6 +62,9 @@ export function Gradebook({
         rules and extra credit are not included. This is not an official grade.
       </p>
       <p>Configured weight: {summary.configuredWeight.toFixed(1)}% of 100%.</p>
+      {!!categories.length && (
+        <GradeProjection categories={categories} entries={entries} />
+      )}
       {summary.rows.map((c) => (
         <div className="row" key={c.id}>
           <div>

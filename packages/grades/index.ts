@@ -31,3 +31,49 @@ export function gradeSummary(
     upper: weightedPoints + Math.max(0, 100 - scoredWeight),
   };
 }
+
+export type GradeScenario = {
+  categoryId: string;
+  possible: number;
+  low: number;
+  high: number;
+};
+/** Hypothetical additional work. Original entries are never mutated or persisted. */
+export function projectGrade(
+  categories: GradeCategory[],
+  entries: GradeEntry[],
+  scenario: GradeScenario,
+) {
+  if (!categories.some((c) => c.id === scenario.categoryId))
+    throw Error("Choose a grade category for this class.");
+  const { possible, low, high } = scenario;
+  if (
+    ![possible, low, high].every(Number.isFinite) ||
+    possible <= 0 ||
+    possible > 1000000 ||
+    low < 0 ||
+    high < low ||
+    high > possible
+  )
+    throw Error(
+      "Use a score range from zero to possible points, with the lower score first.",
+    );
+  const hypothetical = (earned: number): GradeEntry => ({
+    id: "hypothetical",
+    categoryId: scenario.categoryId,
+    title: "What-if",
+    earned,
+    possible,
+    revision: 0,
+    recordedAt: "",
+    updatedAt: "",
+    authority: "user-entered",
+  });
+  const lower = gradeSummary(categories, [...entries, hypothetical(low)]);
+  const upper = gradeSummary(categories, [...entries, hypothetical(high)]);
+  return {
+    lower: lower.lower,
+    upper: upper.upper,
+    scoredWeight: lower.scoredWeight,
+  };
+}

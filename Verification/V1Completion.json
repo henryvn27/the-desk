@@ -758,11 +758,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Gradebook.tsx; packages/grades; packages/domain",
-      "automated": "56 tests + typecheck/lint/build pass; weighted/missing/zero scores, bounds, class ownership, stale corrections and restart tested.",
-      "live": "Installed macOS gradebook smoke passes category/score entry, overweight rejection, correction, displayed assumptions/range and exact restart. Screenshot inspected; operated video captured.",
+      "automated": "58 tests + typecheck/lint/build pass; point-weighted ranges, missing/zero scores, invalid scenarios, unchanged originals, bounds, class ownership and stale corrections tested.",
+      "live": "Installed macOS gradebook smoke passes manual categories/scores/corrections, what-if bounds and range, unchanged stored scores, transient scenario state and restart persistence. Screenshot inspected; operated video captured.",
       "mac": "Unsigned installed arm64 gradebook smoke passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Teacher modeling, screenshot extraction, grading exceptions, future-work projections, planner integration and Windows interaction remain unfinished."
+      "blocker": "Teacher modeling, screenshot extraction, grading exceptions, planner integration and Windows interaction remain unfinished; scenarios cover one additional item under stated assumptions."
     },
     {
       "id": "CONCEPT-001",

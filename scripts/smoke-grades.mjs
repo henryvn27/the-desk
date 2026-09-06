@@ -52,7 +52,10 @@ try {
   await page
     .getByRole("button", { name: "Save category", exact: true })
     .click();
-  await page.getByText("Assignments", { exact: true }).first().waitFor();
+  await page
+    .locator(".gradebook .row strong")
+    .filter({ hasText: /^Assignments$/ })
+    .waitFor();
   await page
     .getByLabel("Score title", { exact: true })
     .fill("Forces assessment");
@@ -72,6 +75,38 @@ try {
   const saved = await page.evaluate(() => window.desk.snapshot());
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(output, "gradebook.png") });
+  await page.getByText("Explore an upcoming score", { exact: true }).click();
+  await page
+    .getByLabel("Projection category", { exact: true })
+    .selectOption({ label: "Tests" });
+  await page.getByLabel("Upcoming possible points", { exact: true }).fill("10");
+  await page.getByLabel("Lower expected points", { exact: true }).fill("9");
+  await page.getByLabel("Upper expected points", { exact: true }).fill("7");
+  await page
+    .getByRole("button", { name: "Calculate scenario", exact: true })
+    .click();
+  await page
+    .getByText(
+      "Use a score range from zero to possible points, with the lower score first.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.getByLabel("Lower expected points", { exact: true }).fill("7");
+  await page.getByLabel("Upper expected points", { exact: true }).fill("9");
+  await page
+    .getByRole("button", { name: "Calculate scenario", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "What-if range: 64.0–92.0%", exact: true })
+    .waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desk.snapshot())).gradeEntries,
+    saved.gradeEntries,
+  );
+  await page
+    .getByRole("region", { name: "Grade scenario result", exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(output, "grade-projection.png") });
   await app.close();
   app = undefined;
   await launch();
@@ -81,9 +116,15 @@ try {
   const restored = await page.evaluate(() => window.desk.snapshot());
   assert.deepEqual(restored.gradeCategories, saved.gradeCategories);
   assert.deepEqual(restored.gradeEntries, saved.gradeEntries);
+  assert.equal(
+    await page
+      .getByRole("region", { name: "Grade scenario result", exact: true })
+      .count(),
+    0,
+  );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: weighted categories, rejection above 100%, score correction, range assumptions and restart persistence",
+    "PASS: weighted categories, rejection above 100%, score correction, range assumptions, non-mutating future-score scenario and restart persistence",
   );
 } finally {
   if (app) await app.close();

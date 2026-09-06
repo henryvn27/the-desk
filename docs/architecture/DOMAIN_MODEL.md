@@ -47,3 +47,6 @@ Task planning metadata records user-selected work kind (assignment, assessment p
 
 
 Schema 11 adds weighted grade categories and manual score entries. Category weights may be incomplete but cannot exceed 100%; scores are bounded to 0..possible points in this model. Class ownership and revisions protect corrections. The recorded-score model weights point-based category averages without silently renormalizing missing weight. Its range assumes recorded averages remain fixed and missing weight scores 0..100%. Future work, drop rules, extra credit, official grade reconciliation and screenshot extraction are not modeled.
+
+
+Grade scenarios model one additional item with a user-supplied earned-point interval. They recalculate the selected category using recorded points plus hypothetical points, retain unknown weight in the range, and never write grade entries. Scenario drafts remain in renderer memory and are cleared on restart/class change. This does not model correlated future outcomes, dropped scores, extra credit, or official-grade policy.
