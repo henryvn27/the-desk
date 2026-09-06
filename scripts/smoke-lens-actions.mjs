@@ -1,11 +1,5 @@
 import { _electron as electron } from "playwright";
-import {
-  copyFile,
-  mkdir,
-  mkdtemp,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -35,7 +29,8 @@ async function launch() {
     recordVideo: { dir: output },
   });
   await waitFor(
-    () => Boolean((page = app.windows().find((p) => p.url().endsWith("#main")))),
+    () =>
+      Boolean((page = app.windows().find((p) => p.url().endsWith("#main")))),
     "Main Desk window missing",
   );
   page.on("pageerror", (error) => errors.push(error.message));
@@ -45,7 +40,10 @@ async function launch() {
 try {
   await launch();
   await app.evaluate(({ dialog }, path) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [path],
+    });
     globalThis.lensRequests = [];
     globalThis.fetch = async (url, init) => {
       const body = JSON.parse(init.body);
@@ -91,7 +89,8 @@ try {
 
   await page.evaluate(() => window.desk.lens());
   await waitFor(
-    () => Boolean((lens = app.windows().find((p) => p.url().endsWith("#lens")))),
+    () =>
+      Boolean((lens = app.windows().find((p) => p.url().endsWith("#lens")))),
     "Lens window missing",
   );
   lens.on("pageerror", (error) => errors.push(error.message));
@@ -111,17 +110,41 @@ try {
   await lens
     .getByRole("button", { name: "Save answer as source", exact: true })
     .click();
-  await lens.getByText("Lens answer saved as a source.", { exact: true }).waitFor();
   await lens
-    .getByRole("button", { name: "Save answer as memory", exact: true })
-    .click();
-  await lens
-    .getByText("Lens answer saved as explicit memory.", { exact: true })
+    .getByText("Lens answer saved as a source.", { exact: true })
     .waitFor();
   await lens
-    .getByRole("button", { name: "Create follow-up task", exact: true })
+    .getByRole("button", { name: "Save answer as note", exact: true })
     .click();
-  await lens.getByText("Lens follow-up task created.", { exact: true }).waitFor();
+  await lens
+    .getByText("Lens answer saved as a note.", { exact: true })
+    .waitFor();
+  await lens
+    .getByRole("button", { name: "Save answer to Canvas", exact: true })
+    .click();
+  await lens
+    .getByText("Lens answer saved to Canvas with its source.", { exact: true })
+    .waitFor();
+  await lens
+    .getByRole("button", { name: "Save as mistake", exact: true })
+    .click();
+  await lens.getByLabel("Concept", { exact: true }).fill("Force components");
+  await lens
+    .getByLabel("What I tried", { exact: true })
+    .fill("I added the force magnitudes directly.");
+  await lens
+    .getByLabel("What went wrong", { exact: true })
+    .fill("I mixed horizontal and vertical components.");
+  await lens.getByRole("button", { name: "Save mistake", exact: true }).click();
+  await lens
+    .getByText("Mistake saved at low confidence for review.", { exact: true })
+    .waitFor();
+  await lens
+    .getByRole("button", { name: "Prepare resource review", exact: true })
+    .click();
+  await lens
+    .getByText("Lens resource review prepared.", { exact: true })
+    .waitFor();
   await app.evaluate(({ shell }) => {
     globalThis.openedResources = [];
     shell.openExternal = async (url) => {
@@ -133,40 +156,88 @@ try {
     .click();
   const snapshot = await page.evaluate(() => window.desk.snapshot());
   const source = snapshot.sources.at(-1);
-  const task = snapshot.tasks.find((item) => item.title === "Review force balance");
-  const followUp = snapshot.tasks.find((item) => item.title === "Review Lens answer");
+  const task = snapshot.tasks.find(
+    (item) => item.title === "Review force balance",
+  );
+  const followUp = snapshot.tasks.find(
+    (item) => item.title === "Review Lens answer",
+  );
   const memory = snapshot.memories.at(-1);
+  const mistake = snapshot.mistakes.at(-1);
+  const canvas = snapshot.canvases.at(-1);
   const [requests, openedResources] = await app.evaluate(() => [
     globalThis.lensRequests,
     globalThis.openedResources,
   ]);
   assert.equal(requests.length, 1);
-  assert.equal(requests[0].url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.equal(
+    requests[0].url,
+    "https://openrouter.ai/api/v1/chat/completions",
+  );
   assert.ok(source);
   assert.equal(source.title, "Lens answer");
-  assert.equal(source.text, "Synthetic Lens answer: resolve the forces, then check the sign of each component.");
+  assert.equal(
+    source.text,
+    "Synthetic Lens answer: resolve the forces, then check the sign of each component.",
+  );
   assert.ok(task);
   assert.ok(followUp);
   assert.equal(followUp.workKind, "optional-review");
   assert.equal(followUp.notes, source.text);
+  assert.equal(followUp.resource, task.resource);
   assert.ok(memory);
   assert.equal(memory.origin, "explicit");
   assert.equal(memory.category, "other");
   assert.equal(memory.text, source.text);
   assert.equal(memory.classId, task.classId);
+  assert.ok(mistake);
+  assert.equal(mistake.concept, "Force components");
+  assert.equal(
+    mistake.originalAttempt,
+    "I added the force magnitudes directly.",
+  );
+  assert.equal(mistake.correction, source.text);
+  assert.equal(mistake.confidence, "low");
+  assert.ok(canvas);
+  const canvasRecord = await page.evaluate(
+    (id) => window.desk.canvas(id),
+    canvas.id,
+  );
+  assert.equal(canvasRecord.scene.elements[0].originalText, source.text);
+  assert.equal(
+    source.text,
+    "Synthetic Lens answer: resolve the forces, then check the sign of each component.",
+  );
+  assert.deepEqual(canvasRecord.scene.sourceIds, [source.id]);
   assert.deepEqual(source.classIds, [task.classId]);
   assert.deepEqual(source.taskIds, [task.id]);
   assert.deepEqual(openedResources, ["https://example.edu/force-balance"]);
   await lens.locator(".lens-panel").screenshot({
     path: join(output, "lens-actions.png"),
   });
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  const taskRow = page
+    .locator("article.row")
+    .filter({ hasText: "Review force balance" });
+  await taskRow.waitFor();
+  await taskRow
+    .getByRole("button", { name: "Open canvas", exact: true })
+    .click();
+  await page.getByRole("dialog", { name: "Study canvas" }).waitFor();
+  await page.locator(".canvas-workspace").screenshot({
+    path: join(output, "lens-canvas-artifact.png"),
+  });
   const video = lens.video();
   await app.close();
   app = undefined;
-  if (video) await copyFile(await video.path(), join(output, "lens-actions-operated.webm"));
+  if (video)
+    await copyFile(
+      await video.path(),
+      join(output, "lens-actions-operated.webm"),
+    );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: synthetic Lens response exposes explicit source, memory, follow-up-task and HTTPS resource actions; saved records persist to the active class/task; no provider or arbitrary action is inferred.",
+    "PASS: synthetic Lens response exposes explicit source, note, low-confidence mistake, Canvas artifact, resource-review and HTTPS open actions; saved records persist to the active class/task; no provider or arbitrary action is inferred.",
   );
 } finally {
   if (app) await app.close();

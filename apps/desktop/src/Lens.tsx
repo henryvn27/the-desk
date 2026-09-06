@@ -6,8 +6,11 @@ import type {
   LensHistoryTurn,
 } from "../../../packages/intelligence/lens-provider";
 import type { Command } from "../../../packages/domain/contracts";
+import type { Snapshot } from "../../../packages/domain/contracts";
 import {
+  lensAnswerCanvasScene,
   lensAnswerMemoryInput,
+  lensAnswerMistakeInput,
   lensAnswerSourceInput,
   lensFollowUpTaskInput,
 } from "../../../packages/intelligence/lens-actions";
@@ -28,8 +31,8 @@ export function Lens({
   className: string;
   classId?: string;
   taskId?: string;
-  taskResource?: boolean;
-  save: (command: Command) => Promise<unknown>;
+  taskResource?: string;
+  save: (command: Command) => Promise<Snapshot | undefined>;
 }) {
   const [savingMode, setSavingMode] = useState(false);
   const [paths, setPaths] = useState<Point[][]>([]),
@@ -44,6 +47,7 @@ export function Lens({
     [history, setHistory] = useState<LensHistoryTurn[]>([]),
     [busy, setBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [showMistake, setShowMistake] = useState(false);
   const width = window.innerWidth,
     height = window.innerHeight;
   const point = (e: React.PointerEvent): Point => ({
@@ -314,7 +318,7 @@ export function Lens({
                         type: "memory.create",
                         input: lensAnswerMemoryInput(answer, classId),
                       });
-                      setStatus("Lens answer saved as explicit memory.");
+                      setStatus("Lens answer saved as a note.");
                     } catch (error) {
                       setStatus(userError(error));
                     } finally {
@@ -322,7 +326,54 @@ export function Lens({
                     }
                   }}
                 >
-                  Save answer as memory
+                  Save answer as note
+                </button>
+              )}
+              {classId && taskId && (
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setStatus("");
+                    try {
+                      const withSource = await save({
+                        type: "source.create",
+                        input: lensAnswerSourceInput(answer, classId, taskId),
+                      });
+                      const source = withSource?.sources.at(-1);
+                      if (!source) throw Error("Lens source was not saved.");
+                      const withCanvas = await save({
+                        type: "canvas.create",
+                        taskId,
+                      });
+                      const canvas = withCanvas?.canvases.at(-1);
+                      if (!canvas) throw Error("Lens Canvas was not created.");
+                      await save({
+                        type: "canvas.save",
+                        id: canvas.id,
+                        revision: canvas.revision,
+                        scene: lensAnswerCanvasScene(answer, source.id),
+                      });
+                      setStatus("Lens answer saved to Canvas with its source.");
+                    } catch (error) {
+                      setStatus(userError(error));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
+                >
+                  Save answer to Canvas
+                </button>
+              )}
+              {classId && (
+                <button
+                  type="button"
+                  aria-expanded={showMistake}
+                  disabled={actionBusy}
+                  onClick={() => setShowMistake((shown) => !shown)}
+                >
+                  Save as mistake
                 </button>
               )}
               {classId && (
@@ -335,9 +386,17 @@ export function Lens({
                     try {
                       await save({
                         type: "task.create",
-                        input: lensFollowUpTaskInput(answer, classId),
+                        input: lensFollowUpTaskInput(
+                          answer,
+                          classId,
+                          taskResource ?? null,
+                        ),
                       });
-                      setStatus("Lens follow-up task created.");
+                      setStatus(
+                        taskResource
+                          ? "Lens resource review prepared."
+                          : "Lens follow-up task created.",
+                      );
                     } catch (error) {
                       setStatus(userError(error));
                     } finally {
@@ -345,7 +404,9 @@ export function Lens({
                     }
                   }}
                 >
-                  Create follow-up task
+                  {taskResource
+                    ? "Prepare resource review"
+                    : "Create follow-up task"}
                 </button>
               )}
               {taskId && taskResource && (
@@ -362,6 +423,65 @@ export function Lens({
                 </button>
               )}
             </div>
+            {showMistake && classId && (
+              <form
+                className="lens-mistake"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  setActionBusy(true);
+                  setStatus("");
+                  try {
+                    const values = new FormData(event.currentTarget);
+                    await save({
+                      type: "mistake.create",
+                      input: lensAnswerMistakeInput(
+                        answer,
+                        classId,
+                        taskId ?? null,
+                        {
+                          concept: String(values.get("concept")),
+                          originalAttempt: String(
+                            values.get("originalAttempt"),
+                          ),
+                          whatWentWrong: String(values.get("whatWentWrong")),
+                        },
+                      ),
+                    });
+                    setShowMistake(false);
+                    setStatus("Mistake saved at low confidence for review.");
+                  } catch (error) {
+                    setStatus(userError(error));
+                  } finally {
+                    setActionBusy(false);
+                  }
+                }}
+              >
+                <p>
+                  Describe what happened. Lens will save its answer as a
+                  low-confidence correction for you to review.
+                </p>
+                <label>
+                  Concept
+                  <input
+                    name="concept"
+                    required
+                    maxLength={300}
+                    defaultValue={title}
+                  />
+                </label>
+                <label>
+                  What I tried
+                  <textarea name="originalAttempt" required maxLength={5000} />
+                </label>
+                <label>
+                  What went wrong
+                  <textarea name="whatWentWrong" required maxLength={5000} />
+                </label>
+                <button type="submit" disabled={actionBusy}>
+                  Save mistake
+                </button>
+              </form>
+            )}
           </div>
         )}
         <form
