@@ -813,12 +813,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "Saved Guide/Balanced/Direct modes, trusted-main teaching instructions, strict provider action rejection; no external-action tools.",
-      "automated": "88 checks pass including mode persistence, renderer override rejection and provider tool/function/output-action rejection.",
+      "implementation": "Saved Guide/Balanced/Direct modes plus trusted-main bounded active-task/class-wide source excerpts. Source provenance/truncation/omissions retained; supporting explanation distinguished by instruction.",
+      "automated": "90 checks pass including source-scope exclusion, serialized size/truncation, mode persistence and provider action rejection.",
       "live": "Synthetic provider responses only; no successful live OpenRouter response.",
-      "mac": "Unsigned installed synthetic tutoring smoke passes mode selection, request policy, friendly rejection, zero task creation and restart; screenshot/video inspected.",
+      "mac": "Unsigned installed synthetic grounding smoke verifies task-linked source inclusion, unrelated exclusion, saved mode requests, action rejection and restart. No live answer-quality proof.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Class-source grounding and live teaching quality remain unverified; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
+      "blocker": "Source relevance retrieval, verified teacher/textbook authority, citations and live teaching quality remain open; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
     },
     {
       "id": "MEMORY-001",

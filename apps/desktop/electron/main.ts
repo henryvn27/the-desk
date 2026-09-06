@@ -1,3 +1,4 @@
+import { lensContext } from "../../../packages/intelligence/grounding";
 import { readCaptureTextFiles } from "../../../packages/intake/text-files";
 import {
   app,
@@ -215,19 +216,9 @@ app.whenReady().then(() => {
     if (lensRequest) throw Error("A Lens response is already in progress.");
     const snapshot = store.snapshot();
     const active = snapshot.sessions.find((s) => !s.endedAt);
-    const task = snapshot.tasks.find((t) => t.id === active?.taskId);
-    const course = snapshot.classes.find((c) => c.id === task?.classId);
     const input = lensInputSchema.parse({
       ...value,
-      context: task
-        ? JSON.stringify({
-            class: course?.name,
-            task: task.title,
-            notesExcerpt: task.notes.slice(0, 12000),
-            notesTruncated: task.notes.length > 12000,
-            resource: task.resource,
-          })
-        : "No active academic session. Ask if academic context is unclear.",
+      context: lensContext(snapshot),
     });
     const key = credentials.read();
     lensRequest = new AbortController();

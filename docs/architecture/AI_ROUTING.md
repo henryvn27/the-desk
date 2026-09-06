@@ -39,3 +39,6 @@ Primary references:
 
 
 Lens now applies saved Guide me, Balanced (default), or Explain directly teaching instructions in the trusted main process. Explicit full-method requests remain allowed in every mode. Provider tool_calls/function_call payloads and extraneous output actions are rejected; no tools are offered. These are request and response boundaries, not proof that a model follows the pedagogy. Class-source retrieval and teaching-quality evaluation remain open; live OpenRouter authentication still returns HTTP 401 and was not retried.
+
+
+Local Lens grounding now selects sources linked explicitly to the active task, then class-wide sources without other task links. It excludes unlinked/other-task material, preserves user-provided-text authority, and sends bounded excerpts with truncation and omitted-source counts. The serialized context is capped at 20,000 characters; no linked URL is fetched. Instructions distinguish source statements from supporting explanation and disclose conflicts. This is deterministic association-based context, not relevance retrieval, verified teacher authority, textbook/web search or validated citations.

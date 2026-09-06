@@ -81,3 +81,6 @@ Schema 20 fences text-file capture provenance. Native import reads up to ten vis
 
 
 Schema 21 fences the persisted tutor-mode setting: guide, balanced (default), or direct. Snapshot and tutor.mode commands validate the enum; SQLite stores the preference across restart. The trusted main process reads this setting for Lens requests. Renderer Lens inputs cannot supply a routing or teaching-mode override. Mode changes do not create tasks or sessions.
+
+
+Lens context is a read-only projection of the active task, task-linked sources and class-wide sources with no task links. It carries source IDs/titles, existing authority, scope and excerpt truncation. It does not change SQLite data or schema 21. Context assembly runs only in the main process and replaces renderer-provided context.
