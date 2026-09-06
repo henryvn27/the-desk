@@ -153,3 +153,65 @@ test("weekly plan carries remaining work across study days without duplication o
   assert.equal(noDays.blocks.length, 0);
   assert.equal(noDays.overloadMinutes, 30);
 });
+
+test("saved commitments reserve capacity once, preserve locks, and elapsed blocks do not imply completion", async () => {
+  const { planWeek } = await import("./index");
+  const { defaultPlanningPreferences } = await import("../domain/contracts");
+  const now = new Date(2026, 8, 7, 8, 0, 0);
+  const start = new Date(2026, 8, 7, 9, 0, 0).toISOString();
+  const end = new Date(2026, 8, 7, 10, 0, 0).toISOString();
+  const saved = {
+    id: "block",
+    taskId: "a",
+    start,
+    end,
+    minutes: 60,
+    why: "Reserved",
+    locked: true,
+    revision: 2,
+    createdAt: start,
+    updatedAt: start,
+  };
+  const original = structuredClone(saved);
+  const result = planWeek(
+    [task("a", 90, null), task("b", 120, null)],
+    now,
+    {
+      ...defaultPlanningPreferences,
+      studyStart: "08:00",
+      sleepCutoff: "12:00",
+      studyDays: [1],
+      bufferPercent: 25,
+    },
+    [saved],
+  );
+  assert.equal(
+    result.blocks
+      .filter((b) => b.taskId === "a")
+      .reduce((s, b) => s + b.minutes, 0),
+    30,
+  );
+  assert.equal(
+    result.blocks.reduce((s, b) => s + b.minutes, 0),
+    120,
+  );
+  assert.equal(result.overloadMinutes, 30);
+  assert.ok(
+    result.blocks.every(
+      (b) =>
+        Date.parse(b.end) <= Date.parse(start) ||
+        Date.parse(b.start) >= Date.parse(end),
+    ),
+  );
+  assert.deepEqual(saved, original);
+  const nextWeek = planWeek(
+    [task("a", 90, null)],
+    new Date(2026, 8, 14, 8),
+    defaultPlanningPreferences,
+    [saved],
+  );
+  assert.equal(
+    nextWeek.blocks.reduce((s, b) => s + b.minutes, 0),
+    90,
+  );
+});

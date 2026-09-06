@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 6);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 7);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -438,6 +438,106 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
     assert.deepEqual(store.canvas(board.id).scene, recoveredScene);
     assert.equal(store.canvas(board.id).revision, 2);
     assert.throws(() => store.execute({ type: "task.undo", id: taskId }));
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("saved blocks survive restart and reject conflicting, stale, locked, and late edits atomically", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-blocks-"));
+  const path = join(directory, "test.sqlite");
+  let store = new DeskStore(path);
+  const now = new Date("2026-09-05T08:00:00Z");
+  try {
+    const classId = store.execute(
+      { type: "class.create", name: "Physics" },
+      now,
+    ).classes[0]!.id;
+    const taskId = store.execute(
+      {
+        type: "task.create",
+        input: {
+          classId,
+          title: "Problems 8–14",
+          minutes: 90,
+          dueAt: "2026-09-05T14:00:00Z",
+          deadlineConfirmed: true,
+          notes: "",
+          resource: null,
+        },
+      },
+      now,
+    ).tasks[0]!.id;
+    const first = store.execute(
+      {
+        type: "block.create",
+        taskId,
+        input: { start: "2026-09-05T10:00:00Z", minutes: 30 },
+        beyondDeadlineApproved: false,
+      },
+      now,
+    ).studyBlocks[0]!;
+    assert.throws(
+      () =>
+        store.execute(
+          {
+            type: "block.create",
+            taskId,
+            input: { start: "2026-09-05T10:15:00Z", minutes: 30 },
+            beyondDeadlineApproved: false,
+          },
+          now,
+        ),
+      /overlaps/,
+    );
+    const locked = store.execute(
+      {
+        type: "block.update",
+        id: first.id,
+        revision: 0,
+        input: { start: first.start, minutes: 30 },
+        locked: true,
+        lockedChangeApproved: false,
+        beyondDeadlineApproved: false,
+      },
+      now,
+    ).studyBlocks[0]!;
+    const move = {
+      type: "block.update" as const,
+      id: first.id,
+      revision: locked.revision,
+      input: { start: "2026-09-05T13:45:00Z", minutes: 30 },
+      locked: true,
+      lockedChangeApproved: false,
+      beyondDeadlineApproved: false,
+    };
+    assert.throws(() => store.execute(move, now), /locked/);
+    assert.throws(
+      () => store.execute({ ...move, lockedChangeApproved: true }, now),
+      /deadline/,
+    );
+    assert.deepEqual(store.snapshot().studyBlocks, [locked]);
+    const moved = store.execute(
+      { ...move, lockedChangeApproved: true, beyondDeadlineApproved: true },
+      now,
+    ).studyBlocks[0]!;
+    assert.throws(
+      () =>
+        store.execute(
+          { ...move, lockedChangeApproved: true, beyondDeadlineApproved: true },
+          now,
+        ),
+      /changed/,
+    );
+    assert.throws(
+      () => store.execute({ type: "task.undo", id: taskId }, now),
+      /saved study blocks/,
+    );
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.snapshot().studyBlocks, [moved]);
+    assert.equal(store.snapshot().tasks[0]!.completed, false);
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

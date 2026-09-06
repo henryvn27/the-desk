@@ -78,6 +78,17 @@ export type Block = {
   minutes: number;
   why: string;
 };
+export const studyBlockTime = z.object({
+  start: z.iso.datetime(),
+  minutes: z.number().int().min(5).max(2400),
+});
+export type StudyBlock = Block & {
+  id: string;
+  locked: boolean;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const planningPreferences = z
   .object({
@@ -98,6 +109,7 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type Snapshot = {
+  studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
   sources: Source[];
   classes: Class[];
@@ -106,6 +118,22 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("block.create"),
+    taskId: id,
+    input: studyBlockTime,
+    beyondDeadlineApproved: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("block.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: studyBlockTime,
+    locked: z.boolean(),
+    lockedChangeApproved: z.boolean(),
+    beyondDeadlineApproved: z.boolean(),
+  }),
+
   z.object({
     type: z.literal("canvas.create"),
     taskId: id,

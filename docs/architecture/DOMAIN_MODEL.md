@@ -11,6 +11,7 @@ The product contract §4 defines the required academic graph. This document desc
 | Source | `sources` plus `source_classes`/`source_tasks` join tables; many-to-many links | Exact pasted text and capture time; user-provided authority |
 | Canvas / notebook | `canvases`, task foreign key, revision-checked scene; optional ordered pages with shared files/source links | Original drawing content; page identity and dimensions owned by Desk |
 | Capture provenance | Optional task payload retaining original/source text, captured time, candidate dates, uncertainties and field confidence | Original user-provided text is retained through task corrections |
+| StudyBlock | `study_blocks`, task foreign key, stable ID and revision | Explicitly reserved time; lock changes and late scheduling require approval; elapsed time is not completion |
 | StudySession | `sessions.task_id` foreign key; tracked start/pause/end and elapsed minutes | Clock measurement is separate from student-reported completion |
 | Session review | Session payload with review time, notes and optional remaining minutes | Explicit student report; no submission or mastery inference |
 | Planning preference | `settings` row `planning`; local study window, weekdays and buffer | Explicit student configuration |
@@ -27,12 +28,14 @@ The product contract §4 defines the required academic graph. This document desc
 - Changing a confirmed deadline or revoking its confirmation requires explicit approval. Capture provenance survives the edit.
 - Uncertain deadlines are excluded from automatic planning. Capacity respects the configured local same-day window and buffer.
 - Remaining-time review cannot modify completed work or overwrite an estimate after a newer session of the same task.
-- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Opening a future schema fails closed.
+- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Schema 7 adds saved study blocks. Opening a future schema fails closed.
 
 ## Required graph still missing
 
-User identity, academic periods, tracks, units, teachers, assessments, artifacts/concepts, attempts, mistakes, persistent plans and study blocks, grades/categories, durable memory, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
+User identity, academic periods, tracks, units, teachers, assessments, artifacts/concepts, attempts, mistakes, persistent plan versions, grades/categories, durable memory, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
 
 The current local profile is not a multi-user security boundary. JSON payload persistence is not evidence that absent objects, synchronization, provenance corrections or confidence history are supported.
 
 Verification: `packages/domain/store.test.ts`, `packages/planner/index.test.ts`, and installed smoke evidence described in `Verification/BASELINE.md`.
+
+Saved blocks are retained across suggestion recalculation. Future reservations reduce remaining estimates and occupy capacity; elapsed blocks do not count as completed work. Automatic cancellation, rebalancing, drag editing and plan revision history remain open.

@@ -3,6 +3,7 @@ import {
   type PlanningPreferences,
   type Block,
   type Task,
+  type StudyBlock,
 } from "../domain/contracts";
 /** Local wall-clock boundaries use the OS timezone, including its DST rules. */
 export function todayWindow(now: Date, raw: PlanningPreferences) {
@@ -25,8 +26,20 @@ export function planWeek(
   tasks: Task[],
   now: Date,
   preferences: PlanningPreferences,
+  commitments: StudyBlock[] = [],
 ) {
   const residual = tasks.filter((t) => !t.completed).map((t) => ({ ...t }));
+  // Elapsed blocks remain visible history; they are not evidence of completed work.
+  const reserved = commitments.filter((b) => Date.parse(b.end) > +now);
+  for (const task of residual) {
+    task.minutes = Math.max(
+      0,
+      task.minutes -
+        reserved
+          .filter((b) => b.taskId === task.id)
+          .reduce((sum, b) => sum + b.minutes, 0),
+    );
+  }
   const blocks: Block[] = [];
   let horizon = new Date(now);
   for (let day = 0; day < 7; day++) {
@@ -37,15 +50,49 @@ export function planWeek(
     }
     const capacity = todayWindow(date, preferences);
     horizon = capacity.end;
-    const daily = plan(
-      residual.filter((t) => t.minutes > 0),
-      capacity.start,
-      capacity.end,
-      capacity.buffer,
+    const occupied = reserved
+      .filter(
+        (b) =>
+          Date.parse(b.start) < +capacity.end &&
+          Date.parse(b.end) > +capacity.start,
+      )
+      .sort((a, b) => a.start.localeCompare(b.start));
+    let cursor = +capacity.start;
+    const gaps: [number, number][] = [];
+    let occupiedMs = 0;
+    for (const block of occupied) {
+      const start = Math.max(+capacity.start, Date.parse(block.start));
+      const end = Math.min(+capacity.end, Date.parse(block.end));
+      if (start > cursor) gaps.push([cursor, start]);
+      occupiedMs += Math.max(0, end - Math.max(cursor, start));
+      cursor = Math.max(cursor, end);
+    }
+    if (cursor < +capacity.end) gaps.push([cursor, +capacity.end]);
+    // Reserve the day's buffer once, including time already committed.
+    let budget = Math.max(
+      0,
+      Math.floor(
+        ((+capacity.end - +capacity.start) * (1 - capacity.buffer) -
+          occupiedMs) /
+          60000,
+      ),
     );
-    for (const block of daily.blocks) {
-      blocks.push(block);
-      residual.find((t) => t.id === block.taskId)!.minutes -= block.minutes;
+    for (const [start, end] of gaps) {
+      if (!budget) break;
+      const daily = plan(
+        residual.filter((t) => t.minutes > 0),
+        new Date(start),
+        new Date(Math.min(end, start + budget * 60000)),
+        0,
+      );
+      for (const block of daily.blocks) {
+        blocks.push({
+          ...block,
+          why: `Fits around your saved blocks; the day retains a ${preferences.bufferPercent}% capacity buffer.`,
+        });
+        residual.find((t) => t.id === block.taskId)!.minutes -= block.minutes;
+        budget -= block.minutes;
+      }
     }
   }
   const unscheduled = residual

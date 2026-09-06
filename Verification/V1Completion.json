@@ -466,11 +466,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check: 28 tests; task correction rejects unapproved confirmed-deadline changes and preserves capture provenance.",
-      "live": "Installed macOS smoke: reject unapproved date change, approve/save, restart and verify corrected deadline plus original source.",
+      "automated": "47 tests plus typecheck/lint/build pass. Saved blocks reject stale/overlapping/unapproved locked or late edits; restart and capacity-reservation tests pass.",
+      "live": "Installed macOS Plan smoke passes reserve, lock, denied edit, approved resize, and exact restart persistence. Screenshot and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+      "blocker": "Drag editing, cancellation, automatic rebalancing, plan history and complete explanation evidence remain unfinished; Windows interaction unverified."
     },
     {
       "id": "PLAN-005",

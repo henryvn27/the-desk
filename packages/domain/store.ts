@@ -7,6 +7,7 @@ import {
   defaultPlanningPreferences,
   planningPreferences,
   type Command,
+  type StudyBlock,
   type Snapshot,
   type Task,
   type Class,
@@ -22,7 +23,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 6) {
+    if (version > 7) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -55,6 +56,10 @@ export class DeskStore {
     // Notebook content lives inside page envelopes. Older renderers would save
     // only root elements, so prevent them from opening this document format.
     if (version <= 5) this.db.exec("BEGIN; PRAGMA user_version=6; COMMIT;");
+    if (version <= 6)
+      this.db.exec(`BEGIN;
+      CREATE TABLE study_blocks(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),data TEXT NOT NULL);
+      PRAGMA user_version=7; COMMIT;`);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -68,6 +73,13 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      studyBlocks: this.db
+        .prepare("SELECT data FROM study_blocks")
+        .all()
+        .map((r) => JSON.parse(r.data as string) as StudyBlock)
+        .sort(
+          (a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id),
+        ),
       canvases: this.db
         .prepare(
           "SELECT id,taskId,title,createdAt,updatedAt,revision FROM canvases",
@@ -107,6 +119,73 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "block.create" || c.type === "block.update") {
+        const existing =
+          c.type === "block.update"
+            ? state.studyBlocks.find((b) => b.id === c.id)
+            : undefined;
+        if (
+          c.type === "block.update" &&
+          (!existing || existing.revision !== c.revision)
+        )
+          throw Error(
+            "This block changed. Refresh your plan before editing it.",
+          );
+        const taskId = c.type === "block.create" ? c.taskId : existing!.taskId;
+        const task = state.tasks.find((t) => t.id === taskId);
+        if (!task || task.completed)
+          throw Error("Choose an unfinished assignment.");
+        const start = Date.parse(c.input.start);
+        const end = start + c.input.minutes * 60000;
+        const changesTime =
+          !existing ||
+          existing.start !== c.input.start ||
+          existing.minutes !== c.input.minutes;
+        if (changesTime && start < +now)
+          throw Error("Choose a future start time.");
+        if (
+          c.type === "block.update" &&
+          existing!.locked &&
+          (changesTime || !c.locked) &&
+          !c.lockedChangeApproved
+        )
+          throw Error("Confirm changing this locked block.");
+        if (
+          changesTime &&
+          task.dueAt &&
+          end > Date.parse(task.dueAt) &&
+          !c.beyondDeadlineApproved
+        )
+          throw Error("Confirm scheduling work beyond its deadline.");
+        if (
+          changesTime &&
+          state.studyBlocks.some(
+            (b) =>
+              b.id !== existing?.id &&
+              Date.parse(b.start) < end &&
+              Date.parse(b.end) > start,
+          )
+        )
+          throw Error("This time overlaps another saved block.");
+        entityId = existing?.id ?? randomUUID();
+        const block: StudyBlock = {
+          id: entityId,
+          taskId,
+          start: c.input.start,
+          end: new Date(end).toISOString(),
+          minutes: c.input.minutes,
+          why: existing?.why ?? "Time reserved by you.",
+          locked: c.type === "block.update" ? c.locked : false,
+          revision: (existing?.revision ?? -1) + 1,
+          createdAt: existing?.createdAt ?? timestamp,
+          updatedAt: timestamp,
+        };
+        this.db
+          .prepare(
+            "INSERT INTO study_blocks VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(entityId, taskId, JSON.stringify(block));
+      }
       if (c.type === "canvas.create") {
         const task = state.tasks.find((t) => t.id === c.taskId);
         if (!task) throw Error("Assignment no longer exists.");
@@ -231,6 +310,8 @@ export class DeskStore {
           .run(updated.classId, JSON.stringify(updated), existing.id);
       }
       if (c.type === "task.undo") {
+        if (state.studyBlocks.some((b) => b.taskId === c.id))
+          throw Error("This task has saved study blocks and cannot be undone.");
         if (state.sessions.some((s) => s.taskId === c.id))
           throw Error("This task has study history and cannot be undone.");
         if (!state.tasks.some((t) => t.id === c.id))

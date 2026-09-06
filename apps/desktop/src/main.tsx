@@ -8,8 +8,9 @@ import type {
   Command,
   Task,
 } from "../../../packages/domain/contracts";
-import { plan, planWeek, todayWindow } from "../../../packages/planner";
+import { planWeek, todayWindow } from "../../../packages/planner";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
+import { StudyPlan } from "./StudyPlan";
 import { PlanningSettings } from "./PlanningSettings";
 import { Sources } from "./Sources";
 import "./style.css";
@@ -25,6 +26,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  studyBlocks: [],
   canvases: [],
   sources: [],
   classes: [],
@@ -148,14 +150,25 @@ function App() {
     }
   }
   const capacity = todayWindow(new Date(tick), data.planning);
-  const schedule = plan(
+  const week = planWeek(
     data.tasks,
-    capacity.start,
-    capacity.end,
-    capacity.buffer,
+    new Date(tick),
+    data.planning,
+    data.studyBlocks,
   );
+  const schedule = {
+    blocks: [
+      ...week.blocks,
+      ...data.studyBlocks.filter((b) =>
+        data.tasks.some((t) => t.id === b.taskId && !t.completed),
+      ),
+    ]
+      .filter(
+        (b) => Date.parse(b.end) > tick && Date.parse(b.start) < +capacity.end,
+      )
+      .sort((a, b) => a.start.localeCompare(b.start)),
+  };
   const next = data.tasks.find((t) => t.id === schedule.blocks[0]?.taskId);
-  const week = planWeek(data.tasks, new Date(tick), data.planning);
   const elapsed = active
     ? Math.max(
         0,
@@ -425,51 +438,7 @@ function App() {
             )}
           </>
         ) : page === "Plan" ? (
-          <>
-            <h1>Your plan</h1>
-            <p className="muted">
-              Next seven days · {data.planning.studyStart}–
-              {data.planning.sleepCutoff} local time ·{" "}
-              {data.planning.bufferPercent}% breathing room
-            </p>
-            {!week.blocks.length && (
-              <p>
-                No study blocks fit in the next seven days. Check your study
-                days and deadlines.
-              </p>
-            )}
-            {week.blocks.map((b) => (
-              <section className="row" key={b.taskId + b.start}>
-                <div>
-                  <strong>
-                    {data.tasks.find((t) => t.id === b.taskId)?.title}
-                  </strong>
-                  <p>
-                    {new Date(b.start).toLocaleString([], {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}{" "}
-                    · {b.minutes} minutes
-                  </p>
-                  <small>{b.why}</small>
-                </div>
-              </section>
-            ))}
-            {week.unscheduled.length > 0 && (
-              <section>
-                <h2>Still needs time</h2>
-                {week.unscheduled.map((u) => (
-                  <p key={u.taskId}>
-                    {data.tasks.find((t) => t.id === u.taskId)?.title} ·{" "}
-                    {u.minutes} min · {u.reason}
-                  </p>
-                ))}
-              </section>
-            )}
-          </>
+          <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
         ) : page === "Settings" ? (
           <>
             <h1>Settings</h1>
