@@ -208,8 +208,8 @@
       "verification": "PARTIAL",
       "implementation": "Capture.tsx; Electron main/preload; packages/intake/text-files.ts; packages/domain; packages/intelligence/capture.ts",
       "automated": "85 tests plus typecheck/lint/build; bounded UTF-8 import, invalid-file/credential-marker rejection, atomic batches and filename/source preservation.",
-      "live": "Development and installed text-import smoke exercise synthetic native-dialog selections, cancellation, failed mixed batch, successful review, Lens import denial and restart.",
-      "mac": "Unsigned installed schema-20 build; app archives match; imported-text screenshot inspected and operated video captured. Native dialog selections are stubbed in automation.",
+      "live": "Automated development/installed imports cover cancellation, invalid batches, review and restart. Separate direct native-picker interaction passes without a dialog stub (scripts/verify-native-picker.mjs).",
+      "mac": "Unsigned installed schema-20 build at 0c464c8; direct unstubbed macOS native-picker import verified using CUA and an isolated synthetic Markdown file. SQLite assertions confirm one pending item, correct basename/source type and no task. Screenshots retained.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
       "blocker": "Typed/pasted assignments and native plain-text/Markdown import supported. PDF/image/OCR, rich documents, browser integrations, voice, email and drag/drop intake remain unimplemented or unverified; Windows interactive proof remains open."
     },
@@ -226,8 +226,8 @@
       "verification": "PARTIAL",
       "implementation": "Capture.tsx; Electron main/preload; packages/intake/text-files.ts; packages/domain; packages/intelligence/capture.ts",
       "automated": "85 tests plus typecheck/lint/build; bounded UTF-8 import, invalid-file/credential-marker rejection, atomic batches and filename/source preservation.",
-      "live": "Development and installed text-import smoke exercise synthetic native-dialog selections, cancellation, failed mixed batch, successful review, Lens import denial and restart.",
-      "mac": "Unsigned installed schema-20 build; app archives match; imported-text screenshot inspected and operated video captured. Native dialog selections are stubbed in automation.",
+      "live": "Automated development/installed imports cover cancellation, invalid batches, review and restart. Separate direct native-picker interaction passes without a dialog stub (scripts/verify-native-picker.mjs).",
+      "mac": "Unsigned installed schema-20 build at 0c464c8; direct unstubbed macOS native-picker import verified using CUA and an isolated synthetic Markdown file. SQLite assertions confirm one pending item, correct basename/source type and no task. Screenshots retained.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
       "blocker": "Typed/pasted assignments and native plain-text/Markdown import supported. PDF/image/OCR, rich documents, browser integrations, voice, email and drag/drop intake remain unimplemented or unverified; Windows interactive proof remains open."
     },
