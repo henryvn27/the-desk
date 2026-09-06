@@ -17,6 +17,7 @@
     "test:account": "node scripts/smoke-account.mjs",
     "test:cloud-sync": "node scripts/smoke-cloud-sync.mjs",
     "test:cloud-sync-conflict": "node scripts/smoke-cloud-sync-conflict.mjs",
+    "test:acceptance:v1": "node scripts/smoke-acceptance-v1.mjs",
     "test:lens-actions": "node scripts/smoke-lens-actions.mjs",
     "test:canvas": "node scripts/smoke-canvas.mjs",
     "test:math": "node scripts/smoke-math.mjs",
