@@ -647,12 +647,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/intelligence/lens-actions.ts; apps/desktop/src/Lens.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-lens-actions.mjs",
-      "automated": "133 tests plus typecheck/lint/build pass; Lens answer source and follow-up-task payloads are schema-validated and link only to the active class/task.",
-      "live": "Synthetic Electron smoke exposes explicit Save answer as source, Create follow-up task and Open task resource actions; the trusted main process validates HTTPS resource URLs and provider tool/action calls remain unavailable.",
-      "mac": "Installed unsigned arm64 smoke passes synthetic Lens answer, linked-source persistence, follow-up-task persistence and HTTPS resource handoff; screenshot and operated video retained at artifacts/lens-actions/.",
-      "windows": "Hosted macOS/Windows checks/build/directory package pass at b0751ad (run 34047572914); no requirement-specific Windows UI proof.",
-      "blocker": "Mistake, note, artifact, Canvas, launch-app and resource-preparation actions remain open; arbitrary third-party UI automation is intentionally deferred. Live provider authentication remains HTTP 401, and Windows interactive proof is open."
+      "implementation": "packages/intelligence/lens-actions.ts; packages/intelligence/lens-actions.test.ts; apps/desktop/src/Lens.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-lens-actions.mjs",
+      "automated": "135 tests plus typecheck/lint/build pass; Lens answer source, explicit class-scoped memory and optional-review task payloads are schema-validated, while trusted main-process HTTPS resource dispatch remains bounded.",
+      "live": "Synthetic Electron smoke exposes explicit Save answer as source, Save answer as memory, Create follow-up task and Open task resource actions; saved source/memory/task records link only to the active class/task, and provider tool/action calls remain unavailable.",
+      "mac": "Installed unsigned arm64 smoke passes synthetic Lens answer, linked-source persistence, explicit-memory persistence, follow-up-task persistence and HTTPS resource handoff; screenshot and operated video retained at artifacts/lens-actions/ and the user-facing outputs folder.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34049995871 for commit 65ab621; no requirement-specific Windows UI proof.",
+      "blocker": "Mistake, artifact, Canvas, launch-app and resource-preparation actions remain open; arbitrary third-party UI automation is intentionally deferred. Live provider authentication remains HTTP 401, and Windows interactive proof is open."
     },
     {
       "id": "LENS-005",
@@ -832,12 +832,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "Explicit editable/forgettable notes plus duration-pattern candidates from repeated session evidence. Store-validated confirmation persists provenance; disable and clear-inferred controls affect Capture learning and tutoring context without deleting explicit notes or study history. Confirmed duration evidence is immutable; changed/unavailable evidence is shown and excluded from tutoring.",
-      "automated": "100 tests pass including immutable observation preservation after review correction, evidence freshness and withholding unverifiable inferred notes, plus prior inference/explicit-memory checks.",
-      "live": "No provider request; actual tutoring use of notes unverified.",
-      "mac": "Unsigned installed synthetic UI smoke verifies saved original evidence after review correction and visible stale warning, plus confirmation/learning controls/clear/restart. Screenshot/video retained; no real study-duration claim.",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Broader preference inference and integration of existing settings/learned preferences remain incomplete. Live tutoring use and Windows UI unverified."
+      "implementation": "apps/desktop/src/Memory.tsx; packages/domain/contracts.ts; packages/domain/store.ts; packages/intelligence/lens-actions.ts; apps/desktop/src/Lens.tsx; scripts/smoke-lens-actions.mjs",
+      "automated": "135 tests pass including explicit memory CRUD, inference freshness/withholding, immutable duration evidence and the Lens explicit class-scoped memory payload, plus typecheck/lint/build.",
+      "live": "Installed unsigned Lens smoke saves the synthetic answer as an explicit class-scoped memory, verifies its origin/category/text and preserves the existing source/task actions; actual tutoring use of notes remains unverified.",
+      "mac": "Unsigned installed Lens and broad desktop smokes pass; the Lens action screenshot and operated video are retained at artifacts/lens-actions/ and the user-facing outputs folder; app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34049995871 for commit 65ab621; no requirement-specific Windows UI proof.",
+      "blocker": "Broader preference/teacher-policy inference and integration of existing settings/learned preferences remain incomplete. Live tutoring use, account/cloud sync and Windows UI remain unverified."
     },
     {
       "id": "PRIV-001",
