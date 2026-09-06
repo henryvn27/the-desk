@@ -236,14 +236,17 @@ test("classifies auth and rate-limit errors without leaking request secrets", as
       const secretKey = "sk-secret-key-material";
       const secretPrompt = "private-prompt-material";
       const events: LensTelemetryEvent[] = [];
+      let calls = 0;
       let caught: unknown;
       try {
         await askLens({ question: secretPrompt }, secretKey, {
-          fetch: async () =>
-            response(
+          fetch: async () => {
+            calls += 1;
+            return response(
               { error: { message: `${secretKey} ${secretPrompt}` } },
               status,
-            ),
+            );
+          },
           onTelemetry: (event) => {
             events.push(event);
           },
@@ -253,6 +256,7 @@ test("classifies auth and rate-limit errors without leaking request secrets", as
       }
       assert.ok(caught instanceof LensProviderError);
       assert.equal(caught.code, code);
+      assert.equal(calls, 1);
       assert.doesNotMatch(caught.message, /secret-key|private-prompt/);
       assert.deepEqual(events[0], {
         model: LENS_MODEL,
