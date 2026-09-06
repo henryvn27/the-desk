@@ -873,11 +873,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/sync.test.ts; apps/desktop/src/SyncSettings.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-sync.mjs",
-      "automated": "131 tests plus typecheck/lint/build: SQLite outbox intent is exposed as bounded snapshot data, survives restart, and remains distinct from cloud sync; local class writes retain their operation ID and authoritative task data.",
-      "live": "Installed unsigned macOS sync smoke creates a local class, shows one queued operation and \u201cCloud sync: not connected,\u201d captures the boundary, restarts, and confirms the same outbox operation and class; installed connection and broad desktop regressions also pass.",
-      "mac": "Unsigned installed arm64 sync, connection and broad desktop smokes pass; screenshot and operated video retained, and app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34045188001; no requirement-specific Windows UI proof.",
-      "blocker": "SQLite local authority and durable outbox intent are visible, but account/auth, asynchronous Supabase transport, conflict preservation/resolution, retry/reconnect behavior and Windows interaction remain incomplete."
+      "automated": "134 tests plus typecheck/lint/build: schema 37 exposes durable outbox status/attempt metadata and preserves both opaque local and remote conflict copies; local writes remain distinct from cloud sync.",
+      "live": "Installed unsigned macOS sync smoke creates a local class, retries without claiming upload, records a preserved local/remote conflict, requests an explicit keep-local resolution, and verifies the operation, copies and resolution survive restart; installed connection, Lens and broad desktop regressions also pass.",
+      "mac": "Unsigned installed arm64 sync, connection, Lens and broad desktop smokes pass; conflict screenshot and operated video are retained at artifacts/sync/, and app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 5b6e7bb (run 34048574058); no requirement-specific Windows UI proof.",
+      "blocker": "SQLite local authority, durable retry metadata and conflict preservation/resolution are bounded and honest, but account/auth, asynchronous Supabase transport, remote-copy application, interrupted-upload recovery and Windows interaction remain incomplete."
     },
     {
       "id": "ACCOUNT-001",
