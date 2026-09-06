@@ -8,6 +8,7 @@ import "@excalidraw/excalidraw/index.css";
 import { canvasScene, type CanvasScene } from "../../../packages/canvas/scene";
 import type { CanvasRecord, Source } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
+import CanvasMath from "./CanvasMath";
 
 export default function Canvas({
   record,
@@ -27,6 +28,7 @@ export default function Canvas({
   const last = useRef(JSON.stringify(record.scene));
   const sourceIds = useRef(record.scene.sourceIds ?? []);
   const [showSources, setShowSources] = useState(false);
+  const [showMath, setShowMath] = useState(false);
   const [links, setLinks] = useState(sourceIds.current);
   function queueScene(value: unknown) {
     try {
@@ -179,6 +181,7 @@ export default function Canvas({
       <div className="canvas-header">
         <strong>{record.title}</strong>
         <span role="status">{status}</span>
+        <button onClick={() => setShowMath(true)}>Math</button>
         <button onClick={() => inkTool(false)}>Pen</button>
         <button onClick={() => inkTool(true)}>Highlighter</button>
         <button
@@ -215,6 +218,9 @@ export default function Canvas({
             </button>
           )}
         </div>
+      )}
+      {showMath && editor.current && (
+        <CanvasMath api={editor.current} close={() => setShowMath(false)} />
       )}
       <div className="canvas-body">
         {showSources && (

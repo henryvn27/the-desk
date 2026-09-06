@@ -9,7 +9,12 @@ const imageMimeType = z.enum([
   "image/gif",
 ]);
 
+export const mathSource = z.object({
+  latex: z.string().trim().min(1).max(2000),
+});
+
 const element = z.looseObject({
+  customData: z.looseObject({ deskMath: mathSource.optional() }).optional(),
   id,
   type: z.enum([
     "rectangle",

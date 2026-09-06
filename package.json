@@ -13,10 +13,13 @@
     "package": "npm run build && electron-builder --dir",
     "lint": "eslint apps packages vite.config.ts",
     "test:desktop": "node scripts/smoke-desktop.mjs",
-    "test:canvas": "node scripts/smoke-canvas.mjs"
+    "test:canvas": "node scripts/smoke-canvas.mjs",
+    "test:math": "node scripts/smoke-math.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",
+    "@mathjax/mathjax-tex-font": "4.1.3",
+    "@mathjax/src": "4.1.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "4.5.4"

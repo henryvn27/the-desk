@@ -51,6 +51,15 @@
       "severity": "medium",
       "status": "open",
       "evidence": "One installed regression run observed 2 paths rather than 1; rerun with diagnostic capture passed. Root cause not established; diagnostics retained in smoke script."
+    },
+    {
+      "id": "QA-CANVAS-001",
+      "area": "canvas",
+      "title": "Math insertion keyboard undo needs diagnosis",
+      "severity": "medium",
+      "status": "open",
+      "evidence": "Development math smoke: Cmd+Z after math insertion and Save did not remove the equation, including after a blank canvas click; toolbar Undo/Redo pass.",
+      "notes": "Do not claim math keyboard parity from toolbar verification. Native menu/focus routing remains to be diagnosed."
     }
   ]
 }
