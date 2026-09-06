@@ -5,6 +5,7 @@ import { parseEnv } from "node:util";
 import { z } from "zod";
 import {
   sessionFromAuthResponse,
+  supabaseAuthError,
   supabaseAuthResponse,
   supabaseAuthUrl,
   supabaseEmail,
@@ -141,7 +142,7 @@ export class SupabaseAccount {
     } catch {
       parsed = {};
     }
-    if (!response.ok) throw Error(authError(parsed, response.status));
+    if (!response.ok) throw Error(supabaseAuthError(parsed, response.status));
     return schema.parse(parsed);
   }
 
@@ -210,13 +211,4 @@ function parseCredentials(email: unknown, password: unknown) {
     email: supabaseEmail.parse(email),
     password: supabasePassword.parse(password),
   };
-}
-
-function authError(payload: unknown, status: number) {
-  const message = z
-    .object({ error_description: z.string().optional(), msg: z.string().optional() })
-    .safeParse(payload);
-  return message.success && (message.data.error_description || message.data.msg)
-    ? `Account request failed: ${message.data.error_description ?? message.data.msg}`
-    : `Account request failed (HTTP ${status}).`;
 }
