@@ -171,12 +171,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/user.test.ts; packages/domain/academic-context.test.ts; packages/study/kit.ts; packages/study/kit.test.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/AcademicContext.tsx; apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs; scripts/smoke-context.mjs",
-      "automated": "128 tests plus typecheck/lint/build: schema-35 local User profile and schema-34 Academic period/Space persistence, typed kinds/date validation, class-link deduplication, duplicate/unknown-link rejection, revision-safe CRUD, linked-record forget guards, restart persistence, telemetry profile association and Session Kit class filtering, alongside prior domain, authority, teacher, hierarchy, assessment, attempt and session coverage.",
-      "live": "Installed unsigned macOS local User smoke creates a profile, restarts, updates by revision and forgets safely without touching a class; Academic context, Units, Teacher, evidence, authority, assessment, Attempts, desktop, checklist and Session Kit regressions also pass.",
-      "mac": "Unsigned installed arm64 local User, Academic context, hierarchy, Teacher, evidence, assessment, Attempts, Authority, desktop, checklist and Session Kit smokes and app.asar/package byte comparison pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34043522745; no requirement-specific Windows UI proof.",
-      "blocker": "Partial graph only. Account/login identity, persistent plan versions, integrations, connection capabilities, graded-work extraction, synchronization, prerequisites, hierarchy-aware planner behavior and Windows interaction remain incomplete."
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/user.test.ts; packages/domain/academic-context.test.ts; packages/domain/plan.test.ts; packages/study/kit.ts; packages/study/kit.test.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/AcademicContext.tsx; apps/desktop/src/StudyPlan.tsx; apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs; scripts/smoke-context.mjs; scripts/smoke-plans.mjs",
+      "automated": "129 tests plus typecheck/lint/build: schema-36 durable computed Plan versions and schema-35 local User profile with schema-34 Academic period/Space persistence, typed kinds/date validation, class-link deduplication, duplicate/unknown-link rejection, revision-safe CRUD, linked-record forget guards, restart persistence, telemetry profile association, planner basis hashing, saved block and unscheduled-work snapshots, and Session Kit class filtering, alongside prior domain, authority, teacher, hierarchy, assessment, attempt and session coverage.",
+      "live": "Installed unsigned macOS Plan smoke creates a task, records Auto-plan, previews and approves a rebalance, confirms two persisted Plan versions after restart; User, Academic context, Units, Teacher, evidence, authority, assessment, Attempts, desktop, checklist and Session Kit regressions also pass.",
+      "mac": "Unsigned installed arm64 Plan, User, Academic context, hierarchy, Teacher, evidence, assessment, Attempts, Authority, desktop, checklist and Session Kit smokes and app.asar/package byte comparison pass",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34044240864; no requirement-specific Windows UI proof.",
+      "blocker": "Partial graph only. Account/login identity, integrations, connection capabilities, graded-work extraction, synchronization, prerequisites, hierarchy-aware planner behavior and Windows interaction remain incomplete."
     },
     {
       "id": "DOMAIN-002",
@@ -408,11 +408,11 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/planner; packages/grades; packages/domain; apps/desktop",
-      "automated": "66 tests + typecheck/lint/build pass. Default and deferred Auto-plan, restart, one-time scheduling, Suggest cancellation, manual override and existing commitment preservation tested.",
-      "live": "Installed macOS Auto-plan capture/change history, mode switch and deferred capture after restart/session-end pass. Active-session fixture seeded via trusted test API; subsequent flow uses UI. Screenshot inspected; operated video captured.",
-      "mac": "Unsigned installed arm64 grade/planner integration passes",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
+      "implementation": "packages/planner; packages/grades; packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/plan.test.ts; apps/desktop/src/StudyPlan.tsx; apps/desktop; scripts/smoke-plans.mjs",
+      "automated": "129 tests plus typecheck/lint/build pass. Default and deferred Auto-plan, restart, one-time scheduling, Suggest cancellation, manual override, existing commitment preservation, immutable computed Plan versions, saved block IDs, unscheduled work, overload and basis hashes are tested.",
+      "live": "Installed macOS Plan smoke captures Auto-plan history, previews and approves a rebalance, shows both versions in Plan history and persists them after restart; earlier mode switch and deferred capture flows also pass. Screenshot inspected; operated video captured.",
+      "mac": "Unsigned installed arm64 Plan smoke and grade/planner integration pass; installed app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34044240864; no requirement-specific Windows UI proof.",
       "blocker": "Broader automatic updates/missed-block handling, Autopilot, learned behavior, mastery/dependencies/teacher/retention inputs and full planning layers remain unfinished; Windows interaction unverified."
     },
     {
