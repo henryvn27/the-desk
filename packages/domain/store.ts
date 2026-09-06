@@ -41,6 +41,7 @@ import {
   type Attempt,
   type Plan,
   type OutboxOperation,
+  type SyncConflict,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -51,7 +52,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 36) {
+    if (version > 37) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -172,6 +173,39 @@ export class DeskStore {
       this.db.exec(`BEGIN;
       CREATE TABLE IF NOT EXISTS plans(id TEXT PRIMARY KEY,data TEXT NOT NULL);
       PRAGMA user_version=36; COMMIT;`);
+    if (version <= 36) {
+      const outboxColumns = new Set(
+        this.db
+          .prepare("PRAGMA table_info(outbox)")
+          .all()
+          .map((row) => row.name as string),
+      );
+      this.db.exec("BEGIN;");
+      if (!outboxColumns.has("status"))
+        this.db.exec(
+          "ALTER TABLE outbox ADD COLUMN status TEXT NOT NULL DEFAULT 'queued';",
+        );
+      if (!outboxColumns.has("attempts"))
+        this.db.exec(
+          "ALTER TABLE outbox ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;",
+        );
+      if (!outboxColumns.has("last_attempt_at"))
+        this.db.exec("ALTER TABLE outbox ADD COLUMN last_attempt_at TEXT;");
+      if (!outboxColumns.has("last_error"))
+        this.db.exec("ALTER TABLE outbox ADD COLUMN last_error TEXT;");
+      this.db.exec(`CREATE TABLE IF NOT EXISTS sync_conflicts(
+        id TEXT PRIMARY KEY,
+        entity_id TEXT NOT NULL,
+        operation_id TEXT,
+        operation TEXT NOT NULL,
+        local_data TEXT NOT NULL,
+        remote_data TEXT NOT NULL,
+        detected_at TEXT NOT NULL,
+        resolution TEXT NOT NULL DEFAULT 'unresolved',
+        resolved_at TEXT
+      );`);
+      this.db.exec("PRAGMA user_version=37; COMMIT;");
+    }
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -398,7 +432,7 @@ export class DeskStore {
         .map((r) => JSON.parse(r.data as string) as PlanChange),
       outbox: this.db
         .prepare(
-          "SELECT id,entity_id,operation,created_at FROM outbox ORDER BY rowid DESC LIMIT 100",
+          "SELECT id,entity_id,operation,created_at,status,attempts,last_attempt_at,last_error FROM outbox ORDER BY rowid DESC LIMIT 100",
         )
         .all()
         .map(
@@ -408,7 +442,30 @@ export class DeskStore {
               entityId: row.entity_id,
               operation: row.operation,
               createdAt: row.created_at,
+              status: row.status,
+              attempts: row.attempts,
+              lastAttemptAt: row.last_attempt_at,
+              lastError: row.last_error,
             }) as OutboxOperation,
+        ),
+      syncConflicts: this.db
+        .prepare(
+          "SELECT id,entity_id,operation_id,operation,local_data,remote_data,detected_at,resolution,resolved_at FROM sync_conflicts ORDER BY rowid DESC LIMIT 100",
+        )
+        .all()
+        .map(
+          (row) =>
+            ({
+              id: row.id,
+              entityId: row.entity_id,
+              operationId: row.operation_id,
+              operation: row.operation,
+              localData: row.local_data,
+              remoteData: row.remote_data,
+              detectedAt: row.detected_at,
+              resolution: row.resolution,
+              resolvedAt: row.resolved_at,
+            }) as SyncConflict,
         ),
       studyBlocks: this.db
         .prepare("SELECT data FROM study_blocks")
@@ -456,6 +513,108 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      let queueCommand = true;
+      if (c.type === "sync.retry") {
+        queueCommand = false;
+        const targets = state.outbox.filter(
+          (operation) =>
+            operation.status === "queued" || operation.status === "retrying",
+        );
+        const selected = c.id
+          ? targets.filter((operation) => operation.id === c.id)
+          : targets;
+        if (!selected.length)
+          throw Error("No local operation is waiting to retry.");
+        for (const operation of selected)
+          this.db
+            .prepare(
+              "UPDATE outbox SET status='queued',attempts=attempts+1,last_attempt_at=?,last_error=? WHERE id=?",
+            )
+            .run(
+              timestamp,
+              "Cloud sync is not connected; this operation remains queued.",
+              operation.id,
+            );
+        entityId = "sync-retry";
+      }
+      if (c.type === "sync.conflict.record") {
+        queueCommand = false;
+        const existing = c.input.operationId
+          ? state.syncConflicts.find(
+              (conflict) =>
+                conflict.operationId === c.input.operationId &&
+                conflict.resolution === "unresolved",
+            )
+          : undefined;
+        if (existing) throw Error("This sync conflict is already awaiting review.");
+        if (
+          c.input.operationId &&
+          !state.outbox.some((operation) => operation.id === c.input.operationId)
+        )
+          throw Error("The conflicted local operation no longer exists.");
+        const conflict: SyncConflict = {
+          id: randomUUID(),
+          entityId: c.input.entityId,
+          operationId: c.input.operationId,
+          operation: c.input.operation,
+          localData: c.input.localData,
+          remoteData: c.input.remoteData,
+          detectedAt: timestamp,
+          resolution: "unresolved",
+          resolvedAt: null,
+        };
+        this.db
+          .prepare(
+            "INSERT INTO sync_conflicts VALUES(?,?,?,?,?,?,?,?,?)",
+          )
+          .run(
+            conflict.id,
+            conflict.entityId,
+            conflict.operationId,
+            conflict.operation,
+            conflict.localData,
+            conflict.remoteData,
+            conflict.detectedAt,
+            conflict.resolution,
+            conflict.resolvedAt,
+          );
+        if (c.input.operationId)
+          this.db
+            .prepare(
+              "UPDATE outbox SET status='conflict',attempts=attempts+1,last_attempt_at=?,last_error=? WHERE id=?",
+            )
+            .run(
+              timestamp,
+              "Conflict requires review before this operation can retry.",
+              c.input.operationId,
+            );
+        entityId = conflict.id;
+      }
+      if (c.type === "sync.conflict.resolve") {
+        queueCommand = false;
+        const conflict = state.syncConflicts.find((item) => item.id === c.id);
+        if (!conflict || conflict.resolution !== "unresolved")
+          throw Error("This sync conflict is already resolved or missing.");
+        this.db
+          .prepare(
+            "UPDATE sync_conflicts SET resolution=?,resolved_at=? WHERE id=?",
+          )
+          .run(c.resolution, timestamp, conflict.id);
+        if (conflict.operationId)
+          this.db
+            .prepare(
+              "UPDATE outbox SET status=?,last_attempt_at=?,last_error=? WHERE id=?",
+            )
+            .run(
+              c.resolution === "keep-local" ? "queued" : "resolved",
+              timestamp,
+              c.resolution === "keep-local"
+                ? "Local copy selected; waiting for a cloud connection."
+                : "Remote copy selected; local store remains unchanged until a trusted sync adapter applies it.",
+              conflict.operationId,
+            );
+        entityId = conflict.id;
+      }
       if (c.type === "tutor.mode") {
         entityId = "tutor-mode";
         this.db
@@ -2231,7 +2390,7 @@ export class DeskStore {
           .prepare("UPDATE sessions SET data=? WHERE id=?")
           .run(JSON.stringify(session), session.id);
       }
-      this.queue(entityId, c.type, timestamp);
+      if (queueCommand && entityId) this.queue(entityId, c.type, timestamp);
       this.db.exec("COMMIT");
       if (c.type === "planning.rebalance") this.rebalance = undefined;
       return this.snapshot();
@@ -2365,8 +2524,10 @@ export class DeskStore {
   }
   private queue(id: string, operation: string, at: string) {
     this.db
-      .prepare("INSERT INTO outbox VALUES(?,?,?,?)")
-      .run(randomUUID(), id, operation, at);
+      .prepare(
+        "INSERT INTO outbox(id,entity_id,operation,created_at,status,attempts,last_attempt_at,last_error) VALUES(?,?,?,?,?,?,?,?)",
+      )
+      .run(randomUUID(), id, operation, at, "queued", 0, null, null);
   }
   canvas(id: string): CanvasRecord {
     const row = this.db.prepare("SELECT * FROM canvases WHERE id=?").get(id);

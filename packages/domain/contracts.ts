@@ -156,7 +156,31 @@ export type OutboxOperation = {
   entityId: string;
   operation: string;
   createdAt: string;
+  status: "queued" | "retrying" | "conflict" | "resolved";
+  attempts: number;
+  lastAttemptAt: string | null;
+  lastError: string | null;
 };
+export const syncConflictResolution = z.enum(["keep-local", "keep-remote"]);
+export type SyncConflict = {
+  id: string;
+  entityId: string;
+  operationId: string | null;
+  operation: string;
+  localData: string;
+  remoteData: string;
+  detectedAt: string;
+  resolution: "unresolved" | "keep-local" | "keep-remote";
+  resolvedAt: string | null;
+};
+export const syncConflictInput = z.object({
+  entityId: id,
+  operationId: id.nullable(),
+  operation: z.string().trim().min(1).max(100),
+  localData: z.string().min(1).max(200000),
+  remoteData: z.string().min(1).max(200000),
+});
+export type SyncConflictInput = z.infer<typeof syncConflictInput>;
 export const trackInput = z.object({
   classId: id,
   name: z.string().trim().min(1).max(200),
@@ -597,6 +621,7 @@ export type Snapshot = {
   plans: Plan[];
   planChanges: PlanChange[];
   outbox: OutboxOperation[];
+  syncConflicts: SyncConflict[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
   sources: Source[];
@@ -606,6 +631,13 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("sync.retry"), id: id.nullable() }),
+  z.object({ type: z.literal("sync.conflict.record"), input: syncConflictInput }),
+  z.object({
+    type: z.literal("sync.conflict.resolve"),
+    id,
+    resolution: syncConflictResolution,
+  }),
   z.object({ type: z.literal("tutor.mode"), mode: tutoringMode }),
   z.object({ type: z.literal("capture.policy"), mode: capturePolicy }),
   z.object({

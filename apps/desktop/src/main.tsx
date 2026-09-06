@@ -71,6 +71,7 @@ const empty: Snapshot = {
   plans: [],
   planChanges: [],
   outbox: [],
+  syncConflicts: [],
   studyBlocks: [],
   canvases: [],
   sources: [],
@@ -585,7 +586,11 @@ function App() {
             />
             <ProviderSettings />
             <ConnectionsSettings />
-            <SyncSettings outbox={data.outbox} />
+            <SyncSettings
+              outbox={data.outbox}
+              conflicts={data.syncConflicts}
+              save={(c) => act(c, true)}
+            />
             <h2>Lens</h2>
             <p>
               Option/Alt + Space opens Lens. This build supports a local

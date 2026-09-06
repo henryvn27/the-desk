@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 36);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 37);
     assert.ok(
       check
         .prepare(
@@ -114,6 +114,13 @@ test("schema 1 data survives the telemetry migration and future schema is reject
       check
         .prepare(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='spaces'",
+        )
+        .get(),
+    );
+    assert.ok(
+      check
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='sync_conflicts'",
         )
         .get(),
     );

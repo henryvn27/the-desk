@@ -38,6 +38,8 @@ try {
   const snapshot = await page.evaluate(() =>
     window.desk.command({ type: "class.create", name: "Physics" }),
   );
+  const course = snapshot.classes[0];
+  assert.ok(course);
   const operationId = snapshot.outbox.at(-1)?.id;
   assert.ok(operationId);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -47,9 +49,35 @@ try {
   });
   await heading.waitFor();
   await page
-    .getByText("1 local operation recorded for a future sync.", { exact: true })
+    .getByText("1 local operation waiting for a future sync.", { exact: true })
     .waitFor();
   await page.getByText("Cloud sync: not connected", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Retry queued operations", exact: true }).click();
+  await page.waitForFunction(
+    async (id) =>
+      (await window.desk.snapshot()).outbox.find(
+        (operation) => operation.id === id,
+      )?.attempts === 1,
+    operationId,
+  );
+  await page.evaluate(
+    ({ course, operationId }) =>
+      window.desk.command({
+        type: "sync.conflict.record",
+        input: {
+          entityId: course.id,
+          operationId,
+          operation: "class.create",
+          localData: JSON.stringify(course),
+          remoteData: JSON.stringify({ ...course, name: "Physics (school)" }),
+        },
+      }),
+    { course, operationId },
+  );
+  await page.getByRole("heading", { name: "Preserved conflicts", exact: true }).waitFor();
+  await page.getByText("Needs review", { exact: true }).waitFor();
+  await page.getByText("View preserved local and remote copies", { exact: true }).click();
+  await page.getByText(/Physics \(school\)/).waitFor();
   await heading.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(output, "sync.png") });
   const video = page.video();
@@ -60,14 +88,24 @@ try {
   await launch();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page
-    .getByText("1 local operation recorded for a future sync.", { exact: true })
+    .getByText("No local operations are waiting.", { exact: true })
     .waitFor();
+  await page.getByText("Needs review", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Keep local copy", exact: true }).click();
+  await page.getByText("keep-local", { exact: true }).waitFor();
   const restarted = await page.evaluate(() => window.desk.snapshot());
   assert.equal(restarted.outbox.at(-1)?.id, operationId);
+  assert.equal(restarted.outbox.at(-1)?.status, "queued");
+  assert.equal(restarted.outbox.at(-1)?.attempts, 2);
   assert.equal(restarted.classes[0]?.name, "Physics");
+  assert.equal(restarted.syncConflicts[0]?.localData, JSON.stringify(course));
+  assert.equal(
+    JSON.parse(restarted.syncConflicts[0]?.remoteData ?? "{}").name,
+    "Physics (school)",
+  );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: local outbox intent is visible as not-connected sync state and survives restart.",
+    "PASS: local outbox intent, retry state and preserved sync conflict survive restart without fake cloud sync.",
   );
 } finally {
   if (app) await app.close();

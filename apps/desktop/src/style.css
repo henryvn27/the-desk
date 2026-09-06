@@ -280,6 +280,45 @@ summary {
   color: #656a67;
   text-align: right;
 }
+.sync-conflicts {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 12px;
+}
+.sync-conflicts h3 {
+  margin: 0;
+}
+.sync-conflict {
+  padding: 16px 18px;
+  border: 1px solid #d6d0c5;
+  border-radius: 10px;
+  background: #fffdfa;
+}
+.sync-conflict h4 {
+  margin: 6px 0 0;
+  font-size: 16px;
+}
+.sync-conflict details {
+  margin-top: 12px;
+}
+.sync-copy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.sync-copy-grid pre {
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px;
+  margin: 6px 0 0;
+  border: 1px solid #ded9d0;
+  border-radius: 6px;
+  background: #f7f4ed;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .session {
   padding: 24px;
   background: #fffdfa;
