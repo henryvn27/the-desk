@@ -1,3 +1,4 @@
+import { planWeek } from "../planner";
 import { startNotebook } from "../canvas/notebook";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
 import { DatabaseSync } from "node:sqlite";
@@ -7,6 +8,8 @@ import {
   defaultPlanningPreferences,
   planningPreferences,
   type Command,
+  type RebalancePreview,
+  type PlanChange,
   type StudyBlock,
   type Snapshot,
   type Task,
@@ -17,13 +20,14 @@ import {
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
+  private rebalance?: { preview: RebalancePreview; basis: string };
   constructor(path: string) {
     this.db = new DatabaseSync(path);
     this.db.exec("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;");
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 8) {
+    if (version > 9) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -61,6 +65,48 @@ export class DeskStore {
       CREATE TABLE study_blocks(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),data TEXT NOT NULL);
       PRAGMA user_version=7; COMMIT;`);
     if (version <= 7) this.db.exec("BEGIN; PRAGMA user_version=8; COMMIT;");
+    if (version <= 8)
+      this.db.exec(
+        "BEGIN; CREATE TABLE plan_changes(id TEXT PRIMARY KEY,appliedAt TEXT NOT NULL,data TEXT NOT NULL); PRAGMA user_version=9; COMMIT;",
+      );
+  }
+  previewRebalance(now = new Date()): RebalancePreview {
+    const state = this.snapshot();
+    if (state.sessions.some((s) => !s.endedAt))
+      throw Error("Finish the active study session before rebalancing.");
+    const planningStart = new Date(+now + 180000);
+    const live = state.studyBlocks.filter((b) => !b.cancelledAt);
+    const replaced = live.filter(
+      (b) => !b.locked && Date.parse(b.start) > +planningStart,
+    );
+    const kept = live.filter((b) => !replaced.some((r) => r.id === b.id));
+    const result = planWeek(state.tasks, planningStart, state.planning, kept);
+    const preview: RebalancePreview = {
+      id: randomUUID(),
+      createdAt: now.toISOString(),
+      expiresAt: new Date(+now + 120000).toISOString(),
+      replaced,
+      kept,
+      unscheduled: result.unscheduled,
+      added: result.blocks.map((b) => ({
+        ...b,
+        id: randomUUID(),
+        locked: false,
+        revision: 0,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      })),
+    };
+    this.rebalance = { preview, basis: this.planningBasis(state) };
+    return structuredClone(preview);
+  }
+  private planningBasis(state: Snapshot) {
+    return JSON.stringify([
+      state.tasks,
+      state.studyBlocks,
+      state.planning,
+      state.sessions,
+    ]);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -74,6 +120,12 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      planChanges: this.db
+        .prepare(
+          "SELECT data FROM plan_changes ORDER BY appliedAt DESC,rowid DESC LIMIT 50",
+        )
+        .all()
+        .map((r) => JSON.parse(r.data as string) as PlanChange),
       studyBlocks: this.db
         .prepare("SELECT data FROM study_blocks")
         .all()
@@ -120,6 +172,52 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "planning.rebalance") {
+        const pending = this.rebalance;
+        if (
+          !pending ||
+          pending.preview.id !== c.previewId ||
+          Date.parse(pending.preview.createdAt) > +now ||
+          Date.parse(pending.preview.expiresAt) <= +now ||
+          pending.basis !== this.planningBasis(state)
+        )
+          throw Error(
+            "The plan changed or this preview expired. Preview the rebalance again.",
+          );
+        if (!c.approved)
+          throw Error(
+            "Approve the proposed commitment changes before applying them.",
+          );
+        const preview = pending.preview;
+        for (const block of preview.replaced) {
+          this.db
+            .prepare("UPDATE study_blocks SET data=? WHERE id=?")
+            .run(
+              JSON.stringify({
+                ...block,
+                cancelledAt: timestamp,
+                updatedAt: timestamp,
+                revision: block.revision + 1,
+              }),
+              block.id,
+            );
+          this.queue(block.id, "block.rebalanced", timestamp);
+        }
+        for (const block of preview.added) {
+          this.db
+            .prepare("INSERT INTO study_blocks VALUES(?,?,?)")
+            .run(block.id, block.taskId, JSON.stringify(block));
+          this.queue(block.id, "block.create", timestamp);
+        }
+        entityId = preview.id;
+        this.db
+          .prepare("INSERT INTO plan_changes VALUES(?,?,?)")
+          .run(
+            entityId,
+            timestamp,
+            JSON.stringify({ ...preview, appliedAt: timestamp }),
+          );
+      }
       if (c.type === "block.cancel") {
         const existing = state.studyBlocks.find((b) => b.id === c.id);
         if (
@@ -137,17 +235,15 @@ export class DeskStore {
               : "Confirm releasing this reserved time.",
           );
         entityId = existing.id;
-        this.db
-          .prepare("UPDATE study_blocks SET data=? WHERE id=?")
-          .run(
-            JSON.stringify({
-              ...existing,
-              cancelledAt: timestamp,
-              updatedAt: timestamp,
-              revision: existing.revision + 1,
-            }),
-            existing.id,
-          );
+        this.db.prepare("UPDATE study_blocks SET data=? WHERE id=?").run(
+          JSON.stringify({
+            ...existing,
+            cancelledAt: timestamp,
+            updatedAt: timestamp,
+            revision: existing.revision + 1,
+          }),
+          existing.id,
+        );
       }
       if (c.type === "block.create" || c.type === "block.update") {
         const existing =
@@ -441,6 +537,7 @@ export class DeskStore {
       }
       this.queue(entityId, c.type, timestamp);
       this.db.exec("COMMIT");
+      if (c.type === "planning.rebalance") this.rebalance = undefined;
       return this.snapshot();
     } catch (error) {
       this.db.exec("ROLLBACK");

@@ -219,6 +219,10 @@ app.whenReady().then(() => {
       else if (owner && !owner.isDestroyed()) owner.close();
     });
   });
+  ipcMain.handle("desk:rebalance-preview", (event) => {
+    check(event);
+    return store.previewRebalance();
+  });
   ipcMain.handle("desk:snapshot", (event) => {
     check(event);
     return store.snapshot();

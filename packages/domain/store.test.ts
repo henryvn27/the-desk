@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 8);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 9);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -590,6 +590,140 @@ test("saved blocks survive restart and reject conflicting, stale, locked, and la
     );
 
     assert.equal(store.snapshot().tasks[0]!.completed, false);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("rebalance previews are atomic, stale-safe, expire, and retain locks and history", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-rebalance-"));
+  const path = join(directory, "test.sqlite");
+  let store = new DeskStore(path);
+  const now = new Date(2026, 8, 7, 8);
+  try {
+    const classId = store.execute(
+      { type: "class.create", name: "Physics" },
+      now,
+    ).classes[0]!.id;
+    const taskId = store.execute(
+      {
+        type: "task.create",
+        input: {
+          classId,
+          title: "Problems",
+          minutes: 120,
+          dueAt: null,
+          deadlineConfirmed: true,
+          resource: null,
+          notes: "",
+        },
+      },
+      now,
+    ).tasks[0]!.id;
+    const first = store.execute(
+      {
+        type: "block.create",
+        taskId,
+        input: { start: new Date(2026, 8, 8, 10).toISOString(), minutes: 30 },
+        beyondDeadlineApproved: false,
+      },
+      now,
+    ).studyBlocks[0]!;
+    const locked = store.execute(
+      {
+        type: "block.update",
+        id: first.id,
+        revision: first.revision,
+        input: { start: first.start, minutes: 30 },
+        locked: true,
+        lockedChangeApproved: false,
+        beyondDeadlineApproved: false,
+      },
+      now,
+    ).studyBlocks[0]!;
+    store.execute(
+      {
+        type: "block.create",
+        taskId,
+        input: { start: new Date(2026, 8, 9, 10).toISOString(), minutes: 30 },
+        beyondDeadlineApproved: false,
+      },
+      now,
+    );
+    const before = store.snapshot();
+    let preview = store.previewRebalance(now);
+    assert.deepEqual(store.snapshot(), before);
+    assert.equal(preview.replaced.length, 1);
+    assert.deepEqual(preview.kept, [locked]);
+    assert.equal(
+      preview.added.reduce((sum, b) => sum + b.minutes, 0),
+      90,
+    );
+    assert.throws(
+      () =>
+        store.execute(
+          {
+            type: "planning.rebalance",
+            previewId: preview.id,
+            approved: false,
+          },
+          now,
+        ),
+      /Approve/,
+    );
+    assert.deepEqual(store.snapshot(), before);
+    assert.throws(
+      () =>
+        store.execute(
+          { type: "planning.rebalance", previewId: preview.id, approved: true },
+          new Date(+now + 120000),
+        ),
+      /expired/,
+    );
+    store.execute(
+      {
+        type: "planning.preferences",
+        input: { ...before.planning, bufferPercent: 20 },
+      },
+      now,
+    );
+    assert.throws(
+      () =>
+        store.execute(
+          { type: "planning.rebalance", previewId: preview.id, approved: true },
+          now,
+        ),
+      /changed/,
+    );
+    preview = store.previewRebalance(now);
+    const applied = store.execute(
+      { type: "planning.rebalance", previewId: preview.id, approved: true },
+      now,
+    );
+    assert.deepEqual(
+      applied.studyBlocks.find((b) => b.id === locked.id),
+      locked,
+    );
+    assert.deepEqual(applied.tasks, before.tasks);
+    assert.equal(applied.planChanges.length, 1);
+    assert.equal(
+      applied.studyBlocks
+        .filter((b) => !b.cancelledAt)
+        .reduce((sum, b) => sum + b.minutes, 0),
+      120,
+    );
+    assert.throws(
+      () =>
+        store.execute(
+          { type: "planning.rebalance", previewId: preview.id, approved: true },
+          now,
+        ),
+      /expired/,
+    );
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.snapshot(), applied);
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

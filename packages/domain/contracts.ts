@@ -90,6 +90,16 @@ export type StudyBlock = Block & {
   createdAt: string;
   updatedAt: string;
 };
+export type RebalancePreview = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  replaced: StudyBlock[];
+  added: StudyBlock[];
+  kept: StudyBlock[];
+  unscheduled: { taskId: string; minutes: number; reason: string }[];
+};
+export type PlanChange = RebalancePreview & { appliedAt: string };
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const planningPreferences = z
   .object({
@@ -110,6 +120,7 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type Snapshot = {
+  planChanges: PlanChange[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
   sources: Source[];
@@ -119,6 +130,11 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("planning.rebalance"),
+    previewId: id,
+    approved: z.boolean(),
+  }),
   z.object({
     type: z.literal("block.cancel"),
     id,
@@ -190,6 +206,7 @@ export type LensCapture = {
   capturedAt: string;
 };
 export interface DeskAPI {
+  previewRebalance(): Promise<RebalancePreview>;
   onEdit(listener: (action: "undo" | "redo") => void): () => void;
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;

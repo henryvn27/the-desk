@@ -179,9 +179,94 @@ try {
   assert.deepEqual(final.studyBlocks[0], cancelled);
   assert.equal(final.tasks[0].completed, false);
   assert.equal(final.tasks[0].minutes, 90);
+  const reserved = await page.evaluate(async () => {
+    const state = await window.desk.snapshot();
+    const start = new Date();
+    start.setDate(start.getDate() + 1);
+    start.setHours(11, 0, 0, 0);
+    const created = await window.desk.command({
+      type: "block.create",
+      taskId: state.tasks[0].id,
+      input: { start: start.toISOString(), minutes: 30 },
+      beyondDeadlineApproved: false,
+    });
+    const block = created.studyBlocks.find((b) => !b.cancelledAt);
+    await window.desk.command({
+      type: "block.update",
+      id: block.id,
+      revision: block.revision,
+      input: { start: block.start, minutes: block.minutes },
+      locked: true,
+      lockedChangeApproved: false,
+      beyondDeadlineApproved: false,
+    });
+    start.setDate(start.getDate() + 1);
+    return window.desk.command({
+      type: "block.create",
+      taskId: state.tasks[0].id,
+      input: { start: start.toISOString(), minutes: 30 },
+      beyondDeadlineApproved: false,
+    });
+  });
+  await page
+    .getByRole("button", { name: "Preview rebalance", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Review proposed changes", exact: true })
+    .waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desk.snapshot())).studyBlocks,
+    reserved.studyBlocks,
+  );
+  await page
+    .getByRole("button", { name: "Apply rebalance", exact: true })
+    .click();
+  await page
+    .getByText(
+      "Approve the proposed commitment changes before applying them.",
+      { exact: false },
+    )
+    .waitFor();
+  await page
+    .getByLabel("I approve these changes to my study commitments", {
+      exact: true,
+    })
+    .check();
+  await page
+    .getByRole("button", { name: "Apply rebalance", exact: true })
+    .click();
+  await page
+    .getByText("Rebalance applied. Review the change history below.", {
+      exact: true,
+    })
+    .waitFor();
+  const rebalanced = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(rebalanced.planChanges.length, 1);
+  assert.deepEqual(
+    rebalanced.studyBlocks.find((b) => b.locked && !b.cancelledAt),
+    reserved.studyBlocks.find((b) => b.locked && !b.cancelledAt),
+  );
+  assert.equal(
+    rebalanced.studyBlocks
+      .filter((b) => !b.cancelledAt)
+      .reduce((sum, b) => sum + b.minutes, 0),
+    90,
+  );
+  assert.deepEqual(rebalanced.tasks, reserved.tasks);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: join(output, "rebalanced-plan.png") });
+  await app.close();
+  app = undefined;
+  await launch();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await page.getByText("Rebalance history", { exact: true }).waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desk.snapshot())).planChanges,
+    rebalanced.planChanges,
+  );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, drag-to-day approval, locked cancellation approval and retained history",
+    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, drag-to-day approval, locked cancellation approval and retained history, rebalance preview/approval/history",
   );
 } finally {
   if (app) await app.close();

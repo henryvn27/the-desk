@@ -16,6 +16,7 @@ const api: DeskAPI = {
   saveProviderKey: (key) => ipcRenderer.invoke("desk:provider-save", key),
   removeProviderKey: () => ipcRenderer.invoke("desk:provider-remove"),
   captureScreen: () => ipcRenderer.invoke("desk:capture-screen"),
+  previewRebalance: () => ipcRenderer.invoke("desk:rebalance-preview"),
   snapshot: () => ipcRenderer.invoke("desk:snapshot"),
   command: (value) => ipcRenderer.invoke("desk:command", value),
   openResource: (id) => ipcRenderer.invoke("desk:resource", id),

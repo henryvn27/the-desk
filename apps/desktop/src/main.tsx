@@ -26,6 +26,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  planChanges: [],
   studyBlocks: [],
   canvases: [],
   sources: [],

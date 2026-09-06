@@ -1,3 +1,4 @@
+import { Rebalance } from "./Rebalance";
 import { useState } from "react";
 import type {
   Block,
@@ -91,6 +92,7 @@ export function StudyPlan({
         Saved blocks stay where you put them. Suggestions use the time around
         them.
       </p>
+      <Rebalance data={data} save={save} />
       <div className="plan-week" aria-label="Seven-day saved blocks">
         {days.map((day) => (
           <section
