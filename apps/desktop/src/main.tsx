@@ -9,6 +9,7 @@ import { Authority } from "./Authority";
 import { Teachers } from "./Teachers";
 import { Units } from "./Units";
 import { AcademicContext } from "./AcademicContext";
+import { UserSettings } from "./UserSettings";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
@@ -44,6 +45,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  user: null,
   mistakes: [],
   memories: [],
   inference: { enabled: true, excludedSessionIds: [] },
@@ -560,6 +562,7 @@ function App() {
         ) : page === "Settings" ? (
           <>
             <h1>Settings</h1>
+            <UserSettings user={data.user} save={(c) => act(c, true)} />
             <PlanningSettings
               preferences={data.planning}
               mode={data.planningMode}

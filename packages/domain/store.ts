@@ -20,6 +20,7 @@ import {
   type Assessment,
   type AcademicPeriod,
   type Space,
+  type User,
   type Track,
   type Unit,
   type Teacher,
@@ -48,7 +49,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 34) {
+    if (version > 35) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -161,6 +162,10 @@ export class DeskStore {
       CREATE TABLE IF NOT EXISTS spaces(id TEXT PRIMARY KEY,data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS space_classes(space_id TEXT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,PRIMARY KEY(space_id,class_id));
       PRAGMA user_version=34; COMMIT;`);
+    if (version <= 34)
+      this.db.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+      PRAGMA user_version=35; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -214,9 +219,12 @@ export class DeskStore {
     ]);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
+    const userId =
+      this.db.prepare("SELECT id FROM users ORDER BY rowid LIMIT 1").get()
+        ?.id ?? "local";
     this.db
       .prepare("INSERT INTO ai_runs VALUES(?,?,?,?,?)")
-      .run(randomUUID(), "local", sessionId, "lens", JSON.stringify(event));
+      .run(randomUUID(), userId, sessionId, "lens", JSON.stringify(event));
   }
   snapshot(): Snapshot {
     const mode = this.db
@@ -229,7 +237,11 @@ export class DeskStore {
     const settings = this.db
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
+    const user = this.db
+      .prepare("SELECT data FROM users ORDER BY rowid LIMIT 1")
+      .get();
     return {
+      user: user ? (JSON.parse(user.data as string) as User) : null,
       mistakes: this.db
         .prepare("SELECT data FROM mistakes ORDER BY rowid")
         .all()
@@ -1805,6 +1817,52 @@ export class DeskStore {
             "INSERT INTO settings VALUES('planning',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
           )
           .run(JSON.stringify(c.input));
+      }
+      if (c.type === "user.create") {
+        if (state.user)
+          throw Error("A local profile already exists. Edit it instead.");
+        entityId = randomUUID();
+        const user: User = {
+          id: entityId,
+          ...c.input,
+          revision: 0,
+          authority: "user-entered",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        this.db
+          .prepare("INSERT INTO users VALUES(?,?)")
+          .run(entityId, JSON.stringify(user));
+      }
+      if (c.type === "user.update") {
+        const existing = state.user;
+        if (!existing || existing.id !== c.id)
+          throw Error("The local profile no longer exists.");
+        if (existing.revision !== c.revision)
+          throw Error(
+            "The local profile changed elsewhere. Reload and try again.",
+          );
+        const user: User = {
+          ...existing,
+          ...c.input,
+          revision: existing.revision + 1,
+          updatedAt: timestamp,
+        };
+        entityId = user.id;
+        this.db
+          .prepare("UPDATE users SET data=? WHERE id=?")
+          .run(JSON.stringify(user), user.id);
+      }
+      if (c.type === "user.forget") {
+        const existing = state.user;
+        if (!existing || existing.id !== c.id)
+          throw Error("The local profile no longer exists.");
+        if (existing.revision !== c.revision)
+          throw Error(
+            "The local profile changed elsewhere. Reload and try again.",
+          );
+        entityId = existing.id;
+        this.db.prepare("DELETE FROM users WHERE id=?").run(existing.id);
       }
       if (c.type === "class.create") {
         entityId = randomUUID();

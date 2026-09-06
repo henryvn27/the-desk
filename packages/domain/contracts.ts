@@ -138,6 +138,19 @@ export type Space = SpaceInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const userInput = z.object({
+  displayName: z.string().trim().min(1).max(200),
+  email: z.string().trim().email().max(500).nullable(),
+  timeZone: z.string().trim().min(1).max(100),
+});
+export type UserInput = z.infer<typeof userInput>;
+export type User = UserInput & {
+  id: string;
+  revision: number;
+  authority: "user-entered";
+  createdAt: string;
+  updatedAt: string;
+};
 export const trackInput = z.object({
   classId: id,
   name: z.string().trim().min(1).max(200),
@@ -540,6 +553,7 @@ export type Attempt = AttemptInput & {
   updatedAt: string;
 };
 export type Snapshot = {
+  user: User | null;
   mistakes: Mistake[];
   memories: AcademicMemory[];
   inference: { enabled: boolean; excludedSessionIds: string[] };
@@ -633,6 +647,18 @@ export const command = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("planning.mode"),
     mode: z.enum(["suggest", "auto-plan"]),
+  }),
+  z.object({ type: z.literal("user.create"), input: userInput }),
+  z.object({
+    type: z.literal("user.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: userInput,
+  }),
+  z.object({
+    type: z.literal("user.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
   }),
   z.object({
     type: z.literal("grade.category"),
