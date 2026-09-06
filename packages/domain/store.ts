@@ -35,7 +35,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 22) {
+    if (version > 23) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -99,6 +99,10 @@ export class DeskStore {
     if (version <= 21)
       this.db.exec(
         "BEGIN; ALTER TABLE sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'unspecified'; ALTER TABLE sources ADD COLUMN revision INTEGER NOT NULL DEFAULT 0; PRAGMA user_version=22; COMMIT;",
+      );
+    if (version <= 22)
+      this.db.exec(
+        "BEGIN; CREATE TABLE memories(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=23; COMMIT;",
       );
   }
   previewRebalance(now = new Date()): RebalancePreview {
@@ -165,6 +169,10 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      memories: this.db
+        .prepare("SELECT data FROM memories ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string)),
       tutoringMode: tutoringMode.parse(
         JSON.parse(
           String(
@@ -616,6 +624,51 @@ export class DeskStore {
             "This canvas changed elsewhere. Reopen it before saving.",
           );
         entityId = c.id;
+      }
+      if (
+        c.type === "memory.create" ||
+        c.type === "memory.update" ||
+        c.type === "memory.forget"
+      ) {
+        const previous =
+          c.type === "memory.create"
+            ? undefined
+            : state.memories.find((memory) => memory.id === c.id);
+        if (
+          c.type !== "memory.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This memory changed elsewhere. Reopen it before saving.",
+          );
+        if (
+          c.type !== "memory.forget" &&
+          c.input.classId &&
+          !state.classes.some((course) => course.id === c.input.classId)
+        )
+          throw Error("Choose an existing class.");
+        if (c.type === "memory.create" && state.memories.length >= 200)
+          throw Error(
+            "Keep up to 200 memories. Forget an old note before adding another.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (c.type === "memory.forget")
+          this.db.prepare("DELETE FROM memories WHERE id=?").run(entityId);
+        else {
+          const memory = {
+            ...c.input,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            origin: "explicit",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO memories VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(entityId, JSON.stringify(memory));
+        }
       }
       if (c.type === "source.classify") {
         const result = this.db

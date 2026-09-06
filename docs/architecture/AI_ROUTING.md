@@ -48,3 +48,6 @@ Source priority now follows user-reported class-material, assigned-textbook, edu
 
 
 Grounding uses bounded lexical passage selection from the validated current question. Overlapping 3,000-character windows are scored by distinct non-stopword matches; repeated tokens do not increase score. Reported source hierarchy remains first, then lexical coverage, task association and stable ID. Excerpts retain exact UTF-16 offsets into original text, truncation, match count and explicit opening-fallback when nothing matches. This retrieves later passages without a network/index/model call. It is not semantic retrieval, proof of relevance, page-based citation or answer-fidelity verification.
+
+
+Active-session Lens context now includes explicit global and current-class memory statements, bounded to 4,000 serialized characters within the existing overall context limit. It excludes other-class notes and discloses omitted count. Statements carry explicit origin and do not override current requests, source evidence or integrity boundaries. Forgetting excludes a note from subsequent assembled context; already-sent requests/conversation replies are not retroactively erased.

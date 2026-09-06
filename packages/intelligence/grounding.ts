@@ -34,6 +34,13 @@ export function lensContext(state: Snapshot, question = ""): string {
     resource: task.resource,
     resourceFetched: false,
     resourceOmitted: false,
+    memories: [] as {
+      id: string;
+      text: string;
+      category: string;
+      origin: "explicit";
+    }[],
+    omittedMemories: 0,
     sources: [] as (ReturnType<typeof sourcePassage> & {
       id: string;
       title: string;
@@ -51,6 +58,29 @@ export function lensContext(state: Snapshot, question = ""): string {
     context.notesTruncated = task.notes.length > 0;
     context.resource = null;
     context.resourceOmitted = task.resource !== null;
+  }
+  const memories = (state.memories ?? []).filter(
+    (memory) => !memory.classId || memory.classId === task.classId,
+  );
+  context.omittedMemories = memories.length;
+  for (const memory of memories) {
+    const entry = {
+      id: memory.id,
+      text: memory.text,
+      category: memory.category,
+      origin: memory.origin,
+    };
+    context.memories.push(entry);
+    context.omittedMemories--;
+    // Reserve the majority of the request for original source passages.
+    if (
+      JSON.stringify(context.memories).length > 4000 ||
+      JSON.stringify(context).length > 20000
+    ) {
+      context.memories.pop();
+      context.omittedMemories++;
+      break;
+    }
   }
   for (const source of eligible) {
     const entry = {

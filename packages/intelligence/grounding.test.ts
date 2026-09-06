@@ -104,3 +104,24 @@ test("within one reported source type lexical coverage precedes task association
   );
   assert.equal(result.sources[1].selectionMethod, "opening-fallback");
 });
+
+test("explicit memory context includes global/current-class statements and discloses its budget", () => {
+  const memories = Array.from({ length: 20 }, (_, i) => ({
+    id: String(i),
+    text: "Preference ".repeat(100),
+    category: "preference" as const,
+    classId: i === 0 ? "other" : i === 1 ? null : "class",
+    revision: 0,
+    origin: "explicit" as const,
+    createdAt: "",
+    updatedAt: "",
+  }));
+  const result = JSON.parse(lensContext({ ...state, memories }));
+  assert.ok(result.memories.length > 0);
+  assert.ok(!result.memories.some((m: { id: string }) => m.id === "0"));
+  assert.equal(result.memories.length + result.omittedMemories, 19);
+  assert.ok(
+    result.memories.every((m: { origin: string }) => m.origin === "explicit"),
+  );
+  assert.ok(JSON.stringify(result).length <= 20000);
+});

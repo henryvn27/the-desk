@@ -23,7 +23,7 @@ test("source type defaults unknown and supports revision-checked corrections acr
     store.close();
     const legacy = new DatabaseSync(join(dir, "desk.sqlite"));
     legacy.exec(
-      "ALTER TABLE sources DROP COLUMN kind; ALTER TABLE sources DROP COLUMN revision; PRAGMA user_version=21;",
+      "ALTER TABLE sources DROP COLUMN kind; ALTER TABLE sources DROP COLUMN revision; DROP TABLE memories; PRAGMA user_version=21;",
     );
     legacy.close();
     store = new DeskStore(join(dir, "desk.sqlite"));

@@ -1,3 +1,4 @@
+import { Memory } from "./Memory";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
@@ -33,6 +34,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  memories: [],
   tutoringMode: "balanced",
   capturePolicy: "balanced",
   captureInbox: [],
@@ -301,7 +303,7 @@ function App() {
       <aside>
         <div className="brand">The Desk</div>
         <nav aria-label="Main">
-          {["Home", "Plan", "Library", "Capture Inbox"].map((p) => (
+          {["Home", "Plan", "Library", "Capture Inbox", "Memory"].map((p) => (
             <button
               key={p}
               aria-current={page === p ? "page" : undefined}
@@ -495,6 +497,8 @@ function App() {
               </>
             )}
           </>
+        ) : page === "Memory" ? (
+          <Memory data={data} save={(c) => act(c, true)} />
         ) : page === "Plan" ? (
           <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
         ) : page === "Settings" ? (

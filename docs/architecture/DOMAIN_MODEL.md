@@ -90,3 +90,6 @@ Schema 22 adds source kind (default unspecified) and revision (default zero). Or
 
 
 Lens passage retrieval is read-only and schema 22 remains unchanged. The current validated question selects exact original substrings; source records are not rewritten. Eligible associations and the 20,000-character serialized context limit remain enforced. Offset metadata refers to UTF-16 string positions, not document pages.
+
+
+Schema 23 adds explicit academic memories. Each stores text, category, optional existing class scope, origin=explicit, stable ID, revision and timestamps. Creation is capped at 200 notes of 2,000 characters; edits and forgetting compare revisions transactionally. Forget removes the current local record; it is not a secure-erasure claim for filesystem backups. Statements do not mutate planner settings, grade records or tasks. Behavioral inference is not implemented in this memory store.

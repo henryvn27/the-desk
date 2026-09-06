@@ -209,7 +209,28 @@ export type CaptureInboxItem = {
   draft: CaptureDraft;
   updatedAt: string;
 };
+export const memoryCategory = z.enum([
+  "preference",
+  "teacher-policy",
+  "target-grade",
+  "duration",
+  "planning",
+  "other",
+]);
+export const memoryInput = z.object({
+  text: z.string().trim().min(1).max(2000),
+  category: memoryCategory,
+  classId: id.nullable(),
+});
+export type AcademicMemory = z.infer<typeof memoryInput> & {
+  id: string;
+  revision: number;
+  origin: "explicit";
+  createdAt: string;
+  updatedAt: string;
+};
 export type Snapshot = {
+  memories: AcademicMemory[];
   tutoringMode: TutoringMode;
   capturePolicy: CapturePolicy;
   captureInbox: CaptureInboxItem[];
@@ -340,6 +361,18 @@ export const command = z.discriminatedUnion("type", [
     id,
     revision: z.number().int().nonnegative(),
     scene: canvasScene,
+  }),
+  z.object({ type: z.literal("memory.create"), input: memoryInput }),
+  z.object({
+    type: z.literal("memory.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: memoryInput,
+  }),
+  z.object({
+    type: z.literal("memory.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
   }),
   z.object({ type: z.literal("source.create"), input: sourceInput }),
   z.object({

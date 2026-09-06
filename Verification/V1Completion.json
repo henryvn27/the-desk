@@ -830,14 +830,14 @@
         "Every memory is viewable, editable, and forgettable; support disabling inferred memory and clearing inferred memories.",
         "Save explicit statements immediately; require repeated evidence and confirmation for durable behavioral inference."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "What The Desk Knows: local explicit statements with categories/class scope; revision-checked edit/forget. Active-session tutoring receives bounded global/current-class notes with explicit provenance.",
+      "automated": "97 tests pass including memory persistence, stale edit/forget rejection, invalid class rejection, forgotten-state restart and scoped/bounded tutoring context.",
+      "live": "No provider request; actual tutoring use of notes unverified.",
+      "mac": "Unsigned installed UI smoke passes explicit create/edit/restart/forget and forgotten-state restart; screenshot inspected and operated video retained.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Behavioral memory inference, confirmation, disable/clear inferred-memory controls and integration of all existing learned preferences remain unimplemented. Live tutoring use and Windows UI unverified."
     },
     {
       "id": "PRIV-001",
