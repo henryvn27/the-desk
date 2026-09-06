@@ -27,7 +27,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 9) {
+    if (version > 10) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -69,6 +69,7 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE plan_changes(id TEXT PRIMARY KEY,appliedAt TEXT NOT NULL,data TEXT NOT NULL); PRAGMA user_version=9; COMMIT;",
       );
+    if (version <= 9) this.db.exec("BEGIN; PRAGMA user_version=10; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -190,17 +191,15 @@ export class DeskStore {
           );
         const preview = pending.preview;
         for (const block of preview.replaced) {
-          this.db
-            .prepare("UPDATE study_blocks SET data=? WHERE id=?")
-            .run(
-              JSON.stringify({
-                ...block,
-                cancelledAt: timestamp,
-                updatedAt: timestamp,
-                revision: block.revision + 1,
-              }),
-              block.id,
-            );
+          this.db.prepare("UPDATE study_blocks SET data=? WHERE id=?").run(
+            JSON.stringify({
+              ...block,
+              cancelledAt: timestamp,
+              updatedAt: timestamp,
+              revision: block.revision + 1,
+            }),
+            block.id,
+          );
           this.queue(block.id, "block.rebalanced", timestamp);
         }
         for (const block of preview.added) {

@@ -247,3 +247,57 @@ test("cancelled reservations restore the full remaining workload", async () => {
   );
   assert.equal(result.blocks[0]!.start, new Date(2026, 8, 7, 8).toISOString());
 });
+
+test("required work outranks optional review, and optional minutes are not required overload", () => {
+  const result = plan(
+    [
+      {
+        ...task("optional", 60, null),
+        workKind: "optional-review",
+        importance: "high",
+      },
+      { ...task("required", 60, null), importance: "low" },
+    ],
+    new Date("2026-09-07T08:00:00Z"),
+    new Date("2026-09-07T09:00:00Z"),
+    0,
+  );
+  assert.equal(result.blocks[0]!.taskId, "required");
+  assert.equal(result.overloadMinutes, 0);
+  assert.match(result.unscheduled[0]!.reason, /Optional review/);
+});
+test("imminent required deadlines precede higher importance and assessments", () => {
+  const result = plan(
+    [
+      {
+        ...task("assessment", 60, "2026-09-09T12:00:00Z"),
+        workKind: "assessment",
+        importance: "high",
+      },
+      { ...task("due", 60, "2026-09-07T09:00:00Z"), importance: "low" },
+    ],
+    new Date("2026-09-07T08:00:00Z"),
+    new Date("2026-09-07T09:00:00Z"),
+    0,
+  );
+  assert.equal(result.blocks[0]!.taskId, "due");
+  assert.equal(result.overloadMinutes, 60);
+});
+test("recorded importance and assessment kind guide flexible work", () => {
+  const result = plan(
+    [
+      task("normal", 30, null),
+      { ...task("assessment", 30, null), workKind: "assessment" },
+      { ...task("important", 30, null), importance: "high" },
+    ],
+    new Date("2026-09-07T08:00:00Z"),
+    new Date("2026-09-07T10:00:00Z"),
+    0,
+  );
+  assert.deepEqual(
+    result.blocks.map((b) => b.taskId),
+    ["important", "assessment", "normal"],
+  );
+  assert.match(result.blocks[0]!.why, /high importance/);
+  assert.match(result.blocks[1]!.why, /Assessment preparation/);
+});

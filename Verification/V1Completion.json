@@ -466,11 +466,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "49 tests plus typecheck/lint/build pass. Rebalance rejects stale/expired/unapproved previews, preserves locks and task work, and persists change history; block edit/cancel and capacity tests pass.",
-      "live": "Installed macOS smoke passes day drag, approval-protected edits/cancellation, rebalance preview/apply, lock preservation and restart history. Screenshot inspected and operated video captured.",
+      "automated": "52 tests plus typecheck/lint/build pass. Required/optional, imminent-deadline and recorded-importance ordering tested; existing block/rebalance safety tests pass.",
+      "live": "Installed macOS smoke persists assessment/importance choices through restart plus drag/edit/release/rebalance regression. Accessible select names fixed after observed timeout; screenshot inspected and video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Automatic mode, complete manual-edit history, stronger prioritization/spacing/learning and richer explanation evidence remain unfinished; Windows interaction unverified."
+      "blocker": "Expected grade impact, mastery/dependency/spacing/learning, automatic mode and complete manual-edit history remain unfinished; Windows interaction unverified."
     },
     {
       "id": "PLAN-005",

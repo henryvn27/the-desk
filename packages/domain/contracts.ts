@@ -24,6 +24,8 @@ export type Source = SourceInput & {
   authority: "user-provided-text";
 };
 export const taskInput = z.object({
+  workKind: z.enum(["assignment", "assessment", "optional-review"]).optional(),
+  importance: z.enum(["low", "normal", "high"]).optional(),
   captureEvidence: z
     .object({
       originalText: z.string().max(20000),

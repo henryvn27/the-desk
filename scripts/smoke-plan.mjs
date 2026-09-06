@@ -26,24 +26,27 @@ async function launch() {
 }
 try {
   await launch();
-  await page.evaluate(async () => {
-    const state = await window.desk.command({
-      type: "class.create",
-      name: "Physics",
-    });
-    await window.desk.command({
-      type: "task.create",
-      input: {
-        classId: state.classes[0].id,
-        title: "Work through problems 8–14",
-        minutes: 90,
-        dueAt: null,
-        deadlineConfirmed: true,
-        resource: null,
-        notes: "",
-      },
-    });
-  });
+  await page.getByLabel("Class name", { exact: true }).fill("Physics");
+  await page.getByRole("button", { name: "Add class", exact: true }).click();
+  await page.getByRole("button", { name: "Physics", exact: true }).waitFor();
+  await page
+    .getByRole("button", { name: "Capture assignment", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Enter manually", exact: true })
+    .click();
+  await page.getByLabel("What needs doing?").fill("Work through problems 8–14");
+  await page
+    .getByLabel("Work type", { exact: true })
+    .selectOption("assessment");
+  await page.getByLabel("Importance", { exact: true }).selectOption("high");
+  await page.getByLabel("Estimated minutes", { exact: true }).fill("90");
+  await page.getByLabel("I have confirmed").check();
+  await page.screenshot({ path: join(output, "assignment-priority.png") });
+  await page
+    .getByRole("button", { name: "Save assignment", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Plan", exact: true }).click();
   await page
     .getByRole("button", { name: "Reserve time", exact: true })
@@ -179,6 +182,8 @@ try {
   assert.deepEqual(final.studyBlocks[0], cancelled);
   assert.equal(final.tasks[0].completed, false);
   assert.equal(final.tasks[0].minutes, 90);
+  assert.equal(final.tasks[0].workKind, "assessment");
+  assert.equal(final.tasks[0].importance, "high");
   const reserved = await page.evaluate(async () => {
     const state = await window.desk.snapshot();
     const start = new Date();
@@ -266,7 +271,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, drag-to-day approval, locked cancellation approval and retained history, rebalance preview/approval/history",
+    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, drag-to-day approval, locked cancellation approval and retained history, rebalance preview/approval/history, assignment priority persistence",
   );
 } finally {
   if (app) await app.close();

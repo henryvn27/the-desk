@@ -130,6 +130,10 @@ export function Capture({
             void onSave(
               {
                 title: String(f.get("title")),
+                workKind: String(f.get("workKind")) as TaskInput["workKind"],
+                importance: String(
+                  f.get("importance"),
+                ) as TaskInput["importance"],
                 classId: String(f.get("classId")),
                 minutes: Number(f.get("minutes")),
                 dueAt: dateTime?.toISOString() ?? null,
@@ -207,6 +211,32 @@ export function Capture({
                 name="time"
                 defaultValue={localTime}
               />
+            </label>
+          </div>
+          <div className="fields">
+            <label>
+              Work type
+              <select
+                name="workKind"
+                aria-label="Work type"
+                defaultValue={existing?.workKind ?? "assignment"}
+              >
+                <option value="assignment">Required assignment</option>
+                <option value="assessment">Assessment preparation</option>
+                <option value="optional-review">Optional review</option>
+              </select>
+            </label>
+            <label>
+              Importance
+              <select
+                name="importance"
+                aria-label="Importance"
+                defaultValue={existing?.importance ?? "normal"}
+              >
+                <option value="low">Lower</option>
+                <option value="normal">Normal</option>
+                <option value="high">Higher</option>
+              </select>
             </label>
           </div>
           <label>

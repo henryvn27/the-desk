@@ -5,6 +5,12 @@ import {
   type Task,
   type StudyBlock,
 } from "../domain/contracts";
+const optional = (t: Task) => t.workKind === "optional-review";
+const importance = (t: Task) =>
+  ({ low: 0, normal: 1, high: 2 })[t.importance ?? "normal"];
+function priorityReason(t: Task) {
+  return `${optional(t) ? "Optional review follows required work" : t.workKind === "assessment" ? "Assessment preparation" : "Required assignment"}; ${t.importance ?? "normal"} importance${t.dueAt ? "; confirmed deadline " + new Date(t.dueAt).toLocaleString() : "; flexible deadline"}.`;
+}
 /** Local wall-clock boundaries use the OS timezone, including its DST rules. */
 export function todayWindow(now: Date, raw: PlanningPreferences) {
   const prefs = planningPreferences.parse(raw);
@@ -86,11 +92,12 @@ export function planWeek(
         new Date(start),
         new Date(Math.min(end, start + budget * 60000)),
         0,
+        capacity.end,
       );
       for (const block of daily.blocks) {
         blocks.push({
           ...block,
-          why: `Fits around your saved blocks; the day retains a ${preferences.bufferPercent}% capacity buffer.`,
+          why: `${priorityReason(residual.find((t) => t.id === block.taskId)!)} Fits around saved blocks; daily capacity includes a ${preferences.bufferPercent}% buffer.`,
         });
         residual.find((t) => t.id === block.taskId)!.minutes -= block.minutes;
         budget -= block.minutes;
@@ -102,17 +109,19 @@ export function planWeek(
     .map((t) => ({
       taskId: t.id,
       minutes: t.minutes,
-      reason: !t.deadlineConfirmed
-        ? "Confirm the deadline before automatic scheduling."
-        : t.dueAt && Date.parse(t.dueAt) <= +horizon
-          ? "Cannot fit before its deadline within your available study time."
-          : "Not scheduled in the next seven days; required work remains.",
+      reason: optional(t)
+        ? "Optional review is deferred when required work or available time takes priority."
+        : !t.deadlineConfirmed
+          ? "Confirm the deadline before automatic scheduling."
+          : t.dueAt && Date.parse(t.dueAt) <= +horizon
+            ? "Cannot fit before its deadline within your available study time."
+            : "Not scheduled in the next seven days; required work remains.",
     }));
   return {
     blocks,
     unscheduled,
     overloadMinutes: residual
-      .filter((t) => t.deadlineConfirmed && t.minutes > 0)
+      .filter((t) => t.deadlineConfirmed && !optional(t) && t.minutes > 0)
       .reduce((sum, t) => sum + t.minutes, 0),
   };
 }
@@ -122,6 +131,7 @@ export function plan(
   start: Date,
   end: Date,
   buffer = 0.15,
+  urgencyEnd = end,
 ): {
   blocks: Block[];
   unscheduled: { taskId: string; minutes: number; reason: string }[];
@@ -131,6 +141,7 @@ export function plan(
     !Number.isFinite(buffer) ||
     !Number.isFinite(+start) ||
     !Number.isFinite(+end) ||
+    !Number.isFinite(+urgencyEnd) ||
     end < start ||
     buffer < 0 ||
     buffer >= 1
@@ -144,6 +155,24 @@ export function plan(
     .filter((t) => !t.completed)
     .sort(
       (a, b) =>
+        Number(optional(a)) - Number(optional(b)) ||
+        Number(
+          Boolean(
+            b.deadlineConfirmed &&
+            b.dueAt &&
+            Date.parse(b.dueAt) <= +urgencyEnd,
+          ),
+        ) -
+          Number(
+            Boolean(
+              a.deadlineConfirmed &&
+              a.dueAt &&
+              Date.parse(a.dueAt) <= +urgencyEnd,
+            ),
+          ) ||
+        importance(b) - importance(a) ||
+        Number(b.workKind === "assessment") -
+          Number(a.workKind === "assessment") ||
         (a.dueAt ? Date.parse(a.dueAt) : Infinity) -
           (b.dueAt ? Date.parse(b.dueAt) : Infinity) ||
         a.createdAt.localeCompare(b.createdAt) ||
@@ -170,9 +199,7 @@ export function plan(
         start: new Date(cursor).toISOString(),
         end: new Date(cursor + minutes * 60000).toISOString(),
         minutes,
-        why: task.dueAt
-          ? `Earlier confirmed deadline; capacity includes a ${Math.round(buffer * 100)}% buffer.`
-          : `Flexible work fits after confirmed deadlines; capacity includes a ${Math.round(buffer * 100)}% buffer.`,
+        why: `${priorityReason(task)} Imminent required deadlines come first, then importance and assessments; capacity includes a ${Math.round(buffer * 100)}% buffer.`,
       });
       cursor += minutes * 60000;
       remaining -= minutes;
@@ -182,8 +209,9 @@ export function plan(
       unscheduled.push({
         taskId: task.id,
         minutes: task.minutes - scheduled,
-        reason:
-          deadline <= cursor
+        reason: optional(task)
+          ? "Optional review is deferred when required work or available time takes priority."
+          : deadline <= cursor
             ? "Cannot fit before its deadline."
             : "Not enough available time; required work remains.",
       });
@@ -192,7 +220,10 @@ export function plan(
     blocks,
     unscheduled,
     overloadMinutes: unscheduled
-      .filter((u) => tasks.find((t) => t.id === u.taskId)?.deadlineConfirmed)
+      .filter((u) => {
+        const t = tasks.find((t) => t.id === u.taskId);
+        return t?.deadlineConfirmed && !optional(t);
+      })
       .reduce((sum, u) => sum + u.minutes, 0),
   };
 }
