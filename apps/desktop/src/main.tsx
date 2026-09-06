@@ -32,6 +32,7 @@ import { Sources } from "./Sources";
 import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
+import { ConnectionsSettings } from "./ConnectionsSettings";
 import { Lens } from "./Lens";
 import { SessionCorrection } from "./SessionCorrection";
 import { TaskChecklist } from "./TaskChecklist";
@@ -577,11 +578,7 @@ function App() {
               save={(mode) => act({ type: "capture.policy", mode }, true)}
             />
             <ProviderSettings />
-            <h2>Connections</h2>
-            <p>
-              Cloud sync is not connected. Changes are saved locally; remote
-              synchronization is not yet available.
-            </p>
+            <ConnectionsSettings />
             <h2>Lens</h2>
             <p>
               Option/Alt + Space opens Lens. This build supports a local
