@@ -813,12 +813,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "Saved Guide/Balanced/Direct modes plus trusted-main bounded active-task/class-wide source excerpts. Source provenance/truncation/omissions retained; supporting explanation distinguished by instruction.",
-      "automated": "90 checks pass including source-scope exclusion, serialized size/truncation, mode persistence and provider action rejection.",
+      "implementation": "Saved tutoring modes; trusted-main bounded associated source excerpts ordered by user-reported class material, assigned textbook, educational reference, general web, then unspecified. Source type is correctable with revision checks; ingestion authority is preserved.",
+      "automated": "92 checks pass including reported source hierarchy, provenance, correction persistence/stale rejection, scope exclusion, size/truncation and provider action rejection.",
       "live": "Synthetic provider responses only; no successful live OpenRouter response.",
-      "mac": "Unsigned installed synthetic grounding smoke verifies task-linked source inclusion, unrelated exclusion, saved mode requests, action rejection and restart. No live answer-quality proof.",
+      "mac": "Unsigned installed synthetic UI smoke passes source creation/correction, reported hierarchy/provenance in outbound requests, unrelated exclusion and restart. Screenshot and operated video retained; live answer fidelity unverified.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Source relevance retrieval, verified teacher/textbook authority, citations and live teaching quality remain open; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
+      "blocker": "Relevance retrieval, independent source verification, citations and live teaching quality remain open; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
     },
     {
       "id": "MEMORY-001",

@@ -60,3 +60,27 @@ test("Grounding respects serialized request budget and discloses exclusions", ()
   assert.ok(result.sources.every((s: { truncated: boolean }) => s.truncated));
   assert.equal(result.sources.length + result.omittedSources, 30);
 });
+
+test("reported source hierarchy precedes association priority without upgrading provenance", () => {
+  const sources = [
+    { ...source("web", ["task"], []), kind: "general-web" as const },
+    { ...source("book", ["task"], []), kind: "assigned-textbook" as const },
+    { ...source("teacher", [], ["class"]), kind: "class-material" as const },
+    {
+      ...source("reference", ["task"], []),
+      kind: "educational-reference" as const,
+    },
+    source("unknown", ["task"], []),
+  ];
+  const result = JSON.parse(lensContext({ ...state, sources }));
+  assert.deepEqual(
+    result.sources.map((s: { id: string }) => s.id),
+    ["teacher", "book", "reference", "web", "unknown"],
+  );
+  assert.ok(
+    result.sources.every(
+      (s: { authority: string; kindReportedBy: string }) =>
+        s.authority === "user-provided-text" && s.kindReportedBy === "user",
+    ),
+  );
+});

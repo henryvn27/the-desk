@@ -1,5 +1,14 @@
+import {
+  sourceKind,
+  sourceKindLabels,
+  type SourceKind,
+} from "../../../packages/intelligence/source-kind";
 import { useEffect, useRef, useState } from "react";
-import type { Snapshot, SourceInput } from "../../../packages/domain/contracts";
+import type {
+  Snapshot,
+  SourceInput,
+  Source,
+} from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 
 export function Sources({
@@ -7,11 +16,13 @@ export function Sources({
   classId,
   search,
   save,
+  classify,
 }: {
   data: Snapshot;
   classId?: string;
   search: string;
   save: (input: SourceInput) => Promise<unknown>;
+  classify: (source: Source, kind: SourceKind) => Promise<unknown>;
 }) {
   const [adding, setAdding] = useState(false);
   const sources = data.sources.filter(
@@ -50,6 +61,7 @@ export function Sources({
                 .join("; ")}
             </p>
           )}
+          <SourceClassification source={s} save={classify} />
           <p className="source-text">{s.text}</p>
         </details>
       ))}
@@ -95,6 +107,7 @@ function SourceCapture({
           setBusy(true);
           setError("");
           void save({
+            kind: sourceKind.parse(f.get("kind")),
             title: String(f.get("title")),
             text: String(f.get("text")),
             classIds: f.getAll("classes").map(String),
@@ -109,6 +122,24 @@ function SourceCapture({
           Source title
           <input name="title" required maxLength={500} />
         </label>
+        <label>
+          Source type
+          <select
+            aria-label="Source type"
+            name="kind"
+            defaultValue="unspecified"
+          >
+            {sourceKind.options.map((kind) => (
+              <option key={kind} value={kind}>
+                {sourceKindLabels[kind]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">
+          Source type is reported by you. Desk uses it to prioritize tutoring
+          references.
+        </p>
         <label>
           Original text
           <textarea name="text" required maxLength={200000} />
@@ -156,5 +187,47 @@ function SourceCapture({
         </div>
       </form>
     </dialog>
+  );
+}
+
+function SourceClassification({
+  source,
+  save,
+}: {
+  source: Source;
+  save: (source: Source, kind: SourceKind) => Promise<unknown>;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  return (
+    <>
+      <label>
+        Source type (reported by you)
+        <select
+          aria-label={`Source type for ${source.title}`}
+          value={source.kind ?? "unspecified"}
+          disabled={busy}
+          onChange={async (e) => {
+            const kind = sourceKind.parse(e.target.value);
+            setBusy(true);
+            setError("");
+            try {
+              await save(source, kind);
+            } catch (error) {
+              setError(userError(error));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {sourceKind.options.map((kind) => (
+            <option key={kind} value={kind}>
+              {sourceKindLabels[kind]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {error && <p role="alert">{error}</p>}
+    </>
   );
 }

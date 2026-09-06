@@ -35,7 +35,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 21) {
+    if (version > 22) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -96,6 +96,10 @@ export class DeskStore {
     if (version <= 18) this.db.exec("BEGIN; PRAGMA user_version=19; COMMIT;");
     if (version <= 19) this.db.exec("BEGIN; PRAGMA user_version=20; COMMIT;");
     if (version <= 20) this.db.exec("BEGIN; PRAGMA user_version=21; COMMIT;");
+    if (version <= 21)
+      this.db.exec(
+        "BEGIN; ALTER TABLE sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'unspecified'; ALTER TABLE sources ADD COLUMN revision INTEGER NOT NULL DEFAULT 0; PRAGMA user_version=22; COMMIT;",
+      );
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -613,16 +617,30 @@ export class DeskStore {
           );
         entityId = c.id;
       }
+      if (c.type === "source.classify") {
+        const result = this.db
+          .prepare(
+            "UPDATE sources SET kind=?,revision=revision+1 WHERE id=? AND revision=?",
+          )
+          .run(c.kind, c.id, c.revision);
+        if (!result.changes)
+          throw Error(
+            "This source changed elsewhere. Reopen it before saving.",
+          );
+        entityId = c.id;
+      }
       if (c.type === "source.create") {
         entityId = randomUUID();
         this.db
-          .prepare("INSERT INTO sources VALUES(?,?,?,?,?)")
+          .prepare("INSERT INTO sources VALUES(?,?,?,?,?,?,?)")
           .run(
             entityId,
             c.input.title,
             c.input.text,
             timestamp,
             "user-provided-text",
+            c.input.kind ?? "unspecified",
+            0,
           );
         for (const classId of new Set(c.input.classIds))
           this.db

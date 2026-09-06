@@ -84,3 +84,6 @@ Schema 21 fences the persisted tutor-mode setting: guide, balanced (default), or
 
 
 Lens context is a read-only projection of the active task, task-linked sources and class-wide sources with no task links. It carries source IDs/titles, existing authority, scope and excerpt truncation. It does not change SQLite data or schema 21. Context assembly runs only in the main process and replaces renderer-provided context.
+
+
+Schema 22 adds source kind (default unspecified) and revision (default zero). Original text, links and user-provided-text authority remain intact. New-source input may record a reported kind; source.classify compares revisions and changes only kind plus revision. Stale or invalid corrections fail atomically. Legacy sources are not assigned inferred authority.

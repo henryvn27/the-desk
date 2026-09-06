@@ -707,6 +707,14 @@ function Library({
         classId={classId}
         search={search}
         save={saveSource}
+        classify={(source, kind) =>
+          saveProgress({
+            type: "source.classify",
+            id: source.id,
+            revision: source.revision ?? 0,
+            kind,
+          })
+        }
       />
       {data.tasks
         .filter(

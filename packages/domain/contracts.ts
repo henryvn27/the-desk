@@ -1,3 +1,4 @@
+import { sourceKind } from "../intelligence/source-kind";
 import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
@@ -14,6 +15,7 @@ export type CanvasRecord = {
 };
 const id = z.string().uuid();
 export const sourceInput = z.object({
+  kind: sourceKind.optional(),
   title: z.string().trim().min(1).max(500),
   text: z.string().min(1).max(200000),
   classIds: z.array(id).max(100),
@@ -21,6 +23,7 @@ export const sourceInput = z.object({
 });
 export type SourceInput = z.infer<typeof sourceInput>;
 export type Source = SourceInput & {
+  revision?: number;
   id: string;
   createdAt: string;
   authority: "user-provided-text";
@@ -339,6 +342,12 @@ export const command = z.discriminatedUnion("type", [
     scene: canvasScene,
   }),
   z.object({ type: z.literal("source.create"), input: sourceInput }),
+  z.object({
+    type: z.literal("source.classify"),
+    id,
+    revision: z.number().int().nonnegative(),
+    kind: sourceKind,
+  }),
   z.object({
     type: z.literal("planning.preferences"),
     input: planningPreferences,

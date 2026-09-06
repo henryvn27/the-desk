@@ -1,3 +1,4 @@
+import { sourcePriority } from "./source-kind";
 import type { Snapshot } from "../domain/contracts";
 
 /** Bounded, local evidence only. No URL fetching or inferred source authority. */
@@ -14,8 +15,10 @@ export function lensContext(state: Snapshot): string {
     )
     .sort(
       (a, b) =>
+        sourcePriority(a.kind) - sourcePriority(b.kind) ||
         Number(b.taskIds.includes(task.id)) -
-          Number(a.taskIds.includes(task.id)) || a.id.localeCompare(b.id),
+          Number(a.taskIds.includes(task.id)) ||
+        a.id.localeCompare(b.id),
     );
   const context = {
     class: state.classes.find((course) => course.id === task.classId)?.name,
@@ -29,6 +32,8 @@ export function lensContext(state: Snapshot): string {
       id: string;
       title: string;
       authority: string;
+      kind: string;
+      kindReportedBy: "user";
       scope: string;
       excerpt: string;
       truncated: boolean;
@@ -46,6 +51,8 @@ export function lensContext(state: Snapshot): string {
       id: source.id,
       title: source.title,
       authority: source.authority,
+      kind: source.kind ?? "unspecified",
+      kindReportedBy: "user" as const,
       scope: source.taskIds.includes(task.id) ? "task" : "class",
       excerpt: source.text.slice(0, 3000),
       truncated: source.text.length > 3000,

@@ -42,3 +42,6 @@ Lens now applies saved Guide me, Balanced (default), or Explain directly teachin
 
 
 Local Lens grounding now selects sources linked explicitly to the active task, then class-wide sources without other task links. It excludes unlinked/other-task material, preserves user-provided-text authority, and sends bounded excerpts with truncation and omitted-source counts. The serialized context is capped at 20,000 characters; no linked URL is fetched. Instructions distinguish source statements from supporting explanation and disclose conflicts. This is deterministic association-based context, not relevance retrieval, verified teacher authority, textbook/web search or validated citations.
+
+
+Source priority now follows user-reported class-material, assigned-textbook, educational-reference, general-web, then unspecified; task association breaks ties. Context includes kindReportedBy=user and the unchanged ingestion authority. The user can correct source type in the Library. This implements reported source hierarchy, not independent verification of a teacher, publisher, page or claim. Relevance retrieval, citations and live source-fidelity evaluation remain open.
