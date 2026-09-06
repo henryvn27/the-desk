@@ -852,12 +852,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/intelligence; apps/desktop; packages/domain",
-      "automated": "npm run check: 27 tests including provider failure and migration contracts",
-      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
-      "mac": "Unsigned installed first-slice development smoke",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+      "implementation": "packages/intelligence; apps/desktop; packages/domain; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs",
+      "automated": "134 tests plus typecheck/lint/build: local JSON export serializes an authoritative SQLite snapshot without provider credentials, and the destructive path requires native confirmation before recreating the database.",
+      "live": "Installed unsigned macOS user-data smoke exports a populated local profile/class/task snapshot, asserts no OPENROUTER_API_KEY string is present, requires an explicit native delete confirmation, and verifies classes/tasks stay empty after restart; local sync conflict smoke preserves both copies and requires a decision.",
+      "mac": "Unsigned installed arm64 user-data, sync, Lens and broad desktop smokes pass; Local data Settings screenshot and operated video are retained at artifacts/user/ and the user-facing outputs folder; installed app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34049319837 for commit 4d9b1eb; no requirement-specific Windows UI proof.",
+      "blocker": "Local export/deletion and conflict-preservation controls are verified. Account/auth, live provider privacy settings, asynchronous cloud transport, remote-copy application, interrupted-upload recovery, broader privacy/security review and Windows interaction remain incomplete."
     },
     {
       "id": "SYNC-001",
