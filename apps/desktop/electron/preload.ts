@@ -15,6 +15,12 @@ const api: DeskAPI = {
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
   providerStatus: () => ipcRenderer.invoke("desk:provider-status"),
+  accountStatus: () => ipcRenderer.invoke("desk:account-status"),
+  accountSignIn: (email, password) =>
+    ipcRenderer.invoke("desk:account-sign-in", email, password),
+  accountSignUp: (email, password) =>
+    ipcRenderer.invoke("desk:account-sign-up", email, password),
+  accountSignOut: () => ipcRenderer.invoke("desk:account-sign-out"),
   importCaptureFiles: () => ipcRenderer.invoke("desk:capture-import"),
   importProviderKey: () => ipcRenderer.invoke("desk:provider-import"),
   removeProviderKey: () => ipcRenderer.invoke("desk:provider-remove"),

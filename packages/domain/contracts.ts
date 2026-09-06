@@ -998,6 +998,10 @@ export interface DeskAPI {
     secureStorage: boolean;
     source: "development-env" | "saved-user-key" | null;
   }>;
+  accountStatus(): Promise<import("../integrations/supabase-auth").SupabaseAccountStatus>;
+  accountSignIn(email: string, password: string): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
+  accountSignUp(email: string, password: string): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
+  accountSignOut(): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
   importProviderKey(): Promise<boolean>;
   importCaptureFiles(): Promise<Snapshot | null>;
   removeProviderKey(): Promise<void>;

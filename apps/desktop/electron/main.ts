@@ -22,6 +22,7 @@ import { rm, writeFile } from "node:fs/promises";
 import { DeskStore } from "../../../packages/domain/store";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
+import { SupabaseAccount } from "./supabase";
 import {
   askLens,
   lensInputSchema,
@@ -38,6 +39,7 @@ if (process.env.DESK_DATA_DIR)
 if (!app.requestSingleInstanceLock()) app.exit(0);
 let store: DeskStore;
 let databasePath = "";
+let account: SupabaseAccount;
 let quitRequested = false;
 app.on("before-quit", () => {
   quitRequested = true;
@@ -170,6 +172,12 @@ app.whenReady().then(() => {
       ? undefined
       : join(app.getAppPath(), ".env.local"),
   );
+  account = new SupabaseAccount(
+    app.getPath("userData"),
+    app.isPackaged || process.env.DESK_ENABLE_DEVELOPMENT_KEY !== "1"
+      ? undefined
+      : join(app.getAppPath(), ".env.local"),
+  );
   ipcMain.handle("desk:capture-import", async (event) => {
     check(event);
     if (event.sender !== main?.webContents || !main)
@@ -191,6 +199,28 @@ app.whenReady().then(() => {
   ipcMain.handle("desk:provider-status", (event) => {
     check(event);
     return credentials.status();
+  });
+  ipcMain.handle("desk:account-status", (event) => {
+    check(event);
+    return account.status();
+  });
+  ipcMain.handle("desk:account-sign-in", async (event, email, password) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to sign in.");
+    return account.signIn(email, password);
+  });
+  ipcMain.handle("desk:account-sign-up", async (event, email, password) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to create an account.");
+    return account.signUp(email, password);
+  });
+  ipcMain.handle("desk:account-sign-out", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to sign out.");
+    return account.signOut();
   });
   ipcMain.handle("desk:provider-import", async (event) => {
     check(event);

@@ -32,6 +32,7 @@ import { Sources } from "./Sources";
 import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
+import { AccountSettings } from "./AccountSettings";
 import { ConnectionsSettings } from "./ConnectionsSettings";
 import { SyncSettings } from "./SyncSettings";
 import { Lens } from "./Lens";
@@ -594,6 +595,7 @@ function App() {
               save={(mode) => act({ type: "capture.policy", mode }, true)}
             />
             <ProviderSettings />
+            <AccountSettings />
             <ConnectionsSettings />
             <SyncSettings
               outbox={data.outbox}
