@@ -9,6 +9,7 @@ The product contract §4 defines the required academic graph. This document desc
 | Class | `classes`; one class has many tasks | Student-entered name |
 | Task | `tasks.class_id` foreign key; JSON payload; one task has many sessions | Student-confirmed title, due instant, estimate, optional HTTPS resource and notes |
 | Source | `sources` plus `source_classes`/`source_tasks` join tables; many-to-many links | Exact pasted text and capture time; user-provided authority |
+| Canvas / notebook | `canvases`, task foreign key, revision-checked scene; optional ordered pages with shared files/source links | Original drawing content; page identity and dimensions owned by Desk |
 | Capture provenance | Optional task payload retaining original/source text, captured time, candidate dates, uncertainties and field confidence | Original user-provided text is retained through task corrections |
 | StudySession | `sessions.task_id` foreign key; tracked start/pause/end and elapsed minutes | Clock measurement is separate from student-reported completion |
 | Session review | Session payload with review time, notes and optional remaining minutes | Explicit student report; no submission or mastery inference |
@@ -26,7 +27,7 @@ The product contract §4 defines the required academic graph. This document desc
 - Changing a confirmed deadline or revoking its confirmation requires explicit approval. Capture provenance survives the edit.
 - Uncertain deadlines are excluded from automatic planning. Capacity respects the configured local same-day window and buffer.
 - Remaining-time review cannot modify completed work or overwrite an estimate after a newer session of the same task.
-- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; opening a future schema fails closed.
+- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Opening a future schema fails closed.
 
 ## Required graph still missing
 

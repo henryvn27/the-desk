@@ -1,5 +1,9 @@
 import { useRef, useState, useEffect } from "react";
-import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
+import {
+  Excalidraw,
+  exportToBlob,
+  CaptureUpdateAction,
+} from "@excalidraw/excalidraw";
 import type {
   ExcalidrawInitialDataState,
   ExcalidrawImperativeAPI,
@@ -9,6 +13,18 @@ import { canvasScene, type CanvasScene } from "../../../packages/canvas/scene";
 import type { CanvasRecord, Source } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 import CanvasMath from "./CanvasMath";
+import {
+  activeNotebookPage,
+  addNotebookPage,
+  selectNotebookPage,
+  replaceNotebookPage,
+} from "../../../packages/canvas/notebook";
+import {
+  makePageFrame,
+  fitElementsToPage,
+  pageNeedsRepair,
+} from "./notebook-renderer";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 
 export default function Canvas({
   record,
@@ -25,15 +41,29 @@ export default function Canvas({
     pending = useRef<CanvasScene | null>(null),
     running = useRef<Promise<void> | null>(null),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const documentScene = useRef(record.scene);
+  const [activePageId, setActivePageId] = useState(
+    record.scene.notebook?.activePageId,
+  );
+  const [changingPage, setChangingPage] = useState(false);
+  const page = documentScene.current.notebook
+    ? activeNotebookPage(documentScene.current)
+    : undefined;
+  const [pageFrame, setPageFrame] = useState(() =>
+    record.scene.notebook
+      ? makePageFrame(activeNotebookPage(record.scene))
+      : undefined,
+  );
   const last = useRef(JSON.stringify(record.scene));
   const sourceIds = useRef(record.scene.sourceIds ?? []);
   const [showSources, setShowSources] = useState(false);
   const [showMath, setShowMath] = useState(false);
   const [links, setLinks] = useState(sourceIds.current);
-  function queueScene(value: unknown) {
+  function queueDocument(value: unknown) {
     try {
       const scene = canvasScene.parse(value);
       invalid.current = false;
+      documentScene.current = scene;
       const serialized = JSON.stringify(scene);
       if (serialized === last.current) return;
       last.current = serialized;
@@ -45,6 +75,50 @@ export default function Canvas({
       invalid.current = true;
       setError(userError(e));
       setStatus("Not saved");
+    }
+  }
+  function queueScene(value: unknown) {
+    try {
+      const visible = canvasScene.parse(value);
+      if (!documentScene.current.notebook) return queueDocument(visible);
+      if (activePageId !== documentScene.current.notebook.activePageId) return;
+      const elements = visible.elements
+        .filter((element) => element.id !== pageFrame?.id)
+        .map((element) => ({ ...element, frameId: null }));
+      queueDocument(
+        replaceNotebookPage(
+          {
+            ...documentScene.current,
+            files: visible.files,
+            sourceIds: visible.sourceIds,
+          },
+          activePageId!,
+          elements,
+        ),
+      );
+    } catch (e) {
+      invalid.current = true;
+      setError(userError(e));
+      setStatus("Not saved");
+    }
+  }
+  async function changePage(id?: string) {
+    if (id && id === documentScene.current.notebook?.activePageId) return;
+    setChangingPage(true);
+    try {
+      await flush();
+      const next = id
+        ? selectNotebookPage(documentScene.current, id)
+        : addNotebookPage(documentScene.current, crypto.randomUUID());
+      queueDocument(next);
+      editor.current = null;
+      setShowMath(false);
+      setPageFrame(makePageFrame(activeNotebookPage(next)));
+      setActivePageId(next.notebook!.activePageId);
+    } catch (e) {
+      setError(userError(e));
+    } finally {
+      setChangingPage(false);
     }
   }
   function changeLinks(next: string[]) {
@@ -111,6 +185,8 @@ export default function Canvas({
         files: editor.current.getFiles(),
         appState: { ...editor.current.getAppState(), exportBackground: true },
         mimeType: "image/png",
+        exportingFrame: pageFrame,
+        ...(pageFrame ? { exportPadding: 0 } : {}),
       });
       const saved = await window.desk.exportCanvas(
         record.id,
@@ -207,6 +283,44 @@ export default function Canvas({
           Close canvas
         </button>
       </div>
+      {page && (
+        <nav className="notebook-pages" aria-label="Notebook pages">
+          <label htmlFor="notebook-page">Page</label>
+          <select
+            id="notebook-page"
+            value={activePageId}
+            disabled={changingPage}
+            onChange={(event) => void changePage(event.target.value)}
+          >
+            {documentScene.current.notebook!.pages.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
+              </option>
+            ))}
+          </select>
+          <button
+            disabled={
+              changingPage ||
+              documentScene.current.notebook!.pages.length >= 100
+            }
+            onClick={() => void changePage()}
+          >
+            Add page
+          </button>
+          <button
+            onClick={() => {
+              if (pageFrame)
+                editor.current?.scrollToContent(pageFrame, {
+                  fitToViewport: true,
+                  viewportZoomFactor: 0.72,
+                });
+            }}
+          >
+            Fit page
+          </button>
+          <span>Portrait page · PNG exports this page</span>
+        </nav>
+      )}
       {error && (
         <div className="error" role="alert">
           <p>{error}</p>
@@ -267,16 +381,33 @@ export default function Canvas({
             })}
           </aside>
         )}
-        <div className="canvas-engine">
+        <div
+          className="canvas-engine"
+          style={changingPage ? { pointerEvents: "none" } : undefined}
+        >
           <Excalidraw
+            key={activePageId ?? "infinite"}
             excalidrawAPI={(api) => {
               editor.current = api;
+              if (pageFrame)
+                requestAnimationFrame(() =>
+                  api.scrollToContent(pageFrame, {
+                    fitToViewport: true,
+                    viewportZoomFactor: 0.72,
+                  }),
+                );
             }}
             name={record.title}
             initialData={
               {
-                elements: record.scene.elements,
-                files: record.scene.files,
+                elements:
+                  pageFrame && page
+                    ? fitElementsToPage(
+                        page.elements as unknown as ExcalidrawElement[],
+                        pageFrame,
+                      )
+                    : documentScene.current.elements,
+                files: documentScene.current.files,
                 appState: {
                   viewBackgroundColor: record.scene.viewBackgroundColor,
                 },
@@ -286,7 +417,19 @@ export default function Canvas({
             aiEnabled={false}
             validateEmbeddable={false}
             onLinkOpen={(_, event) => event.preventDefault()}
-            onChange={(elements, state, files) =>
+            onChange={(elements, state, files) => {
+              if (activePageId !== documentScene.current.notebook?.activePageId)
+                return;
+              if (pageFrame && pageNeedsRepair(elements, pageFrame)) {
+                const api = editor.current;
+                queueMicrotask(() => {
+                  if (api && editor.current === api)
+                    api.updateScene({
+                      elements: fitElementsToPage(elements, pageFrame),
+                      captureUpdate: CaptureUpdateAction.NEVER,
+                    });
+                });
+              }
               queueScene({
                 engine: "excalidraw",
                 version: 1,
@@ -296,8 +439,8 @@ export default function Canvas({
                   ? { sourceIds: sourceIds.current }
                   : {}),
                 viewBackgroundColor: state.viewBackgroundColor,
-              })
-            }
+              });
+            }}
           />
         </div>
       </div>

@@ -57,6 +57,18 @@ function App() {
       setError(userError(e));
     }
   }
+  async function newNotebook(taskId: string) {
+    try {
+      const created = await act(
+        { type: "canvas.create", taskId, notebook: true },
+        true,
+      );
+      const id = created?.canvases.at(-1)?.id;
+      if (id) setCanvas(await window.desk.canvas(id));
+    } catch (e) {
+      setError(userError(e));
+    }
+  }
   useEffect(
     () =>
       window.desk.onEdit((action) => {
@@ -488,6 +500,7 @@ function App() {
             edit={setEditing}
             saveSource={(input) => act({ type: "source.create", input }, true)}
             openCanvas={openCanvas}
+            newNotebook={newNotebook}
           />
         )}
       </main>
@@ -546,6 +559,7 @@ function Library({
   edit,
   saveSource,
   openCanvas,
+  newNotebook,
 }: {
   data: Snapshot;
   classId?: string;
@@ -555,6 +569,7 @@ function Library({
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
   openCanvas: (taskId: string, canvasId?: string) => Promise<void>;
+  newNotebook: (taskId: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   return (
@@ -594,6 +609,9 @@ function Library({
               {t.notes && <p>{t.notes}</p>}
               <button onClick={() => edit(t)}>Edit assignment</button>
               <button onClick={() => void openCanvas(t.id)}>Open canvas</button>
+              <button onClick={() => void newNotebook(t.id)}>
+                New notebook
+              </button>
               {data.canvases
                 .filter((c) => c.taskId === t.id)
                 .slice(1)

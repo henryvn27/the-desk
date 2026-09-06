@@ -372,3 +372,22 @@ button[aria-pressed="true"] {
 .canvas-sources select { width: 100%; }
 .canvas-sources section { border-top: 1px solid #d7d2c7; margin-top: 16px; padding-top: 8px; }
 .canvas-header { flex-wrap: wrap; }
+
+.notebook-pages {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #ded9d0;
+  background: #f7f4ed;
+  flex-wrap: wrap;
+}
+.notebook-pages select {
+  width: auto;
+  min-width: 140px;
+  margin: 0;
+}
+.notebook-pages span {
+  color: #65615a;
+  font-size: 13px;
+}

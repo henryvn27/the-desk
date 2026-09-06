@@ -14,7 +14,8 @@
     "lint": "eslint apps packages vite.config.ts",
     "test:desktop": "node scripts/smoke-desktop.mjs",
     "test:canvas": "node scripts/smoke-canvas.mjs",
-    "test:math": "node scripts/smoke-math.mjs"
+    "test:math": "node scripts/smoke-math.mjs",
+    "test:notebook": "node scripts/smoke-notebook.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",

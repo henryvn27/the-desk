@@ -106,7 +106,11 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("canvas.create"), taskId: id }),
+  z.object({
+    type: z.literal("canvas.create"),
+    taskId: id,
+    notebook: z.boolean().optional(),
+  }),
   z.object({ type: z.literal("canvas.recover"), id, scene: canvasScene }),
   z.object({
     type: z.literal("canvas.save"),

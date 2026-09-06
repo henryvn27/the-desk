@@ -1,3 +1,4 @@
+import { startNotebook } from "../canvas/notebook";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
@@ -21,7 +22,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 5) {
+    if (version > 6) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -51,6 +52,9 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE canvases(id TEXT PRIMARY KEY,taskId TEXT NOT NULL REFERENCES tasks(id),title TEXT NOT NULL,createdAt TEXT NOT NULL,updatedAt TEXT NOT NULL,revision INTEGER NOT NULL,scene TEXT NOT NULL); PRAGMA user_version=5; COMMIT;",
       );
+    // Notebook content lives inside page envelopes. Older renderers would save
+    // only root elements, so prevent them from opening this document format.
+    if (version <= 5) this.db.exec("BEGIN; PRAGMA user_version=6; COMMIT;");
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -107,21 +111,25 @@ export class DeskStore {
         const task = state.tasks.find((t) => t.id === c.taskId);
         if (!task) throw Error("Assignment no longer exists.");
         entityId = randomUUID();
-        this.db.prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)").run(
-          entityId,
-          task.id,
-          task.title,
-          timestamp,
-          timestamp,
-          0,
-          JSON.stringify({
-            engine: "excalidraw",
-            version: 1,
-            elements: [],
-            files: {},
-            viewBackgroundColor: "#ffffff",
-          }),
-        );
+        const blank = {
+          engine: "excalidraw" as const,
+          version: 1 as const,
+          elements: [],
+          files: {},
+          viewBackgroundColor: "#ffffff",
+        };
+        const scene = c.notebook ? startNotebook(blank, randomUUID()) : blank;
+        this.db
+          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
+          .run(
+            entityId,
+            task.id,
+            c.notebook ? `${task.title} notebook` : task.title,
+            timestamp,
+            timestamp,
+            0,
+            JSON.stringify(scene),
+          );
       }
       if (c.type === "canvas.save" || c.type === "canvas.recover") {
         for (const sourceId of c.scene.sourceIds ?? []) {
