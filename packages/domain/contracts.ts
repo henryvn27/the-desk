@@ -993,6 +993,7 @@ export interface DeskAPI {
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
   exportData(): Promise<boolean>;
+  exportCalendar(): Promise<boolean>;
   deleteLocalData(): Promise<Snapshot>;
   canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;

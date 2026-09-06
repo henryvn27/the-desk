@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 import { mkdirSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import { DeskStore } from "../../../packages/domain/store";
+import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
 import { SupabaseAccount } from "./supabase";
@@ -324,6 +325,24 @@ app.whenReady().then(() => {
         null,
         2,
       ),
+      "utf8",
+    );
+    return true;
+  });
+  ipcMain.handle("desk:calendar-export", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Plan in the main Desk window to export the study plan.");
+    const state = store.snapshot();
+    const result = await dialog.showSaveDialog(main, {
+      title: "Export study plan",
+      defaultPath: "the-desk-study-plan.ics",
+      filters: [{ name: "Calendar file", extensions: ["ics"] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    await writeFile(
+      result.filePath,
+      studyBlocksToIcs(state.studyBlocks, state.tasks, state.classes),
       "utf8",
     );
     return true;

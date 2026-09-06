@@ -11,6 +11,7 @@ const api: DeskAPI = {
   closeWindow: () => ipcRenderer.invoke("desk:close-window"),
   exportCanvas: (id, png) => ipcRenderer.invoke("desk:canvas-export", id, png),
   exportData: () => ipcRenderer.invoke("desk:data-export"),
+  exportCalendar: () => ipcRenderer.invoke("desk:calendar-export"),
   deleteLocalData: () => ipcRenderer.invoke("desk:data-delete"),
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),

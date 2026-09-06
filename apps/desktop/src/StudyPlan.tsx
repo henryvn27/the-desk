@@ -97,6 +97,23 @@ export function StudyPlan({
         Saved blocks stay where you put them. Suggestions use the time around
         them.
       </p>
+      <div className="actions">
+        <button
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            setStatus("");
+            void window.desk
+              .exportCalendar()
+              .then((saved) => setStatus(saved ? "Study plan exported." : "Export canceled."))
+              .catch((error) => setStatus(userError(error)))
+              .finally(() => setBusy(false));
+          }}
+        >
+          Export study plan (.ics)
+        </button>
+        <span className="muted">Saves a copy for a calendar you control.</span>
+      </div>
       <Rebalance data={data} save={save} />
       <section aria-label="Plan history">
         <h2>Plan history</h2>
