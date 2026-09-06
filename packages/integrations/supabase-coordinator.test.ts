@@ -144,6 +144,69 @@ test("sync coordinator retries a transient failure without another manual sync",
   }
 });
 
+test("sync coordinator reconciles a committed upload after restart loses the response", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "desk-sync-coordinator-interrupted-"));
+  const database = join(directory, "desk.sqlite");
+  const remote: Array<Record<string, unknown>> = [];
+  let postAttempts = 0;
+  const { server, url } = await listen(async (request, response) => {
+    if (!request.url?.startsWith("/rest/v1/desk_sync_operations")) {
+      response.writeHead(404).end();
+      return;
+    }
+    if (request.method === "GET") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(remote));
+      return;
+    }
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    remote.push(JSON.parse(body));
+    postAttempts += 1;
+    if (postAttempts === 1) {
+      response.destroy();
+      return;
+    }
+    response.writeHead(201).end();
+  });
+  let store: DeskStore | undefined = new DeskStore(database);
+  let restarted: DeskStore | undefined;
+  let first: SupabaseSyncCoordinator | undefined;
+  let second: SupabaseSyncCoordinator | undefined;
+  try {
+    store.execute({ type: "class.create", name: "Interrupted Physics" });
+    first = new SupabaseSyncCoordinator(() => store!, fakeAccount(url));
+    const failed = await first.syncNow();
+    assert.equal(failed.phase, "error");
+    assert.equal(failed.queued, 1);
+    assert.equal(remote.length, 1);
+    first.close();
+    first = undefined;
+    store.close();
+    store = undefined;
+
+    restarted = new DeskStore(database);
+    second = new SupabaseSyncCoordinator(() => restarted!, fakeAccount(url));
+    const recovered = await second.syncNow();
+    assert.equal(recovered.phase, "synced");
+    assert.equal(recovered.queued, 0);
+    assert.equal(recovered.uploaded, 1);
+    assert.equal(postAttempts, 1);
+    assert.equal(restarted.snapshot().outbox.at(-1)?.status, "synced");
+    second.close();
+    second = undefined;
+    restarted.close();
+    restarted = undefined;
+  } finally {
+    first?.close();
+    second?.close();
+    store?.close();
+    restarted?.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("sync coordinator exposes newer remote copies as an explicit conflict phase", async () => {
   const directory = await mkdtemp(join(tmpdir(), "desk-sync-coordinator-conflict-"));
   const database = join(directory, "desk.sqlite");
