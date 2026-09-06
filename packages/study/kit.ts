@@ -7,6 +7,8 @@ import type {
   Task,
   Teacher,
   TeacherEvidence,
+  Track,
+  Unit,
 } from "../domain/contracts";
 
 /** Explicit associations only; class-wide notes are distinct from assignment sources. */
@@ -19,6 +21,8 @@ export function sessionKit(
     attempts?: Attempt[];
     teachers?: Teacher[];
     teacherEvidence?: TeacherEvidence[];
+    tracks?: Track[];
+    units?: Unit[];
   },
 ) {
   const linkedSources = state.sources.filter((source) =>
@@ -107,6 +111,16 @@ export function sessionKit(
   const teachers = [...(state.teachers ?? [])].filter((teacher) =>
     teacher.classIds.includes(task.classId),
   );
+  const units = [...(state.units ?? [])]
+    .filter(
+      (unit) => unit.classId === task.classId && unit.taskIds.includes(task.id),
+    )
+    .sort((a, b) => a.sequence - b.sequence || a.name.localeCompare(b.name));
+  const tracks = [...(state.tracks ?? [])].filter(
+    (track) =>
+      track.classId === task.classId &&
+      units.some((unit) => unit.trackId === track.id),
+  );
   return {
     linkedSources,
     classSources,
@@ -117,5 +131,7 @@ export function sessionKit(
     assessments,
     teachers,
     teacherEvidence,
+    tracks,
+    units,
   };
 }

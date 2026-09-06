@@ -176,6 +176,22 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.units.length > 0 && (
+        <div>
+          <h4>Unit context</h4>
+          <p className="muted">
+            Explicit class hierarchy links for this assignment.
+          </p>
+          {kit.units.map((unit) => (
+            <p key={unit.id}>
+              {unit.name} · {unit.kind}
+              {kit.tracks.find((track) => track.id === unit.trackId)?.name &&
+                ` · ${kit.tracks.find((track) => track.id === unit.trackId)?.name}`}
+              {unit.notes && <> · {unit.notes}</>}
+            </p>
+          ))}
+        </div>
+      )}
       {kit.teacherEvidence.length > 0 && (
         <div>
           <h4>Teacher evidence</h4>
@@ -223,6 +239,7 @@ export function SessionKit({
         !kit.attempts.length &&
         !kit.assessments.length &&
         !kit.teachers.length &&
+        !kit.units.length &&
         !kit.teacherEvidence.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source

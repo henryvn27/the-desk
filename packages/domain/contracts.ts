@@ -90,6 +90,36 @@ export type Assessment = AssessmentInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const trackInput = z.object({
+  classId: id,
+  name: z.string().trim().min(1).max(200),
+  notes: z.string().trim().max(5000),
+});
+export type TrackInput = z.infer<typeof trackInput>;
+export type Track = TrackInput & {
+  id: string;
+  revision: number;
+  authority: "user-entered";
+  createdAt: string;
+  updatedAt: string;
+};
+export const unitInput = z.object({
+  classId: id,
+  trackId: id.nullable(),
+  name: z.string().trim().min(1).max(200),
+  kind: z.enum(["unit", "module"]),
+  sequence: z.number().int().min(0).max(10000),
+  notes: z.string().trim().max(5000),
+  taskIds: z.array(id).max(100),
+});
+export type UnitInput = z.infer<typeof unitInput>;
+export type Unit = UnitInput & {
+  id: string;
+  revision: number;
+  authority: "user-entered";
+  createdAt: string;
+  updatedAt: string;
+};
 export const teacherInput = z.object({
   name: z.string().trim().min(1).max(200),
   email: z.string().trim().max(500).nullable(),
@@ -472,6 +502,8 @@ export type Snapshot = {
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
   assessments: Assessment[];
+  tracks: Track[];
+  units: Unit[];
   teachers: Teacher[];
   teacherEvidence: TeacherEvidence[];
   authorityClaims: AuthorityClaim[];
@@ -573,6 +605,30 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("assessment.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("track.create"), input: trackInput }),
+  z.object({
+    type: z.literal("track.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: trackInput,
+  }),
+  z.object({
+    type: z.literal("track.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("unit.create"), input: unitInput }),
+  z.object({
+    type: z.literal("unit.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: unitInput,
+  }),
+  z.object({
+    type: z.literal("unit.forget"),
     id,
     revision: z.number().int().nonnegative(),
   }),

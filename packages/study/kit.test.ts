@@ -10,6 +10,8 @@ import type {
   StudySession,
   Teacher,
   TeacherEvidence,
+  Track,
+  Unit,
 } from "../domain/contracts";
 import { sessionKit } from "./kit";
 const task: Task = {
@@ -365,5 +367,88 @@ test("session kit includes explicit same-class teachers and excludes other class
       (teacher) => teacher.id,
     ),
     ["physics-teacher"],
+  );
+});
+
+test("session kit includes the explicit unit hierarchy for a linked task", () => {
+  const tracks: Track[] = [
+    {
+      id: "mechanics-track",
+      classId: task.classId,
+      name: "Mechanics",
+      notes: "",
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "history-track",
+      classId: "history",
+      name: "World history",
+      notes: "",
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  const units: Unit[] = [
+    {
+      id: "linked-unit",
+      classId: task.classId,
+      trackId: "mechanics-track",
+      name: "Kinematics",
+      kind: "unit",
+      sequence: 2,
+      notes: "Vectors and motion",
+      taskIds: [task.id],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "unlinked-unit",
+      classId: task.classId,
+      trackId: null,
+      name: "Unlinked",
+      kind: "module",
+      sequence: 1,
+      notes: "",
+      taskIds: [],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "other-unit",
+      classId: "history",
+      trackId: "history-track",
+      name: "Revolutions",
+      kind: "unit",
+      sequence: 1,
+      notes: "",
+      taskIds: [task.id],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  const kit = sessionKit(task, {
+    sources: [],
+    sessions: [],
+    tracks,
+    units,
+  });
+  assert.deepEqual(
+    kit.units.map((unit) => unit.id),
+    ["linked-unit"],
+  );
+  assert.deepEqual(
+    kit.tracks.map((track) => track.id),
+    ["mechanics-track"],
   );
 });

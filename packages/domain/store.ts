@@ -18,6 +18,8 @@ import {
   type GradeCategory,
   type GradeEntry,
   type Assessment,
+  type Track,
+  type Unit,
   type Teacher,
   type TeacherEvidence,
   type AuthorityClaim,
@@ -44,7 +46,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 32) {
+    if (version > 33) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -145,6 +147,11 @@ export class DeskStore {
       CREATE TABLE IF NOT EXISTS teachers(id TEXT PRIMARY KEY,data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS teacher_classes(teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,PRIMARY KEY(teacher_id,class_id));
       PRAGMA user_version=32; COMMIT;`);
+    if (version <= 32)
+      this.db.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS tracks(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS units(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),track_id TEXT REFERENCES tracks(id) ON DELETE SET NULL,data TEXT NOT NULL);
+      PRAGMA user_version=33; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -264,6 +271,14 @@ export class DeskStore {
         .prepare("SELECT data FROM assessments ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as Assessment),
+      tracks: this.db
+        .prepare("SELECT data FROM tracks ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Track),
+      units: this.db
+        .prepare("SELECT data FROM units ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Unit),
       teachers: this.db
         .prepare("SELECT data FROM teachers ORDER BY rowid")
         .all()
@@ -579,6 +594,132 @@ export class DeskStore {
             .run(entityId, assessment.classId, JSON.stringify(assessment));
         } else {
           this.db.prepare("DELETE FROM assessments WHERE id=?").run(entityId);
+        }
+      }
+      if (
+        c.type === "track.create" ||
+        c.type === "track.update" ||
+        c.type === "track.forget"
+      ) {
+        const previous =
+          c.type === "track.create"
+            ? undefined
+            : state.tracks.find((track) => track.id === c.id);
+        if (
+          c.type !== "track.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error("This track changed elsewhere. Reopen it before saving.");
+        const input = c.type === "track.forget" ? undefined : c.input;
+        const classId = input?.classId ?? previous?.classId;
+        if (!classId || !state.classes.some((course) => course.id === classId))
+          throw Error("Choose an existing class for this track.");
+        if (
+          input &&
+          state.tracks.some(
+            (track) =>
+              track.id !== previous?.id &&
+              track.classId === classId &&
+              track.name.toLowerCase() === input.name.toLowerCase(),
+          )
+        )
+          throw Error("A track with this name already exists in the class.");
+        if (
+          previous &&
+          state.units.some(
+            (unit) =>
+              unit.trackId === previous.id &&
+              (input === undefined || unit.classId !== input.classId),
+          )
+        )
+          throw Error(
+            "Edit or unlink this track from its units before changing its class or forgetting it.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const track: Track = {
+            ...input,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            authority: "user-entered",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO tracks VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,data=excluded.data",
+            )
+            .run(entityId, track.classId, JSON.stringify(track));
+        } else {
+          this.db.prepare("DELETE FROM tracks WHERE id=?").run(entityId);
+        }
+      }
+      if (
+        c.type === "unit.create" ||
+        c.type === "unit.update" ||
+        c.type === "unit.forget"
+      ) {
+        const previous =
+          c.type === "unit.create"
+            ? undefined
+            : state.units.find((unit) => unit.id === c.id);
+        if (
+          c.type !== "unit.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error("This unit changed elsewhere. Reopen it before saving.");
+        const input = c.type === "unit.forget" ? undefined : c.input;
+        const classId = input?.classId ?? previous?.classId;
+        if (!classId || !state.classes.some((course) => course.id === classId))
+          throw Error("Choose an existing class for this unit.");
+        const trackId = input ? input.trackId : (previous?.trackId ?? null);
+        if (
+          trackId &&
+          !state.tracks.some(
+            (track) => track.id === trackId && track.classId === classId,
+          )
+        )
+          throw Error("The linked track must belong to the selected class.");
+        const taskIds = [...new Set(input?.taskIds ?? previous?.taskIds ?? [])];
+        if (
+          input &&
+          taskIds.some(
+            (taskId) =>
+              !state.tasks.some(
+                (task) => task.id === taskId && task.classId === classId,
+              ),
+          )
+        )
+          throw Error("Every linked task must belong to the selected class.");
+        if (
+          input &&
+          state.units.some(
+            (unit) =>
+              unit.id !== previous?.id &&
+              unit.classId === classId &&
+              unit.name.toLowerCase() === input.name.toLowerCase(),
+          )
+        )
+          throw Error("A unit with this name already exists in the class.");
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const unit: Unit = {
+            ...input,
+            trackId,
+            taskIds,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            authority: "user-entered",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO units VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,track_id=excluded.track_id,data=excluded.data",
+            )
+            .run(entityId, unit.classId, unit.trackId, JSON.stringify(unit));
+        } else {
+          this.db.prepare("DELETE FROM units WHERE id=?").run(entityId);
         }
       }
       if (
@@ -1587,12 +1728,24 @@ export class DeskStore {
           revision: (existing.revision ?? 0) + 1,
           captureEvidence: existing.captureEvidence ?? c.input.captureEvidence,
         };
+        if (
+          state.units.some(
+            (unit) =>
+              unit.taskIds.includes(existing.id) &&
+              unit.classId !== updated.classId,
+          )
+        )
+          throw Error(
+            "Edit or unlink this task from its unit before changing its class.",
+          );
         entityId = existing.id;
         this.db
           .prepare("UPDATE tasks SET class_id=?,data=? WHERE id=?")
           .run(updated.classId, JSON.stringify(updated), existing.id);
       }
       if (c.type === "task.undo") {
+        if (state.units.some((unit) => unit.taskIds.includes(c.id)))
+          throw Error("Unlink this task from its unit before undoing it.");
         const taskBlocks = state.studyBlocks.filter((b) => b.taskId === c.id);
         if (
           taskBlocks.some(
