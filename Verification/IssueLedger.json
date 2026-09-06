@@ -16,7 +16,9 @@
       "area": "core",
       "title": "Full V1 vertical not yet implemented or live verified",
       "severity": "high",
-      "status": "in_progress"
+      "status": "in_progress",
+      "evidence": "2026-09-06: installed macOS arm64 build passes bounded account, sync, conflict, migration, Lens and acceptance smokes; full Capture-to-Replan, production integrations, voice, Windows and strict distribution evidence remain open.",
+      "notes": "Continue bounded implementation and evidence; do not call the release complete while the completion map or release gates retain material gaps."
     },
     {
       "id": "V1-002",
@@ -41,7 +43,7 @@
       "title": "Live OpenRouter authentication and Lens grounding unverified",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: bounded text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 77 automated tests and installed synthetic import/routing/restart/disconnect smoke pass.",
+      "evidence": "2026-09-06: sanitized live text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 163 automated tests, release-boundary provider-failure checks and installed synthetic import/routing/restart/disconnect smoke pass.",
       "notes": "No further live retries until credential/account state changes. Do not expose or copy the developer key. Account logging settings and real grounding remain unverified; independent V1 work continues."
     },
     {
@@ -77,6 +79,33 @@
       "severity": "low",
       "status": "verified",
       "evidence": "Synthetic installed tutoring smoke reproduced LensProviderError prefix. Shared userError now strips it; exact friendly rejection assertion passes."
+    },
+    {
+      "id": "SYNC-001",
+      "area": "cloud sync",
+      "title": "Production Supabase deployment and remote-copy apply remain unavailable",
+      "severity": "high",
+      "status": "open",
+      "evidence": "2026-09-06: local SQLite, loopback auth/REST, 503 retry, 409 lost-response reconciliation, conflict preservation and interrupted post-commit recovery pass. The production migration/RLS deployment is not applied; remote-copy application/merge and session refresh are not verified.",
+      "notes": "Only publishable client credentials are available. Do not add a privileged service key to the desktop app."
+    },
+    {
+      "id": "RELEASE-001",
+      "area": "release",
+      "title": "macOS directory artifact is ad hoc signed and not notarized",
+      "severity": "high",
+      "status": "open",
+      "evidence": "2026-09-06: release and installed app.asar hashes match f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. codesign reports Signature=adhoc and strict deep verification fails; no notarized release is claimed.",
+      "notes": "Requires the authorized signing/notarization environment and release credentials; local implementation work continues independently."
+    },
+    {
+      "id": "GOOGLE-001",
+      "area": "integrations",
+      "title": "Live Google OAuth and browser extension transport remain unverified",
+      "severity": "high",
+      "status": "open",
+      "evidence": "2026-09-06: runtime-validated multi-identity/progressive capability state model and installed connection/account UI pass; no live OAuth, Classroom/Calendar/Drive transport, extension or Windows interaction proof exists.",
+      "notes": "Provider-neutral fallbacks stay explicit; do not claim sync from a saved URL or OAuth-shaped state."
     }
   ]
 }

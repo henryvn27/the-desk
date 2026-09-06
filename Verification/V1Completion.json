@@ -117,11 +117,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner; apps/desktop/electron/supabase-sync.ts; packages/integrations/supabase-sync.ts; supabase/migrations/20260906182824_desk_sync_operations.sql",
-      "automated": "npm run check passes: electron-only guard, typecheck, lint, 156 tests and production build. SQLite remains authoritative and the bounded authenticated sync boundary is main-process-only.",
-      "live": "Bounded source and installed-package smokes cover account, cloud sync, conflict review, Lens actions and restart persistence; production Supabase is not claimed.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. The packaged app is the current Electron/React/TypeScript V1 artifact.",
+      "automated": "npm run check passes: electron-only guard, typecheck, lint, 163 tests and production build. Release-boundary smoke scans generated output for credential-shaped files. SQLite remains authoritative and the bounded authenticated sync boundary is main-process-only.",
+      "live": "Installed-package smokes cover account, cloud sync, conflict review, interrupted migration recovery, Lens actions and restart persistence; production Supabase is not claimed.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. The packaged app is the current Electron/React/TypeScript V1 artifact.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. This is build/package evidence, not Windows interactive UI proof.",
-      "blocker": "Production Supabase migration/auth, full school integrations, Windows interaction and the remaining contract slices remain open."
+      "blocker": "Production Supabase migration/auth, full school integrations, strict signing/notarization, Windows interaction and the remaining contract slices remain open."
     },
     {
       "id": "PLAT-003",
@@ -136,11 +136,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages; package.json; scripts/check-electron-only.mjs; docs/architecture/ARCHITECTURE.md",
-      "automated": "npm run check passes: electron-only guard, typecheck, lint, 156 tests and production build. scripts/check-electron-only.mjs fails on tracked Swift, Xcode project or Xcode workspace files.",
+      "automated": "npm run check passes: electron-only guard, typecheck, lint, 163 tests and production build. scripts/check-electron-only.mjs fails on tracked Swift, Xcode project or Xcode workspace files.",
       "live": "Electron/React/TypeScript is the only tracked V1 implementation surface; legacy Swift is history/documentation only.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows UI proof.",
-      "blocker": "The full Electron rebuild is guarded and no Swift/Xcode implementation remains. Windows interactive evidence and final release review remain open."
+      "blocker": "The full Electron rebuild is guarded and no Swift/Xcode implementation remains. The installed directory artifact is ad hoc signed; Windows interactive evidence and final release review remain open."
     },
     {
       "id": "PILLAR-001",
@@ -298,9 +298,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/integrations/catalog.ts; packages/integrations/catalog.test.ts; apps/desktop/src/ConnectionsSettings.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-connections.mjs",
-      "automated": "156 tests plus typecheck/lint/build cover the honest connection catalog, bounded browser-context envelope, progressive Google-connection state model, retry/conflict states and main-process boundaries.",
+      "automated": "163 tests plus typecheck/lint/build cover the honest connection catalog, bounded browser-context envelope, runtime-validated progressive Google-connection state model, retry/conflict states and main-process boundaries.",
       "live": "Connection status stays explicit; browser context is accepted only through a bounded versioned protocol and Google states distinguish degraded, blocked, expired and reconnect-required cases.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Bounded connection, browser-protocol and sync smokes have no renderer errors.",
+      "mac": "Installed account, cloud-sync, conflict, acceptance and connection-boundary smokes have no renderer errors; the current app.asar hash is f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows UI proof.",
       "blocker": "OAuth/API adapters, browser extension transport, email ingestion, real Classroom/Khan/Quizlet surfaces, production account sync and Windows interaction remain incomplete."
     },
@@ -648,9 +648,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence/lens-actions.ts; packages/intelligence/lens-actions.test.ts; apps/desktop/src/Lens.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-lens-actions.mjs",
-      "automated": "156 tests plus typecheck/lint/build; Lens action tests cover source, note, low-confidence mistake, Canvas artifact, follow-up resource-review and bounded HTTPS open payloads.",
-      "live": "Synthetic Electron Lens smoke exercises all bounded actions, persists links to the active class/task and captures the operated Lens and Canvas artifact surfaces.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder.",
+      "automated": "163 tests plus typecheck/lint/build; Lens action tests cover source, note, low-confidence mistake, Canvas artifact provenance, follow-up resource-review, bounded HTTPS open payloads, invalid context and non-HTTPS rejection.",
+      "live": "Installed Lens smoke exercises all bounded actions, persists links to the active class/task and captures the operated Lens and Canvas artifact surfaces; no arbitrary action or live provider response is claimed.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows Lens/overlay proof.",
       "blocker": "Live OpenRouter authentication remains HTTP 401; voice, external-screen interpretation, launch-app proof and Windows interactive evidence remain open."
     },
@@ -666,9 +666,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "Saved Guide/Balanced/Direct modes, trusted-main teaching instructions, strict provider action rejection; no external-action tools.",
-      "automated": "156 tests plus typecheck/lint/build include strict provider action rejection, bounded Lens actions and safe auth-error redaction.",
+      "automated": "163 tests plus typecheck/lint/build include strict provider action rejection, bounded Lens actions, safe auth-error redaction and build-output credential scanning.",
       "live": "Synthetic provider responses only; no successful live OpenRouter response or autonomous external action is claimed.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Synthetic tutoring/Lens screenshots and videos retained.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. Synthetic tutoring/Lens screenshots and videos retained.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows UI proof.",
       "blocker": "Class-source grounding and live teaching quality remain unverified; OpenRouter HTTP 401 requires an external credential/account change."
     },
@@ -853,9 +853,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence; packages/domain; packages/integrations/supabase-sync.ts; apps/desktop; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/electron/supabase.ts; apps/desktop/electron/supabase-sync.ts; packages/integrations/supabase-auth.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/AccountSettings.tsx; apps/desktop/src/SyncSettings.tsx; apps/desktop/src/main.tsx; supabase/migrations/20260906182824_desk_sync_operations.sql; scripts/smoke-user.mjs; scripts/smoke-account.mjs; scripts/smoke-cloud-sync.mjs",
-      "automated": "140 tests plus typecheck/lint/build: local JSON export serializes an authoritative SQLite snapshot without provider credentials, deletion requires native confirmation, Supabase account sessions stay encrypted in Electron safeStorage, and sync requests use a main-process-only account token with account-scoped table policies.",
+      "automated": "163 tests plus typecheck/lint/build: local JSON export serializes an authoritative SQLite snapshot without provider credentials, deletion requires native confirmation, Supabase account sessions stay encrypted in Electron safeStorage, sync requests use a main-process-only account token with account-scoped table policies, and release-boundary smoke scans built output for credential material.",
       "live": "Installed unsigned macOS user-data, sync, account, cloud-sync, Lens and broad desktop smokes pass; export/deletion and conflict copies remain local, while the cloud fixture verifies a signed-in main-process upload without exposing credentials to the renderer.",
-      "mac": "Unsigned installed arm64 user-data, sync, account, cloud-sync, Lens and broad desktop smokes pass; cloud-sync screenshot/video and user-data/account evidence are retained in artifacts/ and the user-facing outputs folder; installed app.asar matches the packaged artifact.",
+      "mac": "Installed unsigned/ad hoc arm64 user-data, sync, account, cloud-sync, Lens and broad desktop smokes pass; cloud-sync screenshot/video, user-data/account evidence and current app.asar hash f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5 are retained in artifacts/ and the user-facing outputs folder.",
       "windows": "Hosted macOS/Windows checks/build/package pass at 34052589761 for commit 0ced462; no requirement-specific Windows UI proof.",
       "blocker": "Local export/deletion, conflict-preservation, encrypted account-session controls and main-process-only credential use are verified. Production Supabase migration/RLS deployment, live provider privacy settings, remote-copy application, interrupted-upload recovery, broader privacy/security review and Windows interaction remain incomplete."
     },
@@ -873,11 +873,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/sync.test.ts; apps/desktop/electron/supabase.ts; apps/desktop/electron/supabase-sync.ts; packages/integrations/supabase-auth.ts; packages/integrations/supabase-sync.ts; supabase/migrations/20260906182824_desk_sync_operations.sql; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/src/AccountSettings.tsx; apps/desktop/src/SyncSettings.tsx; apps/desktop/src/main.tsx; scripts/smoke-sync.mjs; scripts/smoke-account.mjs; scripts/smoke-cloud-sync.mjs",
-      "automated": "156 tests plus typecheck/lint/build; migration/recovery smoke covers schema 36/37 to 38 preservation and fail-closed future/corrupt state; acceptance and sync smokes cover offline restart, 503 retry, account-scoped append and newer-remote conflict preservation.",
+      "automated": "163 tests plus typecheck/lint/build; migration/recovery smoke covers schema 36/37 to 38 preservation, fail-closed future/corrupt state and abrupt post-commit process interruption; sync tests cover 503 retry, account scope, newer-remote conflict preservation and 409 idempotent lost-response reconciliation.",
       "live": "Bounded Electron fixtures show SQLite-authoritative local writes, queued retries, preserved local/remote conflict copies and explicit review without silent overwrite.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder. A fresh packaged rerun is gated by the macOS safe-storage permission dialog.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. Installed account, cloud-sync, conflict, migration and acceptance smokes pass; screenshots and operated videos are retained.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows sync UI proof.",
-      "blocker": "Production Supabase migration/RLS deployment is not applied, and remote-copy application/merge, interrupted-upload recovery, session refresh, broader failure modes and Windows interaction remain incomplete."
+      "blocker": "Production Supabase migration/RLS deployment is not applied, and remote-copy application/merge, session refresh, broader failure modes and Windows interaction remain incomplete."
     },
     {
       "id": "ACCOUNT-001",
@@ -891,9 +891,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop/electron/supabase.ts; apps/desktop/electron/supabase-sync.ts; packages/integrations/supabase-auth.ts; packages/integrations/supabase-sync.ts; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/src/AccountSettings.tsx; apps/desktop/src/SyncSettings.tsx; packages/domain/contracts.ts; scripts/smoke-account.mjs; scripts/smoke-cloud-sync.mjs",
-      "automated": "156 tests plus typecheck/lint/build; account boundary tests cover encrypted session summaries and renderer-safe errors, while Google connection tests cover multiple identities and progressive capability outcomes.",
+      "automated": "163 tests plus typecheck/lint/build; account boundary tests cover encrypted session summaries and renderer-safe errors, while runtime Google connection validation covers multiple identities, progressive capability outcomes, malformed inputs and credential isolation.",
       "live": "Loopback account smoke proves main-process sign-in/sign-out/sign-up and restart persistence; Google remains an explicit provider-neutral connection-state boundary without live OAuth transport.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Account/cloud artifacts are retained; a fresh packaged rerun is gated by the macOS safe-storage permission dialog.",
+      "mac": "Installed account/cloud artifacts pass against app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5; fresh packaged launch no longer probes macOS Keychain before an account exists.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows account UI proof.",
       "blocker": "Real Supabase auth/RLS deployment, Google OAuth/session refresh, school transports, multiple live identities and Windows interaction remain incomplete."
     },
@@ -965,14 +965,14 @@
         "Use deterministic TypeScript for scheduling/math where possible; route classification, OCR, simple Lens, hard STEM, complex planning interpretation, long-context synthesis, and media to appropriate runtimes.",
         "Abstract and measure provider/model selection; normal users see The Desk, while advanced/BYOK/debug views may disclose provider/model."
       ],
-      "status": "IN_PROGRESS",
+      "status": "BLOCKED_EXTERNAL",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence; apps/desktop; packages/domain",
-      "automated": "156 tests plus typecheck/lint/build; approved routing, provider failure classification, single-request 401/429 UX, privacy options and telemetry redaction are covered.",
+      "automated": "163 tests plus typecheck/lint/build; approved routing, provider failure classification, single-request 401/429/malformed-response UX, privacy options, telemetry redaction and build-output secret scanning are covered.",
       "live": "Bounded OpenRouter checks still return HTTP 401; no successful live answer, grounding or charged usage is claimed.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Provider import/routing/disconnect evidence contains no key in renderer or package.",
+      "mac": "Installed provider import/routing/disconnect evidence contains no key in renderer or package; current app.asar hash is f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows Lens/provider proof.",
-      "blocker": "OpenRouter credential/account authentication remains unresolved; model-quality, grounding, escalation and billing reconciliation stay open."
+      "blocker": "The supplied OpenRouter credential is rejected with sanitized HTTP 401 for Terra and Gemini checks. Smallest external action: provide a valid OpenRouter user key or correct the account credential. No live answer, grounding, escalation or charged usage is claimed until then."
     },
     {
       "id": "WINDOW-001",
@@ -1058,9 +1058,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check passes: electron-only guard, typecheck, lint, 156 tests and production build. plus bounded acceptance, migration/recovery, Lens-action and sync smoke scripts.",
+      "automated": "npm run check passes: electron-only guard, typecheck, lint, 163 tests and production build, plus bounded acceptance, migration/recovery, Lens-action, sync/conflict and release-boundary smoke scripts.",
       "live": "Acceptance smoke covers three classes/six tasks, offline restart, account rejection, retryable cloud failure and explicit conflict review using a loopback fixture.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder. This is bounded evidence, not the full Capture to Replan vertical.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. Installed acceptance covers three classes/six tasks, offline restart, account rejection, retryable cloud failure and explicit conflict review; this remains bounded evidence, not the full Capture to Replan vertical.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. Build/package only; no Windows interactive vertical proof.",
       "blocker": "Real applications/browser pages/PDFs, live provider, voice, external-screen Lens, full Canvas/PDF work, session evidence and tomorrow adaptation remain incomplete."
     },
@@ -1149,9 +1149,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "156 tests plus typecheck/lint/build, with focused browser bridge, Google state, provider, migration/recovery, retry/conflict and Lens-action suites.",
+      "automated": "163 tests plus typecheck/lint/build, with focused browser bridge, runtime Google state, provider, migration/recovery, retry/conflict, Lens-action and release-boundary suites.",
       "live": "Bounded account, sync, acceptance and Lens smoke scripts pass against loopback/synthetic fixtures; production services are not claimed.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current screenshots/videos retained.",
+      "mac": "Installed account, sync, conflict, migration, acceptance and Lens smoke scripts pass; current app.asar hash is f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5 and screenshots/videos are retained.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows UI proof.",
       "blocker": "Live provider/integration evidence and the remaining full contract criteria are still unverified."
     },
@@ -1166,7 +1166,7 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
+      "automated": "npm run check passes with 163 tests; planner suites cover overloaded days, due-date conflicts, locks, sleep, estimate learning, missed blocks, deadline changes, impossible schedules, timezone/DST, no available time and uncertain dates.",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
@@ -1183,11 +1183,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "scripts/smoke-acceptance-v1.mjs; scripts/smoke-migration-recovery.mjs; scripts/smoke-cloud-sync.mjs; scripts/smoke-cloud-sync-conflict.mjs; packages/domain/sync.test.ts",
-      "automated": "Migration/recovery smoke plus 156-test check cover offline edits, restart, queued retry, conflict preservation, schema migration and fail-closed corrupt/future state.",
+      "automated": "Migration/recovery smoke plus the 163-test check cover offline edits, restart, queued retry, 503 reconnect, 409 lost-response reconciliation, conflict preservation, schema migration, abrupt post-commit interruption and fail-closed corrupt/future state.",
       "live": "Bounded Electron acceptance and sync fixtures pass; no production upload or power-loss simulation is claimed.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder.",
+      "mac": "Installed migration, account, cloud-sync, conflict and broad acceptance smokes pass against app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No requirement-specific Windows failure-mode UI proof.",
-      "blocker": "Simultaneous real clients, interrupted process/WAL recovery, remote-copy merge, session refresh and Windows interactive failure paths remain open."
+      "blocker": "Simultaneous real clients, production remote-copy merge, session refresh and Windows interactive failure paths remain open; the interruption check stops after committed writes and does not simulate power loss mid-transaction."
     },
     {
       "id": "TEST-004",
@@ -1197,14 +1197,14 @@
       "acceptance": [
         "Cover click, rectangle, freehand circle, figure-eight/crossed shape, multi-selection, no selection, multiple monitors, scaled displays, external browser/native app, follow-up, cleanup, save to Canvas, voice/text, denied permission, and capture failure."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence/lens-actions.ts; packages/intelligence/lens-actions.test.ts; packages/intelligence/lens-provider.test.ts; apps/desktop/src/Lens.tsx; scripts/smoke-lens-actions.mjs",
+      "automated": "163 tests plus installed Lens smoke cover click/rectangle/freehand selection input, explicit provider-action rejection, bounded persistence actions, resource-open status and cleanup without renderer errors.",
+      "live": "Installed Lens action smoke and operated artifacts pass; voice, multiple-monitor scaling, external-screen permission, live provider and full overlay matrix remain unverified.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Voice, multiple-monitor/scaled-display, external browser/native app, permission-denied/capture-failure and Windows interaction paths remain incomplete."
     },
     {
       "id": "TEST-005",
@@ -1218,9 +1218,9 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/integrations/browser-bridge.test.ts; packages/integrations/google-connections.test.ts; scripts/smoke-lens-actions.mjs; Canvas and sync smoke suites",
-      "automated": "156 tests plus typecheck/lint/build cover bounded browser envelopes, Google denied/admin-blocked/expired states, Lens actions, Canvas regression contracts and sync conflicts.",
+      "automated": "163 tests plus typecheck/lint/build cover bounded browser envelopes, runtime Google denied/admin-blocked/expired/reconnect states, Lens actions, Canvas regression contracts, sync conflicts and release-boundary provider failures.",
       "live": "Synthetic Lens/Canvas and loopback sync/account smoke evidence passes; no installed extension, live Google OAuth, real Chrome/Edge, PDF or Windows interaction is claimed.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder.",
+      "mac": "Installed Lens, account, cloud-sync/conflict and acceptance smokes pass against current app.asar hash f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5; no installed extension, live Google OAuth, real Chrome/Edge, PDF or Windows interaction is claimed.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. Build/package only.",
       "blocker": "Extension disconnect/permission flows, live Google denial/admin paths, full Canvas/PDF matrix, browser adapters and Windows runtime remain incomplete."
     },
@@ -1501,9 +1501,9 @@
       "status": "UNMET",
       "verification": "PARTIAL",
       "implementation": null,
-      "automated": "npm run check passes: electron-only guard, typecheck, lint, 156 tests and production build. npm run package succeeds for the macOS arm64 directory artifact.",
+      "automated": "npm run check passes: electron-only guard, typecheck, lint, 163 tests and production build. npm run package succeeds for the macOS arm64 directory artifact, and test:release-boundaries scans build output for credential material and exercises malformed/auth provider failures.",
       "live": null,
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b.",
       "blocker": "Full gate acceptance remains incomplete: no packaged extension build, production migration proof, or complete V1 vertical."
     },
@@ -1552,11 +1552,11 @@
       "status": "UNMET",
       "verification": "PARTIAL",
       "implementation": null,
-      "automated": "Lens-action contracts and synthetic smoke cover explicit source/note/mistake/Canvas/follow-up/resource actions; no live provider response.",
+      "automated": "Lens-action contracts and installed synthetic smoke cover explicit source/note/mistake/Canvas/follow-up/resource actions, selection modes and no arbitrary provider tools; no live provider response.",
       "live": "Bounded Lens action smoke passes with no renderer errors and operated artifacts.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Fresh packaged interactive rerun is gated by safe-storage permission.",
+      "mac": "Installed Lens smoke passes with no renderer errors; current app.asar hash is f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No interactive Lens/overlay proof.",
-      "blocker": "Voice, external-screen interpretation, real provider, full selection/drawing/follow-up flow and Windows runtime remain open."
+      "blocker": "Voice, external-screen interpretation, OpenRouter authentication, full overlay matrix, launch-app proof and Windows runtime remain open."
     },
     {
       "id": "GATE-E",
@@ -1603,11 +1603,11 @@
       "status": "UNMET",
       "verification": "PARTIAL",
       "implementation": null,
-      "automated": "Acceptance/sync/migration smokes cover offline core, restart persistence, 503 retry, conflict preservation and fail-closed recovery.",
+      "automated": "Acceptance/sync/migration smokes cover offline core, restart persistence, 503 retry, 409 interrupted-upload reconciliation, conflict preservation and fail-closed recovery.",
       "live": "Bounded loopback fixtures show reconnect/retry/conflict review without silent local overwrite.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Current cloud/sync evidence retained.",
+      "mac": "Installed account, cloud-sync, conflict, migration and acceptance smokes pass; current app.asar hash is f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No Windows interactive sync proof.",
-      "blocker": "Production migration/RLS, remote-copy apply/merge, interrupted-upload recovery and full cross-platform acceptance remain open."
+      "blocker": "Production migration/RLS, remote-copy application/merge, session refresh and full cross-platform acceptance remain open."
     },
     {
       "id": "GATE-H",
@@ -1671,11 +1671,11 @@
       "status": "UNMET",
       "verification": "PARTIAL",
       "implementation": null,
-      "automated": "npm run check passes: electron-only guard, typecheck, lint, 156 tests and production build. npm run package succeeds.",
-      "live": "The current macOS arm64 artifact was installed at the canonical Applications path and its archive hash was compared byte-for-byte.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. First-run safe-storage permission is an external macOS gate for a fresh packaged interactive rerun; rollback backup preserved.",
+      "automated": "npm run check passes with 163 tests and production build; npm run package succeeds; the release-boundary smoke verifies build inventory and no embedded credential material.",
+      "live": "The current macOS arm64 artifact was installed at the canonical Applications path, its archive hash was compared byte-for-byte, and the installed executable passed fresh-launch plus broad acceptance/account/sync/Lens smokes.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. A rollback copy is preserved.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. No installed Windows restart/update proof.",
-      "blocker": "Update path, crash/power-loss recovery, notarized distribution and Windows installed UI remain unverified."
+      "blocker": "Update path, strict signing/notarized distribution, crash/power-loss mid-transaction recovery and Windows installed UI remain unverified."
     },
     {
       "id": "GATE-L",
@@ -1705,9 +1705,9 @@
       "status": "UNMET",
       "verification": "PARTIAL",
       "implementation": null,
-      "automated": "npm run check passes: electron-only guard, typecheck, lint, 156 tests and production build. npm run package succeeds.",
-      "live": "Canonical macOS install completed with rollback backup and exact app.asar hash match; bounded acceptance artifacts are retained.",
-      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 44c3d6cdf797b4fb94c7e4aefb8e104df8825c887beb9586f578ca50bfd111c5. Full fresh packaged interaction is gated by the macOS safe-storage permission dialog.",
+      "automated": "npm run check passes with 163 tests and production build; npm run package succeeds.",
+      "live": "Canonical macOS install completed with rollback backup and exact app.asar hash match; fresh packaged launch and installed account, cloud-sync, conflict, Lens and broad acceptance smokes pass.",
+      "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. The directory artifact is ad hoc signed and fails strict deep resource verification, so notarized release evidence is not claimed.",
       "windows": "GitHub Actions run 34056443678 passed npm ci, npm run check and npm run package on macOS and Windows for commit f80562b. Not applicable to this gate.",
       "blocker": "Live release acceptance, provider/browser/voice/extension flows, notarization and full V1 vertical proof remain open."
     },
