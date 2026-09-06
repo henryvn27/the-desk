@@ -40,6 +40,7 @@ import {
   type Concept,
   type Attempt,
   type Plan,
+  type OutboxOperation,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -395,6 +396,20 @@ export class DeskStore {
         )
         .all()
         .map((r) => JSON.parse(r.data as string) as PlanChange),
+      outbox: this.db
+        .prepare(
+          "SELECT id,entity_id,operation,created_at FROM outbox ORDER BY rowid DESC LIMIT 100",
+        )
+        .all()
+        .map(
+          (row) =>
+            ({
+              id: row.id,
+              entityId: row.entity_id,
+              operation: row.operation,
+              createdAt: row.created_at,
+            }) as OutboxOperation,
+        ),
       studyBlocks: this.db
         .prepare("SELECT data FROM study_blocks")
         .all()

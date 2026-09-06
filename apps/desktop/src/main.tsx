@@ -33,6 +33,7 @@ import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
 import { ConnectionsSettings } from "./ConnectionsSettings";
+import { SyncSettings } from "./SyncSettings";
 import { Lens } from "./Lens";
 import { SessionCorrection } from "./SessionCorrection";
 import { TaskChecklist } from "./TaskChecklist";
@@ -69,6 +70,7 @@ const empty: Snapshot = {
   attempts: [],
   plans: [],
   planChanges: [],
+  outbox: [],
   studyBlocks: [],
   canvases: [],
   sources: [],
@@ -579,6 +581,7 @@ function App() {
             />
             <ProviderSettings />
             <ConnectionsSettings />
+            <SyncSettings outbox={data.outbox} />
             <h2>Lens</h2>
             <p>
               Option/Alt + Space opens Lens. This build supports a local

@@ -151,6 +151,12 @@ export type User = UserInput & {
   createdAt: string;
   updatedAt: string;
 };
+export type OutboxOperation = {
+  id: string;
+  entityId: string;
+  operation: string;
+  createdAt: string;
+};
 export const trackInput = z.object({
   classId: id,
   name: z.string().trim().min(1).max(200),
@@ -590,6 +596,7 @@ export type Snapshot = {
   attempts: Attempt[];
   plans: Plan[];
   planChanges: PlanChange[];
+  outbox: OutboxOperation[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
   sources: Source[];
