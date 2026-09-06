@@ -32,7 +32,7 @@ try{
   await page.getByRole("button",{name:"Settings",exact:true}).click();
   assert.equal(await page.locator('input[type="password"]').count(),0);
   await page.getByRole("button",{name:"Import OpenRouter key",exact:true}).click();
-  await page.getByText("OpenRouter key imported securely.",{exact:true}).waitFor();
+  await page.getByText("OpenRouter key stored securely. Lens will verify it on your next request.",{exact:true}).waitFor();
   assert.deepEqual(await page.evaluate(()=>window.desk.providerStatus()),{configured:true,secureStorage:true,source:"saved-user-key"});
   assert.equal((await readFile(join(data,"openrouter-key.enc"))).includes(Buffer.from(syntheticKey)),false);
   await page.screenshot({path:join(output,"openrouter-settings.png")});

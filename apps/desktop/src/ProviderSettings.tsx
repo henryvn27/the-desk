@@ -32,14 +32,16 @@ export function ProviderSettings() {
       <p>
         {connection.source === "development-env"
           ? "This development session uses the locally configured OpenRouter key. Packaged apps do not load it."
-          : connection.configured
-            ? "An OpenRouter user key is saved on this computer. A successful request verifies the live connection."
+            : connection.configured
+            ? "An OpenRouter user key is saved on this computer. Lens verifies the live connection only when you explicitly ask."
             : "Import your OpenRouter key from a text file or an environment file containing OPENROUTER_API_KEY."}
       </p>
       <p className="muted">
-        The native file picker reads the key into secure local storage. It is
-        never returned to this interface. API usage is billed to your OpenRouter
-        account.
+        The native file picker only stores the key in secure local storage; it
+        does not test provider access. Lens shows authentication, timeout,
+        rate-limit, network, and malformed-response failures without
+        automatically retrying the request. The key is never returned to this
+        interface. API usage is billed to your OpenRouter account.
       </p>
       <p>
         Desk chooses approved models and endpoints. Requests require zero data
@@ -57,7 +59,9 @@ export function ProviderSettings() {
             onClick={() =>
               void change(async () => {
                 if (await window.desk.importProviderKey())
-                  setStatus("OpenRouter key imported securely.");
+                  setStatus(
+                    "OpenRouter key stored securely. Lens will verify it on your next request.",
+                  );
               })
             }
           >
