@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { closeElectron } from "./close-electron.mjs";
 
 const data = await mkdtemp(join(tmpdir(), "desk-cloud-sync-"));
 const output = resolve("artifacts/cloud-sync");
@@ -127,7 +128,7 @@ try {
   await page.getByRole("heading", { name: "Local sync boundary", exact: true }).scrollIntoViewIfNeeded();
   const firstVideo = page.video();
   await page.screenshot({ path: join(output, "cloud-sync.png") });
-  await app.close();
+  await closeElectron(app);
   app = undefined;
   if (firstVideo) await copyFile(await firstVideo.path(), join(output, "cloud-sync-operated.webm"));
 
@@ -146,7 +147,7 @@ try {
     "PASS: authenticated main-process Supabase sync appends an account-scoped operation, marks the local outbox synced, persists across restart, and keeps SQLite authoritative.",
   );
 } finally {
-  if (app) await app.close();
+  if (app) await closeElectron(app);
   await new Promise((resolveServer) => server.close(resolveServer));
   await rm(data, { recursive: true, force: true });
 }

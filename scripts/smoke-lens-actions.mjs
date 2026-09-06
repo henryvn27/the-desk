@@ -3,6 +3,7 @@ import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { closeElectron } from "./close-electron.mjs";
 import { waitFor } from "./wait-for.mjs";
 
 const data = await mkdtemp(join(tmpdir(), "desk-lens-actions-"));
@@ -228,7 +229,7 @@ try {
     path: join(output, "lens-canvas-artifact.png"),
   });
   const video = lens.video();
-  await app.close();
+  await closeElectron(app);
   app = undefined;
   if (video)
     await copyFile(
@@ -240,6 +241,6 @@ try {
     "PASS: synthetic Lens response exposes explicit source, note, low-confidence mistake, Canvas artifact, resource-review and HTTPS open actions; saved records persist to the active class/task; no provider or arbitrary action is inferred.",
   );
 } finally {
-  if (app) await app.close();
+  if (app) await closeElectron(app);
   await rm(data, { recursive: true, force: true });
 }

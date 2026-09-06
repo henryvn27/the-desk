@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { closeElectron } from "./close-electron.mjs";
 
 const data = await mkdtemp(join(tmpdir(), "desk-account-"));
 const output = resolve("artifacts/account");
@@ -98,7 +99,7 @@ try {
   assert.equal(signedIn.userId, "00000000-0000-4000-8000-000000000010");
   const firstVideo = page.video();
   await page.screenshot({ path: join(output, "account.png") });
-  await app.close();
+  await closeElectron(app);
   app = undefined;
   if (firstVideo) await copyFile(await firstVideo.path(), join(output, "account-operated.webm"));
 
@@ -126,7 +127,7 @@ try {
     "PASS: trusted main-process Supabase account sign-in, encrypted restart persistence, sign-out and sign-up flow work without exposing credentials to the renderer.",
   );
 } finally {
-  if (app) await app.close();
+  if (app) await closeElectron(app);
   await new Promise((resolveServer) => server.close(resolveServer));
   await rm(data, { recursive: true, force: true });
 }

@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { closeElectron } from "./close-electron.mjs";
 
 const data = await mkdtemp(join(tmpdir(), "desk-cloud-sync-conflict-"));
 const output = resolve("artifacts/cloud-sync");
@@ -133,7 +134,7 @@ try {
   await page.getByRole("heading", { name: "Local sync boundary", exact: true }).scrollIntoViewIfNeeded();
   const firstVideo = page.video();
   await page.screenshot({ path: join(output, "cloud-sync-conflict.png") });
-  await app.close();
+  await closeElectron(app);
   app = undefined;
   if (firstVideo)
     await copyFile(
@@ -145,7 +146,7 @@ try {
     "PASS: installed Supabase sync preserves a newer remote copy, pauses the local operation, and renders explicit conflict review without silently overwriting SQLite.",
   );
 } finally {
-  if (app) await app.close();
+  if (app) await closeElectron(app);
   await new Promise((resolveServer) => server.close(resolveServer));
   await rm(data, { recursive: true, force: true });
 }

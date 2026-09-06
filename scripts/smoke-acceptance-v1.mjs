@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { _electron as electron } from "playwright";
+import { closeElectron } from "./close-electron.mjs";
 import { waitFor } from "./wait-for.mjs";
 
 const data = await mkdtemp(join(tmpdir(), "desk-acceptance-v1-"));
@@ -207,7 +208,7 @@ async function launch(online) {
 }
 
 async function close() {
-  if (app) await app.close();
+  if (app) await closeElectron(app);
   app = undefined;
   page = undefined;
 }
@@ -324,7 +325,7 @@ try {
     .fill("long-enough-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page
-    .getByText("Account request failed: Invalid login credentials.", {
+    .getByText("Account request failed (HTTP 400).", {
       exact: true,
     })
     .waitFor();
