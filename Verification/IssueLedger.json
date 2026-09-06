@@ -57,9 +57,9 @@
       "area": "canvas",
       "title": "Math insertion keyboard undo needs diagnosis",
       "severity": "medium",
-      "status": "open",
-      "evidence": "Development math smoke: Cmd+Z after math insertion and Save did not remove the equation, including after a blank canvas click; toolbar Undo/Redo pass.",
-      "notes": "Do not claim math keyboard parity from toolbar verification. Native menu/focus routing remains to be diagnosed."
+      "status": "resolved",
+      "evidence": "Installed macOS math smoke verifies Cmd+Z removes the equation and Cmd+Shift+Z restores it, including when the Desk Save button had focus. Native text undo stays in the LaTeX editor.",
+      "notes": "Root cause: Electron native menu accelerator consumed Z before the renderer. before-input-event now passes Z/Y edit shortcuts to renderer editors; Canvas handles keys globally except during its Math dialog. Native Command-Q separately verified through CUA. Windows interaction and direct native Edit-menu actions remain separate unverified paths."
     }
   ]
 }

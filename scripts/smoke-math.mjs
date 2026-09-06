@@ -83,7 +83,9 @@ try {
       "data:image/png;base64,",
     ),
   );
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+z" : "Control+z",
+  );
   await save();
   assert.equal(
     (
@@ -91,7 +93,9 @@ try {
     ).scene.elements.filter((e) => !e.isDeleted).length,
     0,
   );
-  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z",
+  );
   await save();
   assert.equal(
     (
@@ -108,6 +112,23 @@ try {
   await page.getByRole("button", { name: "Math", exact: true }).click();
   await page.getByLabel("Equation", { exact: true }).selectOption(equation.id);
   assert.equal(await page.getByLabel("LaTeX equation").inputValue(), original);
+  await page.getByLabel("LaTeX equation").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("1");
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+z" : "Control+z",
+  );
+  assert.equal(
+    await page.getByLabel("LaTeX equation").inputValue(),
+    original,
+    "Text undo must stay in the equation field",
+  );
+  assert.equal(
+    (
+      await page.evaluate((id) => window.desk.canvas(id), id)
+    ).scene.elements.filter((e) => !e.isDeleted).length,
+    1,
+  );
   await page.getByLabel("LaTeX equation").fill(revised);
   await page
     .getByRole("button", { name: "Update equation", exact: true })
@@ -141,6 +162,11 @@ try {
     (await page.evaluate((id) => window.desk.canvas(id), id)).scene,
     edited.scene,
   );
+  if (process.env.DESK_NATIVE_QUIT_CHECK === "1") {
+    console.log("Awaiting native Quit input");
+    await app.waitForEvent("close", { timeout: 60_000 });
+    app = undefined;
+  }
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     JSON.stringify({
@@ -148,14 +174,20 @@ try {
       flows: [
         "invalid LaTeX reports error",
         "insert rendered equation with source",
-        "undo/redo",
+        "keyboard undo/redo with intermediate scene verification",
+        "text undo remains local to math editor",
+        ...(process.env.DESK_NATIVE_QUIT_CHECK === "1"
+          ? ["native Quit observed"]
+          : []),
         "restart and edit source",
         "edited image and source persist",
         "equation PNG export",
       ],
       limitations: [
         "not full math/Canvas acceptance",
-        "native export dialog result injected; Windows and math keyboard undo not verified",
+        process.env.DESK_NATIVE_QUIT_CHECK === "1"
+          ? "native export dialog result injected; Windows interaction and native Edit-menu actions not verified"
+          : "native export dialog result injected; Windows interaction, native Quit shortcut and Edit-menu actions not verified",
       ],
     }),
   );

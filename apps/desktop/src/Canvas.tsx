@@ -282,6 +282,7 @@ export default function Canvas({
                 },
               } as unknown as ExcalidrawInitialDataState
             }
+            handleKeyboardGlobally={!showMath}
             aiEnabled={false}
             validateEmbeddable={false}
             onLinkOpen={(_, event) => event.preventDefault()}

@@ -68,6 +68,15 @@ function makeWindow(kind: "main" | "lens" | "controller") {
       nodeIntegration: false,
     },
   });
+  // Let renderer editors handle undo/redo. Native Edit-menu accelerators would
+  // otherwise consume these keys before Excalidraw receives them. Other menu
+  // shortcuts (including Quit) remain enabled on their own input events.
+  win.webContents.on("before-input-event", (_event, input) => {
+    const editShortcut =
+      (input.control || input.meta) &&
+      ["z", "y"].includes(input.key.toLowerCase());
+    win.webContents.setIgnoreMenuShortcuts(editShortcut);
+  });
   windows.add(win);
   win.on("closed", () => windows.delete(win));
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

@@ -703,10 +703,10 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "41 tests plus typecheck/lint/build; scene validation, stale-write/source rejection, bounded equation rendering. Dependency installation audit reports zero vulnerabilities.",
-      "live": "Installed macOS smoke: ink, explicit pen/highlighter, arrow/rectangle, undo-redo, text/PNG, close/Quit flush, restart, recovery copies and Library source links/unlink. PNG export/cancel and image-picker results injected. Screenshot and operated videos inspected/captured. Installed math smoke covers valid/invalid LaTeX, insertion, toolbar undo/redo, edit after restart and inspected equation PNG export.",
+      "live": "Installed macOS smoke: ink, explicit pen/highlighter, arrow/rectangle, undo-redo, text/PNG, close/Quit flush, restart, recovery copies and Library source links/unlink. PNG export/cancel and image-picker results injected. Screenshot and operated videos inspected/captured. Installed math smoke covers valid/invalid LaTeX, insertion, toolbar undo/redo, edit after restart and inspected equation PNG export. Installed keyboard undo/redo now verifies intermediate disappearance/restoration; text undo remains in the Math field. Native macOS Quit checked via CUA.",
       "mac": "Installed local arm64 Canvas smoke passes with signing auto-discovery disabled; not notarized. Screenshot and operated videos captured.",
-      "windows": "Checks/build/package pass at e27e01a (run 33999701817); subsequent ink/math changes and interactive Canvas acceptance unverified.",
-      "blocker": "Partial Canvas only; remaining tools, PDF/paged mode, Lens primitives, forced-termination recovery, math keyboard undo and Windows acceptance remain open."
+      "windows": "Checks/build/package pass at 80a6feb (run 34000401116); later keyboard change and interactive Canvas acceptance unverified.",
+      "blocker": "Partial Canvas only; remaining tools, PDF/paged mode, Lens primitives, forced-termination recovery, native Edit-menu actions and Windows acceptance remain open."
     },
     {
       "id": "CANVAS-002",
@@ -722,10 +722,10 @@
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Canvas.tsx; packages/canvas; packages/domain; docs/architecture/CANVAS.md",
       "automated": "41 tests plus typecheck/lint/build; scene validation, stale-write/source rejection, bounded equation rendering. Dependency installation audit reports zero vulnerabilities.",
-      "live": "Installed macOS smoke: ink, explicit pen/highlighter, arrow/rectangle, undo-redo, text/PNG, close/Quit flush, restart, recovery copies and Library source links/unlink. PNG export/cancel and image-picker results injected. Screenshot and operated videos inspected/captured. Installed math smoke covers valid/invalid LaTeX, insertion, toolbar undo/redo, edit after restart and inspected equation PNG export.",
+      "live": "Installed macOS smoke: ink, explicit pen/highlighter, arrow/rectangle, undo-redo, text/PNG, close/Quit flush, restart, recovery copies and Library source links/unlink. PNG export/cancel and image-picker results injected. Screenshot and operated videos inspected/captured. Installed math smoke covers valid/invalid LaTeX, insertion, toolbar undo/redo, edit after restart and inspected equation PNG export. Installed keyboard undo/redo now verifies intermediate disappearance/restoration; text undo remains in the Math field. Native macOS Quit checked via CUA.",
       "mac": "Installed local arm64 Canvas smoke passes with signing auto-discovery disabled; not notarized. Screenshot and operated videos captured.",
-      "windows": "Checks/build/package pass at e27e01a (run 33999701817); subsequent ink/math changes and interactive Canvas acceptance unverified.",
-      "blocker": "Partial Canvas only; remaining tools, PDF/paged mode, Lens primitives, forced-termination recovery, math keyboard undo and Windows acceptance remain open."
+      "windows": "Checks/build/package pass at 80a6feb (run 34000401116); later keyboard change and interactive Canvas acceptance unverified.",
+      "blocker": "Partial Canvas only; remaining tools, PDF/paged mode, Lens primitives, forced-termination recovery, native Edit-menu actions and Windows acceptance remain open."
     },
     {
       "id": "ASSESS-001",
