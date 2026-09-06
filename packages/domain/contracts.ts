@@ -89,6 +89,7 @@ export type TaskInput = z.infer<typeof taskInput>;
 export type Class = { id: string; name: string; color: string };
 export type Task = TaskInput & {
   autoPlanPending?: boolean;
+  revision?: number;
   id: string;
   completed: boolean;
   createdAt: string;
@@ -102,6 +103,12 @@ export type StudySession = {
   endedAt: string | null;
   actualMinutes: number | null;
   completionReported?: boolean;
+  estimateAtStart?: {
+    minutes: number;
+    classId: string;
+    workKind: NonNullable<TaskInput["workKind"]>;
+    taskRevision: number;
+  };
   review?: {
     reviewedAt: string;
     notes: string;

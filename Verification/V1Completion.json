@@ -446,12 +446,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "32 tests plus typecheck/lint/build: weekly residual-time conservation, deadlines, study days, cutoff, buffer and DST windows.",
-      "live": "Installed macOS smoke renders long assignment split across future study days; existing capture/session/preferences flows pass.",
+      "implementation": "apps/desktop; packages/domain; packages/planner; packages/learning/duration.ts",
+      "automated": "68 tests plus typecheck/lint/build: durable start estimates, revision exclusion, same-class/work-type median, minimum samples, partial/legacy/multiple-session exclusion; prior scheduling/review coverage retained.",
+      "live": "Installed unsigned macOS duration smoke: synthetic historical timing through real store commands; UI applies optional estimate, starts/ends unfinished, corrects remaining time, restarts and verifies unchanged start baseline. Screenshot inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Partial only: learned estimates, learning-based spacing, persistent plans and locks remain missing."
+      "windows": "Prior 230551a hosted macOS/Windows checks/build/package pass (34006442962); this duration change has no Windows interaction proof.",
+      "blocker": "Partial only: time-of-day learning, multi-session comparable estimates, learning-based spacing and stop recommendations remain unfinished."
     },
     {
       "id": "PLAN-004",
@@ -573,12 +573,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check: 29 tests. Review persists notes/remaining time, retains measured duration, rejects completed-task and stale-session estimate changes.",
-      "live": "Installed macOS smoke: accept finished-session summary, add unfinished-session notes/remaining time, restart, verify persisted history.",
+      "implementation": "apps/desktop; packages/domain; packages/planner; packages/learning/duration.ts",
+      "automated": "68 tests plus typecheck/lint/build: durable start estimates, revision exclusion, same-class/work-type median, minimum samples, partial/legacy/multiple-session exclusion; prior scheduling/review coverage retained.",
+      "live": "Installed unsigned macOS duration smoke: synthetic historical timing through real store commands; UI applies optional estimate, starts/ends unfinished, corrects remaining time, restarts and verifies unchanged start baseline. Screenshot inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Partial only: no automatic work detection, learned estimates, attempts/mistake/mastery/preparedness updates, or completion correction yet."
+      "windows": "Prior 230551a hosted macOS/Windows checks/build/package pass (34006442962); this duration change has no Windows interaction proof.",
+      "blocker": "Partial only: automatic work detection, attempts/mistake/mastery/preparedness updates and completion correction remain unfinished; duration learning is conservative and opt-in."
     },
     {
       "id": "LENS-001",

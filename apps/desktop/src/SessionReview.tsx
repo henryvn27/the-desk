@@ -44,6 +44,12 @@ export function SessionReview({
           ? "You marked this task finished."
           : "Work remains unfinished."}
       </p>
+      {session.estimateAtStart && (
+        <p>
+          {session.estimateAtStart.minutes} min estimated remaining when you
+          started.
+        </p>
+      )}
       <p className="muted">
         Paused time excluded. Understanding and submission haven’t been
         assessed.

@@ -1,3 +1,4 @@
+import { durationSuggestion } from "../../../packages/learning/duration";
 import { userError } from "./errors";
 import { useEffect, useRef, useState } from "react";
 import type {
@@ -5,6 +6,7 @@ import type {
   GradeCategory,
   TaskInput,
   Task,
+  StudySession,
 } from "../../../packages/domain/contracts";
 import {
   interpretCapture,
@@ -13,6 +15,8 @@ import {
 export function Capture({
   classes,
   gradeCategories,
+  tasks,
+  sessions,
   busy,
   onSave,
   onClose,
@@ -20,6 +24,8 @@ export function Capture({
 }: {
   classes: Class[];
   gradeCategories: GradeCategory[];
+  tasks: Task[];
+  sessions: StudySession[];
   busy: boolean;
   onSave: (
     input: TaskInput,
@@ -35,6 +41,27 @@ export function Capture({
   const [index, setIndex] = useState(0);
   const [error, setError] = useState("");
   const draft = drafts[index];
+  const formKey = index + ":" + (draft?.title ?? "manual");
+  const [estimateInput, setEstimateInput] = useState<{
+    key: string;
+    classId: string;
+    workKind: TaskInput["workKind"];
+    minutes: number;
+    applied: boolean;
+  }>();
+  const estimate =
+    estimateInput?.key === formKey
+      ? estimateInput
+      : {
+          classId:
+            existing?.classId ??
+            draft?.classId ??
+            (draft ? "" : (classes[0]?.id ?? "")),
+          workKind: existing?.workKind ?? "assignment",
+          minutes: existing?.minutes ?? draft?.minutes ?? 30,
+          applied: false,
+        };
+  const suggestion = durationSuggestion(tasks, sessions, estimate);
   const instantValue = existing?.dueAt ?? draft?.deadline?.instant;
   const instant = instantValue ? new Date(instantValue) : null;
   const two = (n: number) => String(n).padStart(2, "0");
@@ -110,7 +137,25 @@ export function Capture({
       )}
       {(draft || manual) && (
         <form
-          key={index + ":" + (draft?.title ?? "manual")}
+          key={formKey}
+          onChange={(e) => {
+            const target = e.target;
+            if (
+              !(target instanceof HTMLInputElement) &&
+              !(target instanceof HTMLSelectElement)
+            )
+              return;
+            if (!["classId", "workKind", "minutes"].includes(target.name))
+              return;
+            const f = new FormData(e.currentTarget);
+            setEstimateInput({
+              key: formKey,
+              classId: String(f.get("classId")),
+              workKind: String(f.get("workKind")) as TaskInput["workKind"],
+              minutes: Number(f.get("minutes")),
+              applied: false,
+            });
+          }}
           onInput={() => setError("")}
           onSubmit={(e) => {
             e.preventDefault();
@@ -189,6 +234,7 @@ export function Capture({
             Class
             <select
               name="classId"
+              aria-label="Class"
               required
               defaultValue={
                 existing?.classId ??
@@ -296,6 +342,40 @@ export function Capture({
               required
             />
           </label>
+          {suggestion && suggestion.minutes !== estimate.minutes && (
+            <section aria-label="Duration suggestion">
+              <p>
+                Similar work took {suggestion.ratio.toFixed(1)}× the starting
+                estimate across {suggestion.samples} reviewed tasks in this
+                class and work type. Each was finished in one session. Timing
+                varies.
+              </p>
+              <button
+                type="button"
+                disabled={estimate.applied}
+                onClick={(e) => {
+                  const input = e.currentTarget.form?.elements.namedItem(
+                    "minutes",
+                  ) as HTMLInputElement | null;
+                  if (!input) return;
+                  input.value = String(suggestion.minutes);
+                  setEstimateInput({
+                    ...estimate,
+                    key: formKey,
+                    applied: true,
+                  });
+                }}
+              >
+                {estimate.applied
+                  ? "Suggested estimate applied"
+                  : `Use ${suggestion.minutes} min estimate`}
+              </button>
+              <p className="muted">
+                Optional adjustment to your estimate; no changes are saved until
+                you confirm.
+              </p>
+            </section>
+          )}
           <label className="check">
             <input
               type="checkbox"

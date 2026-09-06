@@ -497,6 +497,8 @@ function App() {
         <Capture
           classes={data.classes}
           gradeCategories={data.gradeCategories}
+          tasks={data.tasks}
+          sessions={data.sessions}
           busy={busy}
           existing={editing}
           onClose={() => setEditing(undefined)}
@@ -519,6 +521,8 @@ function App() {
         <Capture
           classes={data.classes}
           gradeCategories={data.gradeCategories}
+          tasks={data.tasks}
+          sessions={data.sessions}
           busy={busy}
           onClose={() => setCapture(false)}
           onSave={async (input) => {
@@ -632,6 +636,12 @@ function Library({
                           {new Date(s.endedAt!).toLocaleString()} ·{" "}
                           {Math.round(s.actualMinutes ?? 0)} min tracked
                         </p>
+                        {s.estimateAtStart && (
+                          <p>
+                            {s.estimateAtStart.minutes} min estimated remaining
+                            at start
+                          </p>
+                        )}
                         {s.review?.notes && <p>{s.review.notes}</p>}
                         {s.review?.remainingMinutes != null && (
                           <p>

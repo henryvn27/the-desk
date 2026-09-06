@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 14);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 15);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -193,6 +193,13 @@ test("session review survives restart, updates remaining work, and rejects stale
     store.close();
     store = new DeskStore(path);
     assert.equal(store.snapshot().tasks[0]!.minutes, 35);
+    assert.equal(store.snapshot().tasks[0]!.revision, 1);
+    assert.deepEqual(store.snapshot().sessions[0]!.estimateAtStart, {
+      minutes: 60,
+      classId,
+      workKind: "assignment",
+      taskRevision: 0,
+    });
     assert.equal(store.snapshot().tasks[0]!.completed, false);
     assert.equal(store.snapshot().sessions[0]!.actualMinutes, 20);
     assert.equal(store.snapshot().sessions[0]!.completionReported, false);
@@ -240,6 +247,22 @@ test("session review survives restart, updates remaining work, and rejects stale
       remainingMinutes: null,
     });
     assert.ok(store.snapshot().sessions[1]!.review?.reviewedAt);
+    const task = store.snapshot().tasks[0]!;
+    store.execute({
+      type: "task.update",
+      id: task.id,
+      input: { ...task, minutes: 45 },
+      deadlineChangeApproved: false,
+    });
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(store.snapshot().tasks[0]!.revision, 2);
+    assert.deepEqual(store.snapshot().sessions[1]!.estimateAtStart, {
+      minutes: 35,
+      classId,
+      workKind: "assignment",
+      taskRevision: 1,
+    });
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

@@ -29,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 14) {
+    if (version > 15) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -80,6 +80,7 @@ export class DeskStore {
     if (version <= 11) this.db.exec("BEGIN; PRAGMA user_version=12; COMMIT;");
     if (version <= 12) this.db.exec("BEGIN; PRAGMA user_version=13; COMMIT;");
     if (version <= 13) this.db.exec("BEGIN; PRAGMA user_version=14; COMMIT;");
+    if (version <= 14) this.db.exec("BEGIN; PRAGMA user_version=15; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -535,6 +536,7 @@ export class DeskStore {
           ...c.input,
           id: entityId,
           completed: false,
+          revision: 0,
           createdAt: timestamp,
           ...(active &&
           state.planningMode === "auto-plan" &&
@@ -560,6 +562,7 @@ export class DeskStore {
         const updated: Task = {
           ...existing,
           ...c.input,
+          revision: (existing.revision ?? 0) + 1,
           captureEvidence: existing.captureEvidence ?? c.input.captureEvidence,
         };
         entityId = existing.id;
@@ -600,6 +603,12 @@ export class DeskStore {
           pausedMs: 0,
           endedAt: null,
           actualMinutes: null,
+          estimateAtStart: {
+            minutes: task.minutes,
+            classId: task.classId,
+            workKind: task.workKind ?? "assignment",
+            taskRevision: task.revision ?? 0,
+          },
         };
         this.db
           .prepare("INSERT INTO sessions VALUES(?,?,?,1)")
@@ -664,6 +673,7 @@ export class DeskStore {
               "A newer session exists. Update the assignment estimate directly.",
             );
           task.minutes = c.remainingMinutes;
+          task.revision = (task.revision ?? 0) + 1;
           this.db
             .prepare("UPDATE tasks SET data=? WHERE id=?")
             .run(JSON.stringify(task), task.id);
