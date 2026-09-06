@@ -80,6 +80,84 @@ test("Supabase sync client reads and appends through the authenticated REST boun
   }
 });
 
+test("Supabase sync client lists account-scoped remote operations with a bounded cursor", async () => {
+  const calls: string[] = [];
+  const accountId = "00000000-0000-4000-8000-000000000010";
+  const server = createServer((request, response) => {
+    calls.push(request.url ?? "");
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify([
+        {
+          operation_id: "00000000-0000-4000-8000-000000000020",
+          account_id: accountId,
+          entity_id: "class-id",
+          operation: "class.create",
+          payload: { entityId: "class-id" },
+          created_at: "2026-09-06T12:00:00.000Z",
+        },
+      ]),
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const client = new SupabaseSyncClient({
+    url: `http://127.0.0.1:${address.port}`,
+    publishableKey: "test-publishable-key",
+    accessToken: "test-access-token",
+    userId: accountId,
+  });
+  try {
+    const operations = await client.list("2026-09-06T11:00:00.000Z", 500);
+    assert.equal(operations[0]?.account_id, accountId);
+    assert.match(calls[0] ?? "", /account_id=eq\.00000000-0000-4000-8000-000000000010/);
+    assert.match(calls[0] ?? "", /created_at=gt\.2026-09-06T11%3A00%3A00\.000Z/);
+    assert.match(calls[0] ?? "", /limit=100/);
+    await assert.rejects(
+      () => client.list("not-a-cursor"),
+      /Sync cursor must be an ISO timestamp/,
+    );
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("Supabase sync client rejects a remote operation from another account", async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify([
+        {
+          operation_id: "00000000-0000-4000-8000-000000000020",
+          account_id: "00000000-0000-4000-8000-000000000011",
+          entity_id: "class-id",
+          operation: "class.create",
+          payload: {},
+          created_at: "2026-09-06T12:00:00.000Z",
+        },
+      ]),
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const client = new SupabaseSyncClient({
+    url: `http://127.0.0.1:${address.port}`,
+    publishableKey: "test-publishable-key",
+    accessToken: "test-access-token",
+    userId: "00000000-0000-4000-8000-000000000010",
+  });
+  try {
+    await assert.rejects(
+      () => client.list(),
+      /different account's operation/,
+    );
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test("Supabase sync client rejects empty non-success responses", async () => {
   const server = createServer((_request, response) => {
     response.writeHead(401);

@@ -41,6 +41,15 @@ export function SyncSettings({
       setError(userError(caught));
     }
   }
+  async function keepRemote(id: string) {
+    setError("");
+    try {
+      await save({ type: "sync.conflict.resolve", id, resolution: "keep-remote" });
+      await save({ type: "sync.conflict.apply-remote", id });
+    } catch (caught) {
+      setError(userError(caught));
+    }
+  }
   let cloudLabel = status.authenticated
     ? "Cloud sync: connected"
     : "Cloud sync: not connected";
@@ -106,8 +115,8 @@ export function SyncSettings({
                   </span>
                 </div>
                 <p className="muted">
-                  Both copies are retained. Resolution records the choice; this
-                  build does not pretend to upload or overwrite local data.
+                  Both copies are retained. Applying a remote copy is a separate
+                  explicit step and is replay-safe.
                 </p>
                 <details>
                   <summary>View preserved local and remote copies</summary>
@@ -136,17 +145,20 @@ export function SyncSettings({
                       Keep local copy
                     </button>
                     <button
-                      onClick={() =>
-                        void change({
-                          type: "sync.conflict.resolve",
-                          id: conflict.id,
-                          resolution: "keep-remote",
-                        })
-                      }
+                      onClick={() => void keepRemote(conflict.id)}
                     >
                       Keep remote copy
                     </button>
                   </div>
+                )}
+                {conflict.resolution === "keep-remote" && (
+                  <button
+                    onClick={() =>
+                      void change({ type: "sync.conflict.apply-remote", id: conflict.id })
+                    }
+                  >
+                    Apply remote copy locally
+                  </button>
                 )}
               </article>
             );

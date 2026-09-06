@@ -212,6 +212,7 @@ test("sync coordinator exposes newer remote copies as an explicit conflict phase
   const database = join(directory, "desk.sqlite");
   const remoteOperation = {
     operation_id: "00000000-0000-4000-8000-000000000020",
+    account_id: userId,
     entity_id: "placeholder",
     operation: "class.create",
     payload: { name: "Remote Physics" },

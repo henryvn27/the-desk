@@ -3,6 +3,7 @@ import type { SyncEnvelope } from "../domain/contracts";
 
 const remoteOperation = z.object({
   operation_id: z.string().uuid(),
+  account_id: z.string().uuid(),
   entity_id: z.string().min(1),
   operation: z.string().min(1),
   payload: z.unknown(),
@@ -71,13 +72,33 @@ export class SupabaseSyncClient {
     const query = new URLSearchParams({
       account_id: `eq.${this.context.userId}`,
       entity_id: `eq.${entityId}`,
-      select: "operation_id,entity_id,operation,payload,created_at",
+      select: "operation_id,account_id,entity_id,operation,payload,created_at",
       order: "created_at.desc",
       limit: "1",
     });
     const response = await this.request("GET", query.toString());
     const parsed = z.array(remoteOperation).parse(response);
+    this.assertAccountScope(parsed);
     return parsed[0] ?? null;
+  }
+
+  async list(afterCreatedAt?: string, limit = 100): Promise<RemoteSyncOperation[]> {
+    const bounded = Math.max(1, Math.min(100, Math.trunc(limit)));
+    const query = new URLSearchParams({
+      account_id: `eq.${this.context.userId}`,
+      select: "operation_id,account_id,entity_id,operation,payload,created_at",
+      order: "created_at.asc,operation_id.asc",
+      limit: String(bounded),
+    });
+    if (afterCreatedAt !== undefined) {
+      if (!z.iso.datetime().safeParse(afterCreatedAt).success)
+        throw Error("Sync cursor must be an ISO timestamp.");
+      query.set("created_at", `gt.${afterCreatedAt}`);
+    }
+    const response = await this.request("GET", query.toString());
+    const parsed = z.array(remoteOperation).parse(response);
+    this.assertAccountScope(parsed);
+    return parsed;
   }
 
   async append(envelope: SyncEnvelope): Promise<void> {
@@ -135,5 +156,10 @@ export class SupabaseSyncClient {
       return [];
     }
     return parsed;
+  }
+
+  private assertAccountScope(operations: RemoteSyncOperation[]) {
+    if (operations.some((operation) => operation.account_id !== this.context.userId))
+      throw Error("Cloud sync returned a different account's operation.");
   }
 }

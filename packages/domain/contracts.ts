@@ -641,6 +641,7 @@ export const command = z.discriminatedUnion("type", [
     id,
     resolution: syncConflictResolution,
   }),
+  z.object({ type: z.literal("sync.conflict.apply-remote"), id }),
   z.object({ type: z.literal("tutor.mode"), mode: tutoringMode }),
   z.object({ type: z.literal("capture.policy"), mode: capturePolicy }),
   z.object({

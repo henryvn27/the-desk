@@ -45,6 +45,101 @@ import {
   type SyncConflict,
   type SyncConflictInput,
 } from "./contracts";
+
+type RemoteSyncRow = Record<string, unknown>;
+type RemoteSyncRecord = {
+  table: string;
+  row: RemoteSyncRow;
+  classIds?: string[];
+  taskIds?: string[];
+};
+type RemoteSyncPayload = {
+  entityId: string;
+  operation: string;
+  record?: RemoteSyncRecord;
+  deleted?: boolean;
+};
+
+function isRecord(value: unknown): value is RemoteSyncRow {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requiredRemoteString(row: RemoteSyncRow, key: string, table: string) {
+  const value = row[key];
+  if (typeof value !== "string" || value.length === 0)
+    throw Error(`Remote ${table} row has an invalid ${key}.`);
+  return value;
+}
+
+function remoteInteger(row: RemoteSyncRow, key: string, table: string) {
+  const value = row[key];
+  if (typeof value !== "number" || !Number.isInteger(value))
+    throw Error(`Remote ${table} row has an invalid ${key}.`);
+  return value;
+}
+
+function remoteJsonString(row: RemoteSyncRow, key: string, table: string) {
+  const value = requiredRemoteString(row, key, table);
+  try {
+    JSON.parse(value);
+  } catch {
+    throw Error(`Remote ${table} row has invalid JSON in ${key}.`);
+  }
+  return value;
+}
+
+function remoteIds(record: RemoteSyncRecord, key: "classIds" | "taskIds") {
+  const value = record[key];
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string"))
+    throw Error(`Remote ${record.table} record has invalid ${key}.`);
+  return [...new Set(value)];
+}
+
+function payloadsEqual(left: string, right: string) {
+  try {
+    return JSON.stringify(JSON.parse(left)) === JSON.stringify(JSON.parse(right));
+  } catch {
+    return false;
+  }
+}
+
+function parseRemotePayload(
+  serialized: string,
+  entityId: string,
+  operation: string,
+): RemoteSyncPayload {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    throw Error("The preserved remote sync copy is invalid JSON.");
+  }
+  if (!isRecord(parsed) || parsed.entityId !== entityId || parsed.operation !== operation)
+    throw Error("The preserved remote sync copy does not match this conflict.");
+  if (parsed.deleted === true) return { entityId, operation, deleted: true };
+  if (parsed.deleted !== undefined || !isRecord(parsed.record))
+    throw Error("The preserved remote sync copy has no supported record.");
+  const table = parsed.record.table;
+  const row = parsed.record.row;
+  if (typeof table !== "string" || !isRecord(row) || row.id !== entityId)
+    throw Error("The preserved remote sync row does not match this entity.");
+  const candidate: RemoteSyncRecord = { table, row };
+  if (parsed.record.classIds !== undefined) {
+    candidate.classIds = remoteIds(
+      { table, row, classIds: parsed.record.classIds as string[] },
+      "classIds",
+    );
+  }
+  if (parsed.record.taskIds !== undefined) {
+    candidate.taskIds = remoteIds(
+      { table, row, taskIds: parsed.record.taskIds as string[] },
+      "taskIds",
+    );
+  }
+  return { entityId, operation, record: candidate };
+}
+
 export class DeskStore {
   private db: DatabaseSync;
   private rebalance?: { preview: RebalancePreview; basis: string };
@@ -567,6 +662,391 @@ export class DeskStore {
   recordSyncConflict(input: SyncConflictInput, now = new Date()): Snapshot {
     return this.execute({ type: "sync.conflict.record", input }, now);
   }
+  /** Apply a user-approved remote conflict without creating a new local write. */
+  applyRemoteConflict(conflictId: string, now = new Date()): Snapshot {
+    const timestamp = now.toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.applyRemoteConflictInTransaction(conflictId, timestamp);
+      this.db.exec("COMMIT");
+      return this.snapshot();
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  private applyRemoteConflictInTransaction(conflictId: string, timestamp: string) {
+    const conflict = this.db
+        .prepare(
+          "SELECT id,entity_id,operation_id,operation,local_data,remote_data,resolution FROM sync_conflicts WHERE id=?",
+        )
+        .get(conflictId) as
+        | {
+            id: string;
+            entity_id: string;
+            operation_id: string | null;
+            operation: string;
+            local_data: string;
+            remote_data: string;
+            resolution: string;
+          }
+        | undefined;
+      if (!conflict) throw Error("This sync conflict is missing.");
+      if (conflict.resolution !== "keep-remote")
+        throw Error("Choose keep-remote before applying a remote copy.");
+      if (conflict.operation_id) {
+        const operation = this.db
+          .prepare("SELECT entity_id,status FROM outbox WHERE id=?")
+          .get(conflict.operation_id) as
+          | { entity_id: string; status: string }
+          | undefined;
+        if (!operation || operation.entity_id !== conflict.entity_id)
+          throw Error("The local operation for this sync conflict is missing.");
+        if (operation.status !== "resolved")
+          throw Error("Resolve the local operation before applying the remote copy.");
+      }
+
+      const current = this.syncPayload(conflict.entity_id, conflict.operation);
+      if (payloadsEqual(current, conflict.remote_data)) return;
+      if (!payloadsEqual(current, conflict.local_data))
+        throw Error("The local copy changed after this conflict was recorded.");
+
+      const payload = parseRemotePayload(
+        conflict.remote_data,
+        conflict.entity_id,
+        conflict.operation,
+      );
+      if (payload.deleted) this.applyRemoteDeletion(conflict.entity_id);
+      else if (payload.record) this.applyRemoteRecord(payload.record);
+      else throw Error("The preserved remote sync copy has no supported record.");
+
+      if (!payloadsEqual(this.syncPayload(conflict.entity_id, conflict.operation), conflict.remote_data))
+        throw Error("The remote copy could not be applied without data loss.");
+      if (conflict.operation_id)
+        this.db
+          .prepare(
+            "UPDATE outbox SET status='resolved',last_attempt_at=?,last_error=? WHERE id=?",
+          )
+          .run(timestamp, "Remote copy applied locally.", conflict.operation_id);
+  }
+
+  private applyRemoteDeletion(entityId: string) {
+    const tables = [
+      "classes",
+      "tasks",
+      "sessions",
+      "sources",
+      "canvases",
+      "study_blocks",
+      "plan_changes",
+      "grade_categories",
+      "grade_entries",
+      "assessments",
+      "teacher_evidence",
+      "authority_claims",
+      "authority_resolutions",
+      "teachers",
+      "tracks",
+      "units",
+      "academic_periods",
+      "spaces",
+      "users",
+      "plans",
+      "mistakes",
+      "concepts",
+      "attempts",
+      "capture_inbox",
+      "memories",
+      "settings",
+    ];
+    const matches = tables.filter((table) =>
+      this.db.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(entityId),
+    );
+    if (matches.length > 1)
+      throw Error("The remote deletion matches more than one local table.");
+    const table = matches[0];
+    if (!table) return;
+    if (table === "sources") {
+      this.db.prepare("DELETE FROM source_classes WHERE source_id=?").run(entityId);
+      this.db.prepare("DELETE FROM source_tasks WHERE source_id=?").run(entityId);
+    }
+    if (table === "teachers")
+      this.db.prepare("DELETE FROM teacher_classes WHERE teacher_id=?").run(entityId);
+    if (table === "academic_periods")
+      this.db.prepare("DELETE FROM period_classes WHERE period_id=?").run(entityId);
+    if (table === "spaces")
+      this.db.prepare("DELETE FROM space_classes WHERE space_id=?").run(entityId);
+    this.db.prepare(`DELETE FROM ${table} WHERE id=?`).run(entityId);
+  }
+
+  private applyRemoteRecord(record: RemoteSyncRecord) {
+    const { row, table } = record;
+    const id = requiredRemoteString(row, "id", table);
+    if (table === "classes") {
+      this.db
+        .prepare(
+          "INSERT INTO classes(id,name,color) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,color=excluded.color",
+        )
+        .run(id, requiredRemoteString(row, "name", table), requiredRemoteString(row, "color", table));
+      return;
+    }
+    if (table === "tasks") {
+      this.db
+        .prepare(
+          "INSERT INTO tasks(id,class_id,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,data=excluded.data",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "class_id", table),
+          remoteJsonString(row, "data", table),
+        );
+      return;
+    }
+    if (table === "sessions") {
+      const active = remoteInteger(row, "active", table);
+      if (active !== 0 && active !== 1)
+        throw Error("Remote sessions row has an invalid active flag.");
+      this.db
+        .prepare(
+          "INSERT INTO sessions(id,task_id,data,active) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET task_id=excluded.task_id,data=excluded.data,active=excluded.active",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "task_id", table),
+          remoteJsonString(row, "data", table),
+          active,
+        );
+      return;
+    }
+    if (table === "sources") {
+      const classIds = remoteIds(record, "classIds");
+      const taskIds = remoteIds(record, "taskIds");
+      this.db
+        .prepare(
+          "INSERT INTO sources(id,title,text,createdAt,authority,kind,revision) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,text=excluded.text,createdAt=excluded.createdAt,authority=excluded.authority,kind=excluded.kind,revision=excluded.revision",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "title", table),
+          requiredRemoteString(row, "text", table),
+          requiredRemoteString(row, "createdAt", table),
+          requiredRemoteString(row, "authority", table),
+          typeof row.kind === "string" ? row.kind : "unspecified",
+          typeof row.revision === "number" && Number.isInteger(row.revision)
+            ? row.revision
+            : 0,
+        );
+      this.replaceRemoteLinks("source_classes", "source_id", "class_id", id, classIds);
+      this.replaceRemoteLinks("source_tasks", "source_id", "task_id", id, taskIds);
+      return;
+    }
+    if (table === "canvases") {
+      this.db
+        .prepare(
+          "INSERT INTO canvases(id,taskId,title,createdAt,updatedAt,revision,scene) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET taskId=excluded.taskId,title=excluded.title,createdAt=excluded.createdAt,updatedAt=excluded.updatedAt,revision=excluded.revision,scene=excluded.scene",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "taskId", table),
+          requiredRemoteString(row, "title", table),
+          requiredRemoteString(row, "createdAt", table),
+          requiredRemoteString(row, "updatedAt", table),
+          remoteInteger(row, "revision", table),
+          remoteJsonString(row, "scene", table),
+        );
+      return;
+    }
+    if (table === "study_blocks") {
+      this.db
+        .prepare(
+          "INSERT INTO study_blocks(id,task_id,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET task_id=excluded.task_id,data=excluded.data",
+        )
+        .run(id, requiredRemoteString(row, "task_id", table), remoteJsonString(row, "data", table));
+      return;
+    }
+    if (table === "plan_changes") {
+      this.db
+        .prepare(
+          "INSERT INTO plan_changes(id,appliedAt,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET appliedAt=excluded.appliedAt,data=excluded.data",
+        )
+        .run(id, requiredRemoteString(row, "appliedAt", table), remoteJsonString(row, "data", table));
+      return;
+    }
+    if (table === "grade_categories") {
+      this.db
+        .prepare(
+          "INSERT INTO grade_categories(id,class_id,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,data=excluded.data",
+        )
+        .run(id, requiredRemoteString(row, "class_id", table), remoteJsonString(row, "data", table));
+      return;
+    }
+    if (table === "grade_entries") {
+      this.db
+        .prepare(
+          "INSERT INTO grade_entries(id,category_id,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,data=excluded.data",
+        )
+        .run(id, requiredRemoteString(row, "category_id", table), remoteJsonString(row, "data", table));
+      return;
+    }
+    if (table === "assessments") {
+      this.db
+        .prepare(
+          "INSERT INTO assessments(id,class_id,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,data=excluded.data",
+        )
+        .run(id, requiredRemoteString(row, "class_id", table), remoteJsonString(row, "data", table));
+      return;
+    }
+    if (table === "teacher_evidence") {
+      this.db
+        .prepare(
+          "INSERT INTO teacher_evidence(id,class_id,assessment_id,task_id,data) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,assessment_id=excluded.assessment_id,task_id=excluded.task_id,data=excluded.data",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "class_id", table),
+          row.assessment_id === null ? null : requiredRemoteString(row, "assessment_id", table),
+          row.task_id === null ? null : requiredRemoteString(row, "task_id", table),
+          remoteJsonString(row, "data", table),
+        );
+      return;
+    }
+    if (table === "authority_claims") {
+      this.db
+        .prepare(
+          "INSERT INTO authority_claims(id,class_id,task_id,data) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,task_id=excluded.task_id,data=excluded.data",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "class_id", table),
+          requiredRemoteString(row, "task_id", table),
+          remoteJsonString(row, "data", table),
+        );
+      return;
+    }
+    if (table === "authority_resolutions") {
+      this.db
+        .prepare(
+          "INSERT INTO authority_resolutions(id,task_id,fact,claim_id,data) VALUES(?,?,?,?,?) ON CONFLICT(task_id,fact) DO UPDATE SET id=excluded.id,claim_id=excluded.claim_id,data=excluded.data",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "task_id", table),
+          requiredRemoteString(row, "fact", table),
+          requiredRemoteString(row, "claim_id", table),
+          remoteJsonString(row, "data", table),
+        );
+      return;
+    }
+    if (table === "teachers") {
+      this.db
+        .prepare(
+          "INSERT INTO teachers(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+        )
+        .run(id, remoteJsonString(row, "data", table));
+      this.replaceRemoteLinks(
+        "teacher_classes",
+        "teacher_id",
+        "class_id",
+        id,
+        remoteIds(record, "classIds"),
+      );
+      return;
+    }
+    if (table === "tracks") {
+      this.db
+        .prepare(
+          "INSERT INTO tracks(id,class_id,data) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,data=excluded.data",
+        )
+        .run(id, requiredRemoteString(row, "class_id", table), remoteJsonString(row, "data", table));
+      return;
+    }
+    if (table === "units") {
+      this.db
+        .prepare(
+          "INSERT INTO units(id,class_id,track_id,data) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,track_id=excluded.track_id,data=excluded.data",
+        )
+        .run(
+          id,
+          requiredRemoteString(row, "class_id", table),
+          row.track_id === null ? null : requiredRemoteString(row, "track_id", table),
+          remoteJsonString(row, "data", table),
+        );
+      return;
+    }
+    if (table === "academic_periods" || table === "spaces") {
+      const data = remoteJsonString(row, "data", table);
+      const parsed = JSON.parse(data) as RemoteSyncRow;
+      const classIds =
+        record.classIds ??
+        (Array.isArray(parsed.classIds) && parsed.classIds.every((item) => typeof item === "string")
+          ? [...new Set(parsed.classIds as string[])]
+          : []);
+      if (table === "academic_periods") {
+        this.db
+          .prepare(
+            "INSERT INTO academic_periods(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(id, data);
+        this.replaceRemoteLinks("period_classes", "period_id", "class_id", id, classIds);
+      } else {
+        this.db
+          .prepare(
+            "INSERT INTO spaces(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(id, data);
+        this.replaceRemoteLinks("space_classes", "space_id", "class_id", id, classIds);
+      }
+      return;
+    }
+    if (table === "users") {
+      const data = remoteJsonString(row, "data", table);
+      const other = this.db
+        .prepare("SELECT id FROM users WHERE id<>? LIMIT 1")
+        .get(id);
+      if (other) throw Error("A different local profile prevents this remote copy.");
+      this.db
+        .prepare("INSERT INTO users(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data")
+        .run(id, data);
+      return;
+    }
+    if (
+      table === "plans" ||
+      table === "mistakes" ||
+      table === "concepts" ||
+      table === "attempts" ||
+      table === "capture_inbox" ||
+      table === "memories"
+    ) {
+      const data = remoteJsonString(row, "data", table);
+      this.db
+        .prepare(`INSERT INTO ${table}(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data`)
+        .run(id, data);
+      return;
+    }
+    if (table === "settings") {
+      this.db
+        .prepare("INSERT INTO settings(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data")
+        .run(id, remoteJsonString(row, "data", table));
+      return;
+    }
+    throw Error(`Remote sync table ${table} is not supported.`);
+  }
+
+  private replaceRemoteLinks(
+    table: string,
+    ownerColumn: string,
+    valueColumn: string,
+    ownerId: string,
+    values: string[],
+  ) {
+    const deleteSql = `DELETE FROM ${table} WHERE ${ownerColumn}=?`;
+    const insertSql = `INSERT INTO ${table}(${ownerColumn},${valueColumn}) VALUES(?,?)`;
+    this.db.prepare(deleteSql).run(ownerId);
+    const insert = this.db.prepare(insertSql);
+    for (const value of values) insert.run(ownerId, value);
+  }
+
   execute(raw: Command, now = new Date()): Snapshot {
     const c = command.parse(raw);
     const timestamp = now.toISOString();
@@ -676,6 +1156,11 @@ export class DeskStore {
               conflict.operationId,
             );
         entityId = conflict.id;
+      }
+      if (c.type === "sync.conflict.apply-remote") {
+        queueCommand = false;
+        this.applyRemoteConflictInTransaction(c.id, timestamp);
+        entityId = c.id;
       }
       if (c.type === "tutor.mode") {
         entityId = "tutor-mode";
@@ -2608,7 +3093,7 @@ export class DeskStore {
       ["sessions", "SELECT id,task_id,data,active FROM sessions WHERE id=?"],
       [
         "sources",
-        "SELECT id,title,text,createdAt,authority FROM sources WHERE id=?",
+        "SELECT id,title,text,createdAt,authority,kind,revision FROM sources WHERE id=?",
       ],
       ["canvases", "SELECT id,taskId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
       ["study_blocks", "SELECT id,task_id,data FROM study_blocks WHERE id=?"],
@@ -2616,7 +3101,10 @@ export class DeskStore {
       ["grade_categories", "SELECT id,class_id,data FROM grade_categories WHERE id=?"],
       ["grade_entries", "SELECT id,category_id,data FROM grade_entries WHERE id=?"],
       ["assessments", "SELECT id,class_id,data FROM assessments WHERE id=?"],
-      ["teacher_evidence", "SELECT id,class_id,data FROM teacher_evidence WHERE id=?"],
+      [
+        "teacher_evidence",
+        "SELECT id,class_id,assessment_id,task_id,data FROM teacher_evidence WHERE id=?",
+      ],
       ["authority_claims", "SELECT id,class_id,task_id,data FROM authority_claims WHERE id=?"],
       ["authority_resolutions", "SELECT id,task_id,fact,claim_id,data FROM authority_resolutions WHERE id=?"],
       ["teachers", "SELECT id,data FROM teachers WHERE id=?"],

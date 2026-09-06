@@ -101,3 +101,127 @@ test("sync conflict preserves both copies, requires a decision, and keeps retry 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("approved remote conflicts apply transactionally and are idempotent", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "desk-sync-remote-apply-"));
+  const database = join(directory, "desk.sqlite");
+  try {
+    const store = new DeskStore(database);
+    const created = store.execute(
+      { type: "class.create", name: "Local Physics" },
+      new Date("2026-09-06T12:00:00Z"),
+    );
+    const local = created.classes[0]!;
+    const operation = created.outbox.at(-1)!;
+    const localPayload = store.syncBatch()[0]!.payload;
+    const remotePayload = JSON.stringify({
+      entityId: local.id,
+      operation: operation.operation,
+      record: {
+        table: "classes",
+        row: { id: local.id, name: "Physics (school)", color: local.color },
+      },
+    });
+    const conflict = store.recordSyncConflict(
+      {
+        entityId: local.id,
+        operationId: operation.id,
+        operation: operation.operation,
+        localData: localPayload,
+        remoteData: remotePayload,
+      },
+      new Date("2026-09-06T12:01:00Z"),
+    );
+    const resolved = store.execute(
+      {
+        type: "sync.conflict.resolve",
+        id: conflict.syncConflicts[0]!.id,
+        resolution: "keep-remote",
+      },
+      new Date("2026-09-06T12:02:00Z"),
+    );
+    const applied = store.execute(
+      { type: "sync.conflict.apply-remote", id: resolved.syncConflicts[0]!.id },
+      new Date("2026-09-06T12:03:00Z"),
+    );
+    assert.equal(applied.classes[0]?.name, "Physics (school)");
+    assert.equal(applied.outbox.at(-1)?.status, "resolved");
+    assert.match(applied.outbox.at(-1)?.lastError ?? "", /applied locally/);
+
+    const replayed = store.execute({
+      type: "sync.conflict.apply-remote",
+      id: applied.syncConflicts[0]!.id,
+    });
+    assert.equal(replayed.classes[0]?.name, "Physics (school)");
+    assert.equal(replayed.classes.length, 1);
+    store.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("remote conflict application refuses a newer local copy", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "desk-sync-remote-stale-"));
+  const database = join(directory, "desk.sqlite");
+  try {
+    const store = new DeskStore(database);
+    const created = store.execute(
+      {
+        type: "source.create",
+        input: {
+          title: "Formula sheet",
+          text: "F = ma",
+          classIds: [],
+          taskIds: [],
+        },
+      },
+      new Date("2026-09-06T12:00:00Z"),
+    );
+    const source = created.sources[0]!;
+    const operation = created.outbox.at(-1)!;
+    const localPayload = store.syncBatch()[0]!.payload;
+    const remotePayload = JSON.stringify({
+      entityId: source.id,
+      operation: operation.operation,
+      record: {
+        table: "sources",
+        row: {
+          id: source.id,
+          title: source.title,
+          text: "F = m × a",
+          createdAt: source.createdAt,
+          authority: source.authority,
+          kind: "unspecified",
+          revision: 0,
+        },
+        classIds: [],
+        taskIds: [],
+      },
+    });
+    const conflict = store.recordSyncConflict({
+      entityId: source.id,
+      operationId: operation.id,
+      operation: operation.operation,
+      localData: localPayload,
+      remoteData: remotePayload,
+    });
+    store.execute({
+      type: "sync.conflict.resolve",
+      id: conflict.syncConflicts[0]!.id,
+      resolution: "keep-remote",
+    });
+    store.execute({
+      type: "source.classify",
+      id: source.id,
+      revision: source.revision ?? 0,
+      kind: "class-material",
+    });
+    assert.throws(
+      () => store.applyRemoteConflict(conflict.syncConflicts[0]!.id),
+      /local copy changed/,
+    );
+    store.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
