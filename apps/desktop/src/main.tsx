@@ -350,7 +350,7 @@ function App() {
         }
         classId={activeTask?.classId}
         taskId={activeTask?.id}
-        taskResource={Boolean(activeTask?.resource)}
+        taskResource={activeTask?.resource ?? undefined}
         save={(command) => act(command, true)}
       />
     );
