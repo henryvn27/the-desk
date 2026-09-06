@@ -6,6 +6,7 @@ import { Attempts } from "./Attempts";
 import { Assessments } from "./Assessments";
 import { Evidence } from "./Evidence";
 import { Authority } from "./Authority";
+import { Teachers } from "./Teachers";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
@@ -51,6 +52,7 @@ const empty: Snapshot = {
   gradeCategories: [],
   gradeEntries: [],
   assessments: [],
+  teachers: [],
   teacherEvidence: [],
   authorityClaims: [],
   authorityResolutions: [],
@@ -330,6 +332,7 @@ function App() {
             "Assessments",
             "Evidence",
             "Authority",
+            "Teachers",
           ].map((p) => (
             <button
               key={p}
@@ -538,6 +541,8 @@ function App() {
           <Evidence data={data} save={(c) => act(c, true)} />
         ) : page === "Authority" ? (
           <Authority data={data} save={(c) => act(c, true)} />
+        ) : page === "Teachers" ? (
+          <Teachers data={data} save={(c) => act(c, true)} />
         ) : page === "Plan" ? (
           <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
         ) : page === "Settings" ? (

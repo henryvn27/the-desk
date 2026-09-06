@@ -5,6 +5,7 @@ import type {
   Mistake,
   Snapshot,
   Task,
+  Teacher,
   TeacherEvidence,
 } from "../domain/contracts";
 
@@ -16,6 +17,7 @@ export function sessionKit(
     mistakes?: Mistake[];
     concepts?: Concept[];
     attempts?: Attempt[];
+    teachers?: Teacher[];
     teacherEvidence?: TeacherEvidence[];
   },
 ) {
@@ -102,6 +104,9 @@ export function sessionKit(
         b.createdAt.localeCompare(a.createdAt),
     )
     .slice(0, 5);
+  const teachers = [...(state.teachers ?? [])].filter((teacher) =>
+    teacher.classIds.includes(task.classId),
+  );
   return {
     linkedSources,
     classSources,
@@ -110,6 +115,7 @@ export function sessionKit(
     concepts,
     attempts,
     assessments,
+    teachers,
     teacherEvidence,
   };
 }

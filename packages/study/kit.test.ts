@@ -8,6 +8,7 @@ import type {
   Task,
   Source,
   StudySession,
+  Teacher,
   TeacherEvidence,
 } from "../domain/contracts";
 import { sessionKit } from "./kit";
@@ -331,5 +332,38 @@ test("session kit keeps linked teacher evidence separate from Desk context", () 
       teacherEvidence,
     }).teacherEvidence.map((evidence) => evidence.id),
     ["linked-evidence"],
+  );
+});
+
+test("session kit includes explicit same-class teachers and excludes other classes", () => {
+  const teachers: Teacher[] = [
+    {
+      id: "physics-teacher",
+      name: "Dr. Rivera",
+      email: "rivera@example.edu",
+      notes: "Physics instructor",
+      classIds: [task.classId],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "history-teacher",
+      name: "Ms. Lee",
+      email: null,
+      notes: "History instructor",
+      classIds: ["history"],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  assert.deepEqual(
+    sessionKit(task, { sources: [], sessions: [], teachers }).teachers.map(
+      (teacher) => teacher.id,
+    ),
+    ["physics-teacher"],
   );
 });

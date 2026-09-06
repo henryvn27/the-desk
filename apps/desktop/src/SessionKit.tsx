@@ -161,6 +161,21 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.teachers.length > 0 && (
+        <div>
+          <h4>Teacher context</h4>
+          <p className="muted">
+            Linked identity only; this does not infer a teacher's grading
+            patterns.
+          </p>
+          {kit.teachers.map((teacher) => (
+            <p key={teacher.id}>
+              {teacher.name}
+              {teacher.email && <> · {teacher.email}</>}
+            </p>
+          ))}
+        </div>
+      )}
       {kit.teacherEvidence.length > 0 && (
         <div>
           <h4>Teacher evidence</h4>
@@ -207,6 +222,7 @@ export function SessionKit({
         !kit.concepts.length &&
         !kit.attempts.length &&
         !kit.assessments.length &&
+        !kit.teachers.length &&
         !kit.teacherEvidence.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source

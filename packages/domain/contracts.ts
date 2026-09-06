@@ -90,6 +90,20 @@ export type Assessment = AssessmentInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const teacherInput = z.object({
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().max(500).nullable(),
+  notes: z.string().trim().max(5000),
+  classIds: z.array(id).min(1).max(100),
+});
+export type TeacherInput = z.infer<typeof teacherInput>;
+export type Teacher = TeacherInput & {
+  id: string;
+  revision: number;
+  authority: "user-entered";
+  createdAt: string;
+  updatedAt: string;
+};
 export const evidenceKind = z.enum([
   "graded-work",
   "teacher-feedback",
@@ -100,6 +114,7 @@ export const evidenceSource = z.enum(["manual", "text-import", "image-import"]);
 export const teacherEvidenceInput = z
   .object({
     classId: id,
+    teacherId: id.nullable().optional(),
     assessmentId: id.nullable(),
     taskId: id.nullable(),
     title: z.string().trim().min(1).max(500),
@@ -457,6 +472,7 @@ export type Snapshot = {
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
   assessments: Assessment[];
+  teachers: Teacher[];
   teacherEvidence: TeacherEvidence[];
   authorityClaims: AuthorityClaim[];
   authorityResolutions: AuthorityResolution[];
@@ -557,6 +573,18 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("assessment.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("teacher.create"), input: teacherInput }),
+  z.object({
+    type: z.literal("teacher.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: teacherInput,
+  }),
+  z.object({
+    type: z.literal("teacher.forget"),
     id,
     revision: z.number().int().nonnegative(),
   }),

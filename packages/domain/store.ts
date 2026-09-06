@@ -18,6 +18,7 @@ import {
   type GradeCategory,
   type GradeEntry,
   type Assessment,
+  type Teacher,
   type TeacherEvidence,
   type AuthorityClaim,
   type AuthorityResolution,
@@ -43,7 +44,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 31) {
+    if (version > 32) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -139,6 +140,11 @@ export class DeskStore {
       CREATE TABLE IF NOT EXISTS authority_claims(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS authority_resolutions(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,fact TEXT NOT NULL,claim_id TEXT NOT NULL REFERENCES authority_claims(id),data TEXT NOT NULL,UNIQUE(task_id,fact));
       PRAGMA user_version=31; COMMIT;`);
+    if (version <= 31)
+      this.db.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS teachers(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS teacher_classes(teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,PRIMARY KEY(teacher_id,class_id));
+      PRAGMA user_version=32; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -258,6 +264,10 @@ export class DeskStore {
         .prepare("SELECT data FROM assessments ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as Assessment),
+      teachers: this.db
+        .prepare("SELECT data FROM teachers ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Teacher),
       teacherEvidence: this.db
         .prepare("SELECT data FROM teacher_evidence ORDER BY rowid")
         .all()
@@ -572,6 +582,85 @@ export class DeskStore {
         }
       }
       if (
+        c.type === "teacher.create" ||
+        c.type === "teacher.update" ||
+        c.type === "teacher.forget"
+      ) {
+        const previous =
+          c.type === "teacher.create"
+            ? undefined
+            : state.teachers.find((teacher) => teacher.id === c.id);
+        if (
+          c.type !== "teacher.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This teacher changed elsewhere. Reopen it before saving.",
+          );
+        const input = c.type === "teacher.forget" ? undefined : c.input;
+        const classIds = [
+          ...new Set(input?.classIds ?? previous?.classIds ?? []),
+        ];
+        if (
+          input &&
+          (classIds.length === 0 ||
+            classIds.some(
+              (classId) =>
+                !state.classes.some((course) => course.id === classId),
+            ))
+        )
+          throw Error("Link this teacher to at least one existing class.");
+        if (
+          input &&
+          state.teachers.some(
+            (teacher) =>
+              teacher.id !== previous?.id &&
+              teacher.name.toLowerCase() === input.name.toLowerCase() &&
+              teacher.classIds.some((classId) => classIds.includes(classId)),
+          )
+        )
+          throw Error(
+            "A teacher with this name already exists in one of these classes.",
+          );
+        if (
+          previous &&
+          state.teacherEvidence.some(
+            (evidence) =>
+              evidence.teacherId === previous.id &&
+              (input === undefined || !classIds.includes(evidence.classId)),
+          )
+        )
+          throw Error(
+            "This teacher has linked evidence. Edit or unlink the evidence before removing that class or forgetting the teacher.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const teacher: Teacher = {
+            ...input,
+            classIds,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            authority: "user-entered",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO teachers VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(entityId, JSON.stringify(teacher));
+          this.db
+            .prepare("DELETE FROM teacher_classes WHERE teacher_id=?")
+            .run(entityId);
+          for (const classId of classIds)
+            this.db
+              .prepare("INSERT INTO teacher_classes VALUES(?,?)")
+              .run(entityId, classId);
+        } else {
+          this.db.prepare("DELETE FROM teachers WHERE id=?").run(entityId);
+        }
+      }
+      if (
         c.type === "evidence.create" ||
         c.type === "evidence.update" ||
         c.type === "evidence.forget"
@@ -591,6 +680,18 @@ export class DeskStore {
         const classId = input?.classId ?? previous?.classId;
         if (!classId || !state.classes.some((course) => course.id === classId))
           throw Error("Choose an existing class for this teacher evidence.");
+        const teacherId =
+          input && Object.prototype.hasOwnProperty.call(input, "teacherId")
+            ? (input.teacherId ?? null)
+            : (previous?.teacherId ?? null);
+        if (
+          teacherId &&
+          !state.teachers.some(
+            (teacher) =>
+              teacher.id === teacherId && teacher.classIds.includes(classId),
+          )
+        )
+          throw Error("The linked teacher must teach the selected class.");
         if (
           input?.assessmentId &&
           !state.assessments.some(
@@ -628,6 +729,7 @@ export class DeskStore {
         if (input) {
           const evidence: TeacherEvidence = {
             ...input,
+            teacherId,
             conceptIds,
             id: entityId,
             revision: (previous?.revision ?? -1) + 1,

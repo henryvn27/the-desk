@@ -105,6 +105,10 @@ export function Evidence({
             {new Date(evidence.capturedAt).toLocaleString()}
           </p>
           <p>
+            {evidence.teacherId
+              ? `Teacher: ${data.teachers.find((teacher) => teacher.id === evidence.teacherId)?.name ?? "Unknown"}`
+              : "No teacher linked"}
+            {" · "}
             {evidence.assessmentId
               ? `Assessment: ${data.assessments.find((assessment) => assessment.id === evidence.assessmentId)?.title ?? "Unknown"}`
               : "No assessment linked"}
@@ -185,6 +189,9 @@ function EvidenceForm({
   const concepts = data.concepts.filter(
     (concept) => concept.classId === classId,
   );
+  const teachers = data.teachers.filter((teacher) =>
+    teacher.classIds.includes(classId),
+  );
   return (
     <form
       key={existing?.id ?? "new-evidence"}
@@ -196,6 +203,7 @@ function EvidenceForm({
         submit(
           teacherEvidenceInput.parse({
             classId: String(values.get("classId")),
+            teacherId: String(values.get("teacherId")) || null,
             assessmentId: String(values.get("assessmentId")) || null,
             taskId: String(values.get("taskId")) || null,
             title: String(values.get("title")),
@@ -269,6 +277,21 @@ function EvidenceForm({
           {Object.entries(sourceLabels).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Teacher (optional)
+        <select
+          name="teacherId"
+          aria-label="Evidence teacher"
+          defaultValue={existing?.teacherId ?? ""}
+        >
+          <option value="">No linked teacher</option>
+          {teachers.map((teacher) => (
+            <option key={teacher.id} value={teacher.id}>
+              {teacher.name}
             </option>
           ))}
         </select>
