@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { plan } from "./index";
-import type { Task } from "../domain/contracts";
+import { plan, planWeek } from "./index";
+import type { StudySession, Task } from "../domain/contracts";
 const task = (
   id: string,
   minutes: number,
@@ -388,4 +388,115 @@ test("earlier imminent deadlines remain ahead of later high-importance work", ()
     ["early", "later"],
   );
   assert.equal(result.overloadMinutes, 0);
+});
+
+test("unfinished session work carries into the next plan with an explanation", () => {
+  const result = plan(
+    [
+      { ...task("new", 30, null), importance: "high" },
+      { ...task("carry", 30, null), importance: "normal" },
+    ],
+    new Date("2026-09-07T08:00:00Z"),
+    new Date("2026-09-07T09:00:00Z"),
+    0,
+    new Date("2026-09-07T09:00:00Z"),
+    {
+      gradeCategories: [],
+      gradeEntries: [],
+      sessions: [
+        {
+          id: "session",
+          taskId: "carry",
+          startedAt: "2026-09-06T08:00:00Z",
+          pausedAt: null,
+          pausedMs: 0,
+          endedAt: "2026-09-06T08:25:00Z",
+          actualMinutes: 25,
+          completionReported: false,
+        } satisfies StudySession,
+      ],
+    },
+  );
+  assert.equal(result.blocks[0]!.taskId, "carry");
+  assert.match(result.blocks[0]!.why, /unfinished study session/);
+});
+
+test("active or completed sessions do not create carryover priority", () => {
+  const base = {
+    gradeCategories: [],
+    gradeEntries: [],
+  };
+  const tasks = [
+    { ...task("new", 30, null), importance: "high" as const },
+    { ...task("carry", 30, null), importance: "normal" as const },
+  ];
+  const args = [
+    {
+      id: "session",
+      taskId: "carry",
+      startedAt: "2026-09-06T08:00:00Z",
+      pausedAt: null,
+      pausedMs: 0,
+      endedAt: null,
+      actualMinutes: null,
+    },
+    {
+      id: "session-2",
+      taskId: "carry",
+      startedAt: "2026-09-06T08:00:00Z",
+      pausedAt: null,
+      pausedMs: 0,
+      endedAt: "2026-09-06T08:25:00Z",
+      actualMinutes: 25,
+      completionReported: true,
+    },
+  ] satisfies StudySession[];
+  for (const session of args) {
+    const result = plan(
+      tasks,
+      new Date("2026-09-07T08:00:00Z"),
+      new Date("2026-09-07T09:00:00Z"),
+      0,
+      new Date("2026-09-07T09:00:00Z"),
+      { ...base, sessions: [session] },
+    );
+    assert.equal(result.blocks[0]!.taskId, "new");
+    assert.doesNotMatch(result.blocks[0]!.why, /unfinished study session/);
+  }
+});
+
+test("weekly planning carries unfinished session work into the next available day", () => {
+  const now = new Date("2026-09-07T08:00:00Z");
+  const result = planWeek(
+    [
+      { ...task("new", 30, null), importance: "high" },
+      { ...task("carry", 30, null), importance: "normal" },
+    ],
+    now,
+    {
+      studyStart: "08:00",
+      sleepCutoff: "09:00",
+      studyDays: [1],
+      bufferPercent: 5,
+    },
+    [],
+    {
+      gradeCategories: [],
+      gradeEntries: [],
+      sessions: [
+        {
+          id: "session",
+          taskId: "carry",
+          startedAt: "2026-09-06T08:00:00Z",
+          pausedAt: null,
+          pausedMs: 0,
+          endedAt: "2026-09-06T08:25:00Z",
+          actualMinutes: 25,
+          completionReported: false,
+        } satisfies StudySession,
+      ],
+    },
+  );
+  assert.equal(result.blocks[0]!.taskId, "carry");
+  assert.match(result.blocks[0]!.why, /unfinished study session/);
 });

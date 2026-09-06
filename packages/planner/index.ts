@@ -9,11 +9,13 @@ import {
   type Mistake,
   type Concept,
   type Assessment,
+  type StudySession,
 } from "../domain/contracts";
 type GradeData = Pick<Snapshot, "gradeCategories" | "gradeEntries"> & {
   mistakes?: Mistake[];
   concepts?: Concept[];
   assessments?: Assessment[];
+  sessions?: StudySession[];
 };
 const noGrades: GradeData = { gradeCategories: [], gradeEntries: [] };
 const optional = (t: Task) => t.workKind === "optional-review";
@@ -63,6 +65,16 @@ function assessmentPriority(
       return Math.max(score, 3);
     return Math.max(score, 2);
   }, 0);
+}
+function unfinishedSessionPriority(task: Task, sessions: StudySession[]) {
+  return sessions.some(
+    (session) =>
+      session.taskId === task.id &&
+      session.endedAt !== null &&
+      session.completionReported === false,
+  )
+    ? 1
+    : 0;
 }
 /** Local wall-clock boundaries use the OS timezone, including its DST rules. */
 export function todayWindow(now: Date, raw: PlanningPreferences) {
@@ -213,6 +225,7 @@ export function plan(
   const mistakes = grades.mistakes ?? [];
   const concepts = grades.concepts ?? [];
   const assessments = grades.assessments ?? [];
+  const sessions = grades.sessions ?? [];
   const eligible = tasks.filter(
     (t) => !t.completed && t.deadlineConfirmed && !optional(t),
   );
@@ -254,6 +267,8 @@ export function plan(
         Date.parse(b.dueAt) <= +urgencyEnd
           ? Date.parse(a.dueAt) - Date.parse(b.dueAt)
           : 0) ||
+        unfinishedSessionPriority(b, sessions) -
+          unfinishedSessionPriority(a, sessions) ||
         importance(b) - importance(a) ||
         (useGradeInfluence ? influenceScore(b) - influenceScore(a) : 0) ||
         Number(b.workKind === "assessment") -
@@ -284,7 +299,7 @@ export function plan(
         start: new Date(cursor).toISOString(),
         end: new Date(cursor + minutes * 60000).toISOString(),
         minutes,
-        why: `${conceptPriority(task, concepts, +urgencyEnd) > 0 ? "Prioritized because a linked or due concept needs review. " : ""}${mistakePriority(task, mistakes, +urgencyEnd) > 0 ? "Prioritized because a linked or due mistake needs review. " : ""}${assessmentPriority(task, assessments, +urgencyEnd) > 0 ? "Prioritized because it is linked to an upcoming assessment. " : ""}${priorityReason(task)} ${influences.get(task.id) ? `In the recorded ${influences.get(task.id)!.category} model, a 10-percentage-point score change on this item shifts the course model by ${influences.get(task.id)!.pointsPerTen.toFixed(2)} percentage points; this is potential influence, not predicted improvement. ` : ""}${useGradeInfluence ? "After imminent deadlines and your importance choice, potential influence is divided by days until due (minimum one; flexible work uses seven). " : "Incomplete grade context: using deadline and importance ordering. "}`,
+        why: `${conceptPriority(task, concepts, +urgencyEnd) > 0 ? "Prioritized because a linked or due concept needs review. " : ""}${mistakePriority(task, mistakes, +urgencyEnd) > 0 ? "Prioritized because a linked or due mistake needs review. " : ""}${assessmentPriority(task, assessments, +urgencyEnd) > 0 ? "Prioritized because it is linked to an upcoming assessment. " : ""}${unfinishedSessionPriority(task, sessions) > 0 ? "Continued from an unfinished study session. " : ""}${priorityReason(task)} ${influences.get(task.id) ? `In the recorded ${influences.get(task.id)!.category} model, a 10-percentage-point score change on this item shifts the course model by ${influences.get(task.id)!.pointsPerTen.toFixed(2)} percentage points; this is potential influence, not predicted improvement. ` : ""}${useGradeInfluence ? "After imminent deadlines and your importance choice, potential influence is divided by days until due (minimum one; flexible work uses seven). " : "Incomplete grade context: using deadline and importance ordering. "}`,
       });
       cursor += minutes * 60000;
       remaining -= minutes;
