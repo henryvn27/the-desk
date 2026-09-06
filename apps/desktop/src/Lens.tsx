@@ -5,17 +5,27 @@ import type {
   LensOverlayMark,
   LensHistoryTurn,
 } from "../../../packages/intelligence/lens-provider";
+import type { Command } from "../../../packages/domain/contracts";
+import { lensAnswerSourceInput } from "../../../packages/intelligence/lens-actions";
 type Point = { x: number; y: number };
 export function Lens({
   title,
   className,
   tutoringMode,
   saveTutoringMode,
+  classId,
+  taskId,
+  taskResource,
+  save,
 }: {
   tutoringMode: TutoringMode;
   saveTutoringMode: (mode: TutoringMode) => Promise<unknown>;
   title: string;
   className: string;
+  classId?: string;
+  taskId?: string;
+  taskResource?: boolean;
+  save: (command: Command) => Promise<unknown>;
 }) {
   const [savingMode, setSavingMode] = useState(false);
   const [paths, setPaths] = useState<Point[][]>([]),
@@ -29,6 +39,7 @@ export function Lens({
     [marks, setMarks] = useState<LensOverlayMark[]>([]),
     [history, setHistory] = useState<LensHistoryTurn[]>([]),
     [busy, setBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const width = window.innerWidth,
     height = window.innerHeight;
   const point = (e: React.PointerEvent): Point => ({
@@ -258,7 +269,49 @@ export function Lens({
         )}
         {answer && (
           <div className="lens-answer" aria-live="polite">
-            {answer}
+            <div className="lens-answer-text">{answer}</div>
+            <div className="lens-actions" aria-label="Lens actions">
+              {classId && (
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setStatus("");
+                    try {
+                      await save({
+                        type: "source.create",
+                        input: lensAnswerSourceInput(
+                          answer,
+                          classId,
+                          taskId ?? null,
+                        ),
+                      });
+                      setStatus("Lens answer saved as a source.");
+                    } catch (error) {
+                      setStatus(userError(error));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
+                >
+                  Save answer as source
+                </button>
+              )}
+              {taskId && taskResource && (
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={() =>
+                    void window.desk
+                      .openResource(taskId)
+                      .catch((error) => setStatus(userError(error)))
+                  }
+                >
+                  Open task resource
+                </button>
+              )}
+            </div>
           </div>
         )}
         <form

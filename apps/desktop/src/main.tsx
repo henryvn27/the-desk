@@ -318,6 +318,10 @@ function App() {
         className={
           data.classes.find((c) => c.id === activeTask?.classId)?.name ?? ""
         }
+        classId={activeTask?.classId}
+        taskId={activeTask?.id}
+        taskResource={Boolean(activeTask?.resource)}
+        save={(command) => act(command, true)}
       />
     );
   if (kind === "controller")

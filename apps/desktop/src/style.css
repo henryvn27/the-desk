@@ -400,6 +400,12 @@ body:has(.lens),
   max-height: 200px;
   overflow: auto;
 }
+.lens-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
 button[aria-pressed="true"] {
   background: #e8e2d7;
 }
