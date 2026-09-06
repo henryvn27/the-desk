@@ -160,16 +160,28 @@ app.whenReady().then(() => {
     )
       throw Error("Untrusted request");
   };
-  const credentials = new ProviderCredentials(app.getPath("userData"));
+  const credentials = new ProviderCredentials(
+    app.getPath("userData"),
+    app.isPackaged || process.env.DESK_ENABLE_DEVELOPMENT_KEY !== "1"
+      ? undefined
+      : join(app.getAppPath(), ".env.local"),
+  );
   ipcMain.handle("desk:provider-status", (event) => {
     check(event);
     return credentials.status();
   });
-  ipcMain.handle("desk:provider-save", (event, key) => {
+  ipcMain.handle("desk:provider-import", async (event) => {
     check(event);
-    if (event.sender !== main?.webContents)
+    if (event.sender !== main?.webContents || !main)
       throw Error("Open Settings to connect a provider.");
-    credentials.save(key);
+    const result = await dialog.showOpenDialog(main, {
+      title: "Import OpenRouter key",
+      properties: ["openFile"],
+      buttonLabel: "Import key",
+    });
+    if (result.canceled || !result.filePaths[0]) return false;
+    credentials.importFile(result.filePaths[0]);
+    return true;
   });
   ipcMain.handle("desk:provider-remove", (event) => {
     check(event);

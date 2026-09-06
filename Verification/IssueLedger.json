@@ -38,11 +38,11 @@
     {
       "id": "LENS-001",
       "area": "lens",
-      "title": "Live AI grounding and overlay teaching require a configured provider and screen permission",
+      "title": "Live OpenRouter authentication and Lens grounding unverified",
       "severity": "high",
       "status": "open",
-      "evidence": "Provider adapter and UI are implemented; only injected transport tests and no-key live fallback tested. No live API key consumed.",
-      "notes": "Configure provider through app Settings, never paste secrets into chat. Continue independent V1 lanes."
+      "evidence": "2026-09-06: bounded text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 77 automated tests and installed synthetic import/routing/restart/disconnect smoke pass.",
+      "notes": "No further live retries until credential/account state changes. Do not expose or copy the developer key. Account logging settings and real grounding remain unverified; independent V1 work continues."
     },
     {
       "id": "QA-LENS-002",

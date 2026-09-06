@@ -1,69 +1,75 @@
 import { useEffect, useState } from "react";
+import type { DeskAPI } from "../../../packages/domain/contracts";
 export function ProviderSettings() {
-  const [configured, setConfigured] = useState(false),
-    [secure, setSecure] = useState(false),
-    [key, setKey] = useState(""),
-    [status, setStatus] = useState("");
+  const [connection, setConnection] = useState<
+    Awaited<ReturnType<DeskAPI["providerStatus"]>>
+  >({ configured: false, secureStorage: false, source: null });
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     void window.desk
       .providerStatus()
-      .then((s) => {
-        setConfigured(s.configured);
-        setSecure(s.secureStorage);
-      })
+      .then(setConnection)
       .catch(() => setStatus("Provider settings could not be loaded."));
   }, []);
+  async function change(action: () => Promise<unknown>) {
+    setBusy(true);
+    setStatus("");
+    try {
+      await action();
+      setConnection(await window.desk.providerStatus());
+    } catch {
+      setStatus(
+        "The connection could not be changed. Check the key file and secure local storage.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <section>
-      <h2>AI connection</h2>
+      <h2>AI connection · OpenRouter</h2>
       <p>
-        {configured
-          ? "A provider key is saved on this computer. Live connection is verified when a request succeeds."
-          : "Connect an OpenAI API key to use Lens assistance in this development build."}
+        {connection.source === "development-env"
+          ? "This development session uses the locally configured OpenRouter key. Packaged apps do not load it."
+          : connection.configured
+            ? "An OpenRouter user key is saved on this computer. A successful request verifies the live connection."
+            : "Import your OpenRouter key from a text file or an environment file containing OPENROUTER_API_KEY."}
       </p>
       <p className="muted">
-        API usage is billed by the provider. Your key stays in secure local
-        storage. Lens sends your question and context when you press Ask; a
+        The native file picker reads the key into secure local storage. It is
+        never returned to this interface. API usage is billed to your OpenRouter
+        account.
+      </p>
+      <p>
+        Desk chooses approved models and endpoints. Requests require zero data
+        retention and deny provider data collection. OpenRouter account-level
+        logging settings still apply.
+      </p>
+      <p className="muted">
+        Lens sends your question and session context when you press Ask. A
         captured screen is shared only when you select that option.
       </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void window.desk
-            .saveProviderKey(key)
-            .then(() => {
-              setKey("");
-              setConfigured(true);
-              setStatus("Key saved securely.");
-            })
-            .catch(() =>
-              setStatus(
-                "Could not save this key. Check its format and secure storage.",
-              ),
-            );
-        }}
-      >
-        <label>
-          OpenAI API key
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            minLength={20}
-            maxLength={500}
-          />
-        </label>
+      {connection.source !== "development-env" && (
         <div className="actions">
-          <button disabled={!secure || key.length < 20}>Save key</button>
-          {configured && (
+          <button
+            disabled={busy || !connection.secureStorage}
+            onClick={() =>
+              void change(async () => {
+                if (await window.desk.importProviderKey())
+                  setStatus("OpenRouter key imported securely.");
+              })
+            }
+          >
+            Import OpenRouter key
+          </button>
+          {connection.configured && (
             <button
-              type="button"
+              disabled={busy}
               onClick={() =>
-                void window.desk.removeProviderKey().then(() => {
-                  setConfigured(false);
-                  setStatus("Provider disconnected.");
+                void change(async () => {
+                  await window.desk.removeProviderKey();
+                  setStatus("OpenRouter disconnected.");
                 })
               }
             >
@@ -71,8 +77,10 @@ export function ProviderSettings() {
             </button>
           )}
         </div>
-      </form>
-      {!secure && <p>Secure storage is unavailable. A key cannot be saved.</p>}
+      )}
+      {!connection.secureStorage && (
+        <p>Secure storage is unavailable. A user key cannot be saved.</p>
+      )}
       {status && <p role="status">{status}</p>}
     </section>
   );

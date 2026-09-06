@@ -630,11 +630,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence; apps/desktop; packages/domain",
-      "automated": "npm run check: 27 tests including provider failure and migration contracts",
-      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
-      "mac": "Unsigned installed first-slice development smoke",
+      "automated": "77 tests plus typecheck/lint/build; strict approved routing, canonical identities, structured output, privacy constraints and telemetry failure handling.",
+      "live": "Bounded OpenRouter text/synthetic-image checks returned HTTP 401; no successful live answer, grounding or charged usage verified.",
+      "mac": "Unsigned installed synthetic OpenRouter import/routing/restart/disconnect smoke; no renderer key entry, Lens import denied, package environment/credential file exclusion verified.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+      "blocker": "Live authentication rejected (HTTP 401); quality/grounding, workload escalation, billing reconciliation and remaining full criteria stay open."
     },
     {
       "id": "LENS-004",
@@ -950,11 +950,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence; apps/desktop; packages/domain",
-      "automated": "npm run check: 27 tests including provider failure and migration contracts",
-      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
-      "mac": "Unsigned installed first-slice development smoke",
+      "automated": "77 tests plus typecheck/lint/build; strict approved routing, canonical identities, structured output, privacy constraints and telemetry failure handling.",
+      "live": "Bounded OpenRouter text/synthetic-image checks returned HTTP 401; no successful live answer, grounding or charged usage verified.",
+      "mac": "Unsigned installed synthetic OpenRouter import/routing/restart/disconnect smoke; no renderer key entry, Lens import denied, package environment/credential file exclusion verified.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+      "blocker": "Live authentication rejected (HTTP 401); quality/grounding, workload escalation, billing reconciliation and remaining full criteria stay open."
     },
     {
       "id": "AI-001",
@@ -968,11 +968,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence; apps/desktop; packages/domain",
-      "automated": "npm run check: 27 tests including provider failure and migration contracts",
-      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
-      "mac": "Unsigned installed first-slice development smoke",
+      "automated": "77 tests plus typecheck/lint/build; strict approved routing, canonical identities, structured output, privacy constraints and telemetry failure handling.",
+      "live": "Bounded OpenRouter text/synthetic-image checks returned HTTP 401; no successful live answer, grounding or charged usage verified.",
+      "mac": "Unsigned installed synthetic OpenRouter import/routing/restart/disconnect smoke; no renderer key entry, Lens import denied, package environment/credential file exclusion verified.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+      "blocker": "Live authentication rejected (HTTP 401); quality/grounding, workload escalation, billing reconciliation and remaining full criteria stay open."
     },
     {
       "id": "WINDOW-001",

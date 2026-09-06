@@ -1,3 +1,4 @@
+import { inferenceRoute } from "./routing";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -25,17 +26,28 @@ const modelOutput = {
 };
 
 function response(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({ model: LENS_MODEL, ...(body as object) }),
+    {
+      status,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 }
 
-test("sends one strict, stored-disabled Responses request with normalized inputs", async () => {
+test("sends one strict OpenRouter request with approved multimodal routing and privacy controls", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const fetcher: typeof fetch = async (url, init) => {
     calls.push({ url: String(url), init });
-    return response({ output_text: JSON.stringify(modelOutput) });
+    return response({
+      model: "google/gemini-3.8-flash",
+      choices: [
+        {
+          finish_reason: "stop",
+          message: { content: JSON.stringify(modelOutput) },
+        },
+      ],
+    });
   };
 
   const result = await askLens(
@@ -54,38 +66,38 @@ test("sends one strict, stored-disabled Responses request with normalized inputs
   );
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0]!.url, "https://api.openai.com/v1/responses");
+  assert.equal(calls[0]!.url, "https://openrouter.ai/api/v1/chat/completions");
   const body = JSON.parse(String(calls[0]!.init!.body));
-  assert.equal(body.model, LENS_MODEL);
-  assert.equal(body.store, false);
+  assert.equal(body.model, "google/gemini-3.8-flash");
+  assert.deepEqual(body.provider, inferenceRoute("MULTIMODAL").provider);
+  assert.equal(body.models, undefined);
   assert.equal(body.tools, undefined);
-  assert.equal(body.text.format.type, "json_schema");
-  assert.equal(body.text.format.strict, true);
-  assert.equal(body.input.at(-1).content[1].type, "input_image");
+  assert.equal(body.response_format.type, "json_schema");
+  assert.equal(body.response_format.json_schema.strict, true);
+  assert.equal(body.messages.at(-1).content[1].type, "image_url");
   assert.equal(result.explanation, modelOutput.explanation);
   assert.deepEqual(result.overlays, modelOutput.overlays);
   assert.equal(result.usage, null);
   assert.equal(result.cost, null);
 });
 
-test("reports actual cached token usage and dated model cost", async () => {
+test("reports actual cached token usage and OpenRouter-reported cost", async () => {
   const events: LensTelemetryEvent[] = [];
   const result = await askLens({ question: "Teach me." }, "test-key", {
     fetch: async () =>
       response({
-        output: [
+        choices: [
           {
-            type: "message",
-            content: [
-              { type: "output_text", text: JSON.stringify(modelOutput) },
-            ],
+            finish_reason: "stop",
+            message: { content: JSON.stringify(modelOutput) },
           },
         ],
         usage: {
-          input_tokens: 1_000,
-          input_tokens_details: { cached_tokens: 200 },
-          output_tokens: 500,
+          prompt_tokens: 1_000,
+          prompt_tokens_details: { cached_tokens: 200 },
+          completion_tokens: 500,
           total_tokens: 1_500,
+          cost: 0.002865,
         },
       }),
     onTelemetry: async (event) => {
@@ -99,8 +111,8 @@ test("reports actual cached token usage and dated model cost", async () => {
     outputTokens: 500,
     totalTokens: 1_500,
   });
-  assert.equal(result.cost?.estimatedUsd, 0.002865);
-  assert.equal(result.cost?.rateDate, "2026-09-05");
+  assert.equal(result.cost?.reportedUsd, 0.002865);
+  assert.equal(result.cost?.source, "openrouter-usage");
   assert.equal(events.length, 1);
   assert.equal(events[0]!.success, true);
   assert.deepEqual(events[0]!.usage, result.usage);
@@ -176,12 +188,25 @@ test("classifies refusal, incomplete, and malformed structured output", async (t
     [
       "refusal",
       {
-        output: [{ content: [{ type: "refusal", refusal: "I cannot help." }] }],
+        choices: [
+          {
+            finish_reason: "content_filter",
+            message: { refusal: "I cannot help." },
+          },
+        ],
       },
       "refusal",
     ],
-    ["incomplete", { status: "incomplete" }, "incomplete"],
-    ["malformed", { output_text: "{broken" }, "malformed_response"],
+    [
+      "incomplete",
+      { choices: [{ finish_reason: "length", message: { content: "" } }] },
+      "incomplete",
+    ],
+    [
+      "malformed",
+      { choices: [{ finish_reason: "stop", message: { content: "{broken" } }] },
+      "malformed_response",
+    ],
   ];
   for (const [name, body, expectedCode] of cases)
     await t.test(name, async () => {
@@ -301,7 +326,15 @@ test("does not hide telemetry persistence failures", async () => {
   const storageFailure = new Error("telemetry storage failed");
   await assert.rejects(
     askLens({ question: "Help." }, "test-key", {
-      fetch: async () => response({ output_text: JSON.stringify(modelOutput) }),
+      fetch: async () =>
+        response({
+          choices: [
+            {
+              finish_reason: "stop",
+              message: { content: JSON.stringify(modelOutput) },
+            },
+          ],
+        }),
       onTelemetry: async () => {
         throw storageFailure;
       },

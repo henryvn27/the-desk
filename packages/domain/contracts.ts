@@ -324,8 +324,12 @@ export interface DeskAPI {
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
   canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
-  providerStatus(): Promise<{ configured: boolean; secureStorage: boolean }>;
-  saveProviderKey(key: string): Promise<void>;
+  providerStatus(): Promise<{
+    configured: boolean;
+    secureStorage: boolean;
+    source: "development-env" | "saved-user-key" | null;
+  }>;
+  importProviderKey(): Promise<boolean>;
   removeProviderKey(): Promise<void>;
   captureScreen(): Promise<LensCapture>;
   snapshot(): Promise<Snapshot>;

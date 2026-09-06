@@ -1,13 +1,8 @@
 import { z } from "zod";
+import { APPROVED_MODELS, CANONICAL_MODELS, inferenceRoute, type RoutingTier } from "./routing";
 
-export const LENS_MODEL = "gpt-5.4-mini" as const;
+export const LENS_MODEL = "openai/gpt-5.6-terra" as const;
 export const LENS_TIMEOUT_MS = 45_000;
-export const LENS_PRICE_DATE = "2026-09-05" as const;
-export const LENS_RATES_PER_MILLION = {
-  input: 0.75,
-  cachedInput: 0.075,
-  output: 4.5,
-} as const;
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
@@ -91,22 +86,16 @@ export type LensUsage = z.infer<typeof lensUsageSchema>;
 
 export const lensCostSchema = z
   .object({
-    estimatedUsd: z.number().nonnegative(),
+    reportedUsd: z.number().finite().nonnegative(),
     currency: z.literal("USD"),
-    rateDate: z.literal(LENS_PRICE_DATE),
-    ratesPerMillionTokens: z
-      .object({
-        input: z.literal(LENS_RATES_PER_MILLION.input),
-        cachedInput: z.literal(LENS_RATES_PER_MILLION.cachedInput),
-        output: z.literal(LENS_RATES_PER_MILLION.output),
-      })
-      .strict(),
+    source: z.literal("openrouter-usage"),
   })
   .strict();
 export type LensCost = z.infer<typeof lensCostSchema>;
 
 export const lensResponseSchema = lensModelOutputSchema.extend({
-  model: z.literal(LENS_MODEL),
+  model: z.enum(APPROVED_MODELS),
+  resolvedModel: z.string(),
   usage: lensUsageSchema.nullable(),
   cost: lensCostSchema.nullable(),
 });
@@ -143,7 +132,8 @@ export class LensProviderError extends Error {
 }
 
 export type LensTelemetryEvent = {
-  model: typeof LENS_MODEL;
+  resolvedModel?: string;
+  model: (typeof APPROVED_MODELS)[number];
   startedAt: string;
   latencyMs: number;
   success: boolean;
@@ -154,6 +144,7 @@ export type LensTelemetryEvent = {
 };
 
 export type AskLensOptions = {
+  tier?: RoutingTier;
   fetch?: typeof fetch;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -203,14 +194,9 @@ const OUTPUT_JSON_SCHEMA = {
   },
 } as const;
 
-type ResponseEnvelope = {
-  status?: unknown;
-  output_text?: unknown;
-  output?: unknown;
-  usage?: unknown;
-};
+type ResponseEnvelope = { choices?: unknown; usage?: unknown; model?: unknown };
 
-/** Sends one non-retried Responses API request and validates its structured reply. */
+/** Sends one non-retried OpenRouter request and validates its structured reply. */
 export async function askLens(
   input: LensInput,
   apiKey: string,
@@ -222,9 +208,12 @@ export async function askLens(
   if (!apiKey.trim())
     throw new LensProviderError(
       "invalid_input",
-      "An OpenAI API key is required.",
+      "An OpenRouter API key is required.",
     );
 
+  const route = inferenceRoute(
+    options.tier ?? (input.imageDataUrl ? "MULTIMODAL" : "STANDARD"),
+  );
   const timeoutMs = options.timeoutMs ?? LENS_TIMEOUT_MS;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
     throw new LensProviderError(
@@ -259,15 +248,18 @@ export async function askLens(
   }, timeoutMs);
 
   try {
-    const response = await fetcher("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const response = await fetcher(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(buildRequest(parsedInput.data, route)),
+        signal: controller.signal,
       },
-      body: JSON.stringify(buildRequest(parsedInput.data)),
-      signal: controller.signal,
-    });
+    );
     httpStatus = response.status;
     if (!response.ok) throw httpError(response.status);
 
@@ -277,25 +269,40 @@ export async function askLens(
     } catch {
       throw new LensProviderError(
         "malformed_response",
-        "OpenAI returned an unreadable response.",
+        "OpenRouter returned an unreadable response.",
         response.status,
       );
     }
 
     const envelope = asEnvelope(raw);
     usage = parseUsage(envelope.usage);
-    cost = usage ? estimateCost(usage) : null;
+    const rawUsage = envelope.usage as { cost?: unknown } | undefined;
+    const parsedCost = lensCostSchema.safeParse({
+      reportedUsd: rawUsage?.cost,
+      currency: "USD",
+      source: "openrouter-usage",
+    });
+    cost = parsedCost.success ? parsedCost.data : null;
+    if (
+      envelope.model !== route.model &&
+      envelope.model !== CANONICAL_MODELS[route.model]
+    )
+      throw new LensProviderError(
+        "malformed_response",
+        "OpenRouter returned an unexpected model.",
+      );
     const modelOutput = parseModelOutput(envelope, response.status);
     const parsedResult = lensResponseSchema.safeParse({
       ...modelOutput,
-      model: LENS_MODEL,
+      model: route.model,
+      resolvedModel: envelope.model,
       usage,
       cost,
     });
     if (!parsedResult.success)
       throw new LensProviderError(
         "malformed_response",
-        "OpenAI returned an invalid Lens response.",
+        "OpenRouter returned an invalid Lens response.",
         response.status,
       );
     result = parsedResult.data;
@@ -307,7 +314,8 @@ export async function askLens(
   }
 
   const event: LensTelemetryEvent = {
-    model: LENS_MODEL,
+    model: route.model,
+    ...(result ? { resolvedModel: result.resolvedModel } : {}),
     startedAt,
     latencyMs: Math.max(0, Date.now() - startedMs),
     success: !failure,
@@ -322,10 +330,13 @@ export async function askLens(
   return result!;
 }
 
-function buildRequest(input: LensInput) {
+function buildRequest(
+  input: LensInput,
+  route: ReturnType<typeof inferenceRoute>,
+) {
   const content: Array<Record<string, unknown>> = [
     {
-      type: "input_text",
+      type: "text",
       text: JSON.stringify({
         question: input.question,
         context: input.context ?? null,
@@ -334,23 +345,24 @@ function buildRequest(input: LensInput) {
     },
   ];
   if (input.imageDataUrl)
-    content.push({ type: "input_image", image_url: input.imageDataUrl });
-
+    content.push({ type: "image_url", image_url: { url: input.imageDataUrl } });
   return {
-    model: LENS_MODEL,
-    store: false,
-    instructions: INSTRUCTIONS,
-    input: [
+    ...route,
+    stream: false,
+    messages: [
+      { role: "system", content: INSTRUCTIONS },
       ...(input.history ?? []).map((turn) => ({
         role: turn.role,
         content: turn.content,
       })),
       { role: "user", content },
     ],
-    max_output_tokens: 4_096,
-    text: {
-      format: {
-        type: "json_schema",
+    ...(route.model.startsWith("openai/")
+      ? { max_completion_tokens: 4096 }
+      : { max_tokens: 4096 }),
+    response_format: {
+      type: "json_schema",
+      json_schema: {
         name: "lens_response",
         strict: true,
         schema: OUTPUT_JSON_SCHEMA,
@@ -363,7 +375,7 @@ function asEnvelope(raw: unknown): ResponseEnvelope {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new LensProviderError(
       "malformed_response",
-      "OpenAI returned an invalid response.",
+      "OpenRouter returned an invalid response.",
     );
   return raw as ResponseEnvelope;
 }
@@ -372,74 +384,52 @@ function parseModelOutput(
   envelope: ResponseEnvelope,
   status: number,
 ): LensModelOutput {
-  if (envelope.status === "incomplete")
+  const choice = Array.isArray(envelope.choices)
+    ? envelope.choices[0]
+    : undefined;
+  if (choice?.finish_reason === "length")
     throw new LensProviderError(
       "incomplete",
-      "OpenAI could not complete the Lens response.",
+      "OpenRouter could not complete the Lens response.",
       status,
     );
-
-  const contentItems = responseContent(envelope.output);
-  if (contentItems.some((item) => item.type === "refusal"))
+  if (choice?.finish_reason === "content_filter" || choice?.message?.refusal)
     throw new LensProviderError(
       "refusal",
-      "OpenAI declined the Lens request.",
+      "OpenRouter declined the Lens request.",
       status,
     );
-
-  const text =
-    typeof envelope.output_text === "string"
-      ? envelope.output_text
-      : contentItems
-          .filter(
-            (item): item is { type: "output_text"; text: string } =>
-              item.type === "output_text" && typeof item.text === "string",
-          )
-          .map((item) => item.text)
-          .join("");
-  if (!text)
+  if (
+    choice?.finish_reason !== "stop" ||
+    typeof choice?.message?.content !== "string"
+  )
     throw new LensProviderError(
       "malformed_response",
-      "OpenAI returned no Lens explanation.",
+      "OpenRouter returned no completed Lens explanation.",
       status,
     );
-
   try {
-    return lensModelOutputSchema.parse(JSON.parse(text));
+    return lensModelOutputSchema.parse(JSON.parse(choice.message.content));
   } catch {
     throw new LensProviderError(
       "malformed_response",
-      "OpenAI returned an invalid Lens explanation.",
+      "OpenRouter returned an invalid Lens explanation.",
       status,
     );
   }
-}
-
-function responseContent(output: unknown): Array<Record<string, unknown>> {
-  if (!Array.isArray(output)) return [];
-  const items: Array<Record<string, unknown>> = [];
-  for (const message of output) {
-    if (!message || typeof message !== "object") continue;
-    const content = (message as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-    for (const item of content)
-      if (item && typeof item === "object" && !Array.isArray(item))
-        items.push(item as Record<string, unknown>);
-  }
-  return items;
 }
 
 function parseUsage(value: unknown): LensUsage | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   const details =
-    raw.input_tokens_details && typeof raw.input_tokens_details === "object"
-      ? (raw.input_tokens_details as Record<string, unknown>)
+    raw.prompt_tokens_details && typeof raw.prompt_tokens_details === "object"
+      ? (raw.prompt_tokens_details as Record<string, unknown>)
       : {};
   const parsed = lensUsageSchema.safeParse({
-    inputTokens: raw.input_tokens,
+    inputTokens: raw.prompt_tokens,
     cachedInputTokens: details.cached_tokens ?? 0,
-    outputTokens: raw.output_tokens,
+    outputTokens: raw.completion_tokens,
     totalTokens: raw.total_tokens,
   });
   if (
@@ -450,36 +440,22 @@ function parseUsage(value: unknown): LensUsage | null {
   return parsed.data;
 }
 
-function estimateCost(usage: LensUsage): LensCost {
-  const uncachedInput = usage.inputTokens - usage.cachedInputTokens;
-  return {
-    estimatedUsd:
-      (uncachedInput * LENS_RATES_PER_MILLION.input +
-        usage.cachedInputTokens * LENS_RATES_PER_MILLION.cachedInput +
-        usage.outputTokens * LENS_RATES_PER_MILLION.output) /
-      1_000_000,
-    currency: "USD",
-    rateDate: LENS_PRICE_DATE,
-    ratesPerMillionTokens: LENS_RATES_PER_MILLION,
-  };
-}
-
 function httpError(status: number): LensProviderError {
   if (status === 401 || status === 403)
     return new LensProviderError(
       "authentication",
-      "OpenAI rejected the API credentials.",
+      "OpenRouter rejected the API credentials.",
       status,
     );
   if (status === 429)
     return new LensProviderError(
       "rate_limit",
-      "OpenAI rate-limited the Lens request.",
+      "OpenRouter rate-limited the Lens request.",
       status,
     );
   return new LensProviderError(
     "http_error",
-    `OpenAI returned HTTP ${status}.`,
+    `OpenRouter returned HTTP ${status}.`,
     status,
   );
 }
@@ -496,7 +472,7 @@ function classifyError(
     return new LensProviderError("aborted", "The Lens request was canceled.");
   return new LensProviderError(
     "network_error",
-    "The Lens request could not reach OpenAI.",
+    "The Lens request could not reach OpenRouter.",
   );
 }
 

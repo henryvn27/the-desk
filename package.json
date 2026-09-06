@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test packages/**/*.test.ts",
-    "start": "electron .",
+    "start": "node scripts/start.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "package": "npm run build && electron-builder --dir",
     "lint": "eslint apps packages vite.config.ts",
