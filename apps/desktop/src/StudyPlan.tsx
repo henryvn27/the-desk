@@ -98,6 +98,34 @@ export function StudyPlan({
         them.
       </p>
       <Rebalance data={data} save={save} />
+      <section aria-label="Plan history">
+        <h2>Plan history</h2>
+        {data.plans.length ? (
+          data.plans.slice(0, 8).map((plan) => (
+            <div className="row" key={plan.id}>
+              <div>
+                <strong>
+                  {plan.trigger === "auto-plan" ? "Auto-plan" : "Rebalance"}
+                </strong>
+                <p>
+                  {new Date(plan.createdAt).toLocaleString()} ·{" "}
+                  {plan.blockIds.length} saved block
+                  {plan.blockIds.length === 1 ? "" : "s"}
+                </p>
+                <small>
+                  {plan.overloadMinutes > 0
+                    ? `${plan.overloadMinutes} minutes still need time.`
+                    : "No unscheduled required minutes recorded."}
+                </small>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="muted">
+            Committed Auto-plan and rebalance versions will appear here.
+          </p>
+        )}
+      </section>
       <div className="plan-week" aria-label="Seven-day saved blocks">
         {days.map((day) => (
           <section

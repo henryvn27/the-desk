@@ -392,6 +392,20 @@ export type PlanChange = RebalancePreview & {
   appliedAt: string;
   reason?: string;
 };
+export type Plan = {
+  id: string;
+  revision: number;
+  createdAt: string;
+  horizonStart: string;
+  horizonEnd: string;
+  mode: PlanningMode;
+  trigger: "auto-plan" | "rebalance";
+  blockIds: string[];
+  unscheduled: { taskId: string; minutes: number; reason: string }[];
+  overloadMinutes: number;
+  basisHash: string;
+  authority: "computed";
+};
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const planningPreferences = z
   .object({
@@ -574,6 +588,7 @@ export type Snapshot = {
   authorityResolutions: AuthorityResolution[];
   concepts: Concept[];
   attempts: Attempt[];
+  plans: Plan[];
   planChanges: PlanChange[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];

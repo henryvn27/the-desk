@@ -6,7 +6,7 @@ import { planWeek } from "../planner";
 import { startNotebook } from "../canvas/notebook";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
 import { DatabaseSync } from "node:sqlite";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   command,
   capturePolicy,
@@ -39,6 +39,7 @@ import {
   type Mistake,
   type Concept,
   type Attempt,
+  type Plan,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -49,7 +50,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 35) {
+    if (version > 36) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -166,6 +167,10 @@ export class DeskStore {
       this.db.exec(`BEGIN;
       CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,data TEXT NOT NULL);
       PRAGMA user_version=35; COMMIT;`);
+    if (version <= 35)
+      this.db.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS plans(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+      PRAGMA user_version=36; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -217,6 +222,36 @@ export class DeskStore {
       state.concepts,
       state.attempts,
     ]);
+  }
+  private savePlanVersion(
+    state: Snapshot,
+    now: Date,
+    trigger: Plan["trigger"],
+    blockIds: string[],
+    unscheduled: Plan["unscheduled"],
+  ) {
+    const createdAt = now.toISOString();
+    const basis = this.planningBasis(state);
+    const plan: Plan = {
+      id: randomUUID(),
+      revision: 0,
+      createdAt,
+      horizonStart: createdAt,
+      horizonEnd: new Date(+now + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      mode: state.planningMode,
+      trigger,
+      blockIds: [...blockIds],
+      unscheduled: [...unscheduled],
+      overloadMinutes: unscheduled.reduce(
+        (total, item) => total + item.minutes,
+        0,
+      ),
+      basisHash: createHash("sha256").update(basis).digest("hex"),
+      authority: "computed",
+    };
+    this.db
+      .prepare("INSERT INTO plans VALUES(?,?)")
+      .run(plan.id, JSON.stringify(plan));
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     const userId =
@@ -350,6 +385,10 @@ export class DeskStore {
         .prepare("SELECT data FROM attempts ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as Attempt),
+      plans: this.db
+        .prepare("SELECT data FROM plans ORDER BY rowid DESC LIMIT 50")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Plan),
       planChanges: this.db
         .prepare(
           "SELECT data FROM plan_changes ORDER BY appliedAt DESC,rowid DESC LIMIT 50",
@@ -1248,6 +1287,13 @@ export class DeskStore {
             timestamp,
             JSON.stringify({ ...preview, appliedAt: timestamp }),
           );
+        this.savePlanVersion(
+          state,
+          now,
+          "rebalance",
+          [...preview.kept, ...preview.added].map((block) => block.id),
+          preview.unscheduled,
+        );
       }
       if (c.type === "block.cancel") {
         const existing = state.studyBlocks.find((b) => b.id === c.id);
@@ -2237,6 +2283,13 @@ export class DeskStore {
         .prepare("INSERT INTO plan_changes VALUES(?,?,?)")
         .run(change.id, timestamp, JSON.stringify(change));
     }
+    this.savePlanVersion(
+      state,
+      now,
+      "auto-plan",
+      added.map((block) => block.id),
+      result.unscheduled,
+    );
   }
   private createCapturedTask(
     input: TaskInput,

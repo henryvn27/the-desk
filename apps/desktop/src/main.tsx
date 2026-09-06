@@ -66,6 +66,7 @@ const empty: Snapshot = {
   authorityResolutions: [],
   concepts: [],
   attempts: [],
+  plans: [],
   planChanges: [],
   studyBlocks: [],
   canvases: [],
