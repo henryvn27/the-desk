@@ -171,12 +171,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Assessments.tsx; apps/desktop/src/Evidence.tsx; apps/desktop/src/Attempts.tsx",
-      "automated": "114 tests plus typecheck/lint/build: schema-29/30 assessment and teacher-evidence persistence, explicit typed kinds/scores, same-class links, revision-safe CRUD, planner priority, Session Kit filtering and restart coverage, alongside existing source/task/concept/attempt graph checks.",
-      "live": "Installed unsigned macOS smoke creates, edits, restarts and forgets typed assessment and teacher-reported evidence while preserving linked preparation task, concept and grade context; the broader desktop regression and no-renderer-error checks also pass.",
-      "mac": "Unsigned installed arm64 assessment smoke, broad desktop regression and app.asar/package byte comparison pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34017304936; no requirement-specific Windows UI proof.",
-      "blocker": "Partial graph only. Text sources, classes, tasks, sessions, preferences, concepts, attempts, explicit assessments and teacher-reported evidence exist; durable Teacher identity/patterns, most required entities, graded-work extraction, synchronization and Windows interaction remain incomplete."
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/intelligence/authority.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Assessments.tsx; apps/desktop/src/Evidence.tsx; apps/desktop/src/Authority.tsx; apps/desktop/src/Attempts.tsx",
+      "automated": "117 tests plus typecheck/lint/build: schema-29/30/31 assessment, teacher-evidence and authority-claim persistence, explicit typed kinds/scores, same-class links, revision-safe CRUD, conflict preservation, explicit resolution, Lens conflict context and restart coverage, alongside existing source/task/concept/attempt graph checks.",
+      "live": "Installed unsigned macOS smoke creates two competing due-date claims, shows the conflict, applies one by explicit choice, restarts, and preserves the claims/resolution; teacher-evidence, assessment, Attempts, broad desktop and checklist regressions also pass.",
+      "mac": "Unsigned installed arm64 authority smoke, evidence/assessment/Attempts/broad desktop/checklist regressions and app.asar/package byte comparison pass",
+      "windows": "Pending authority-slice hosted checks/build/package; previous hosted pass remains recorded for 34017304936.",
+      "blocker": "Partial graph only. Text sources, classes, tasks, sessions, preferences, concepts, attempts, explicit assessments, teacher-reported evidence and bounded due-date authority claims exist; durable Teacher identity/patterns, most required entities, graded-work extraction, synchronization and Windows interaction remain incomplete."
     },
     {
       "id": "DOMAIN-002",
@@ -189,12 +189,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/intelligence; apps/desktop; packages/domain",
-      "automated": "npm run check: 27 tests including provider failure and migration contracts",
-      "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
-      "mac": "Unsigned installed first-slice development smoke",
+      "implementation": "packages/intelligence; packages/domain; apps/desktop/src/Authority.tsx",
+      "automated": "117 tests plus typecheck/lint/build: provenance fields, confidence, explicit authority classes, revision-safe conflict resolution and Lens disclosure of competing claims.",
+      "live": "Installed authority smoke preserves competing claims and requires an explicit choice; Lens context unit coverage exposes the conflict without selecting a winner. No live provider response yet.",
+      "mac": "Unsigned installed authority smoke",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
+      "blocker": "Live provider response/grounding quality/cost and broader inferred-fact criteria remain unverified; the current authority ledger is bounded to manual due-date claims."
     },
     {
       "id": "CAP-001",
@@ -265,7 +265,7 @@
       "live": "Development and installed policy smoke exercise Balanced filing/reason/undo, Conservative review, Autopilot partial class match and restart. Installed Inbox regression passes.",
       "mac": "Unsigned packaged/installed schema-19 app; archive bytes match; screenshots inspected and operated video captured.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Policy modes and automatic filing implemented for deterministic pasted text. Broader capture formats and requirement-specific Windows interaction proof remain open; full capture acceptance is not complete."
+      "blocker": "Policy modes and automatic filing are implemented for deterministic pasted text. Manual due-date authority claims now preserve and resolve source conflicts explicitly. Broader capture formats and requirement-specific Windows interaction proof remain open; full capture acceptance is not complete."
     },
     {
       "id": "AUTH-001",
@@ -276,14 +276,14 @@
         "Prefer explicit teacher updates, live LMS assignments, syllabi, teacher email, board/photo, and Desk inference in contextual order.",
         "Ask the user when important sources conflict, such as due dates; never silently overwrite with an uncertain guess."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/intelligence/authority.ts; packages/domain/contracts.ts; packages/domain/store.ts; apps/desktop/src/Authority.tsx; packages/intelligence/grounding.ts",
+      "automated": "117 tests plus typecheck/lint/build: authority class ordering, confidence/provenance fields, same-class source/evidence links, stale claim/task revisions, conflict preservation, explicit resolution and Lens disclosure.",
+      "live": "Installed unsigned macOS smoke records syllabus and live-LMS due dates, shows the conflict, requires a choice, applies one claim, and persists the ledger/resolution across restart.",
+      "mac": "Unsigned installed arm64 authority smoke and app.asar/package byte comparison pass",
+      "windows": "Pending authority-slice hosted checks/build/package; previous hosted pass remains recorded for 34017304936.",
+      "blocker": "Bounded manual due-date authority is implemented. Live LMS/email/board integrations, automatic conflict generation from external systems, broader fact types and Windows interaction remain unimplemented or unverified."
     },
     {
       "id": "INT-001",
