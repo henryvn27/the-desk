@@ -1,5 +1,10 @@
 import type { DurationObservation } from "../learning/duration";
 import { sourceKind } from "../intelligence/source-kind";
+import {
+  authorityConfidence,
+  authorityFact,
+  authorityKind,
+} from "../intelligence/authority";
 import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
@@ -131,6 +136,36 @@ export type TeacherEvidence = TeacherEvidenceInput & {
   authority: "teacher-reported";
   createdAt: string;
   updatedAt: string;
+};
+export const authorityClaimInput = z.object({
+  classId: id,
+  taskId: id,
+  fact: authorityFact,
+  value: z.iso.datetime().nullable(),
+  authorityKind,
+  confidence: authorityConfidence,
+  sourceLabel: z.string().trim().min(1).max(500),
+  details: z.string().trim().max(10000),
+  sourceId: id.nullable(),
+  evidenceId: id.nullable(),
+  capturedAt: z.iso.datetime(),
+});
+export type AuthorityClaimInput = z.infer<typeof authorityClaimInput>;
+export type AuthorityClaim = AuthorityClaimInput & {
+  id: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
+export type AuthorityResolution = {
+  id: string;
+  taskId: string;
+  fact: "due-date";
+  claimId: string;
+  claimRevision: number;
+  resolvedAt: string;
+  revision: number;
+  authority: "user-resolved";
 };
 export const taskInput = z.object({
   gradeContext: z
@@ -423,6 +458,8 @@ export type Snapshot = {
   gradeEntries: GradeEntry[];
   assessments: Assessment[];
   teacherEvidence: TeacherEvidence[];
+  authorityClaims: AuthorityClaim[];
+  authorityResolutions: AuthorityResolution[];
   concepts: Concept[];
   attempts: Attempt[];
   planChanges: PlanChange[];
@@ -534,6 +571,29 @@ export const command = z.discriminatedUnion("type", [
     type: z.literal("evidence.forget"),
     id,
     revision: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("authority.claim.create"),
+    input: authorityClaimInput,
+  }),
+  z.object({
+    type: z.literal("authority.claim.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: authorityClaimInput,
+  }),
+  z.object({
+    type: z.literal("authority.claim.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("authority.resolve"),
+    taskId: id,
+    claimId: id,
+    claimRevision: z.number().int().nonnegative(),
+    taskRevision: z.number().int().nonnegative(),
+    resolutionApproved: z.boolean(),
   }),
   z.object({
     type: z.literal("planning.rebalance"),

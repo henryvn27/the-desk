@@ -1,6 +1,7 @@
 import { inferenceEvidenceCurrent } from "../learning/memory";
 import { sourcePassage } from "./passages";
 import { sourcePriority } from "./source-kind";
+import { authorityClaimsConflict, authorityPriority } from "./authority";
 import type { Snapshot } from "../domain/contracts";
 
 /** Bounded, local evidence only. No URL fetching or inferred source authority. */
@@ -27,6 +28,19 @@ export function lensContext(state: Snapshot, question = ""): string {
           Number(a.taskIds.includes(task.id)) ||
         a.id.localeCompare(b.id),
     );
+  const authorityClaims = (state.authorityClaims ?? [])
+    .filter((claim) => claim.taskId === task.id)
+    .sort(
+      (a, b) =>
+        authorityPriority(a.authorityKind) -
+          authorityPriority(b.authorityKind) ||
+        b.capturedAt.localeCompare(a.capturedAt) ||
+        a.id.localeCompare(b.id),
+    );
+  const authorityResolution = (state.authorityResolutions ?? []).find(
+    (resolution) =>
+      resolution.taskId === task.id && resolution.fact === "due-date",
+  );
   const context = {
     class: state.classes.find((course) => course.id === task.classId)?.name,
     task: task.title,
@@ -42,6 +56,25 @@ export function lensContext(state: Snapshot, question = ""): string {
       origin: "explicit" | "inferred";
     }[],
     omittedMemories: 0,
+    authorityClaims: [] as Array<{
+      id: string;
+      fact: string;
+      value: string | null;
+      authorityKind: string;
+      confidence: string;
+      sourceLabel: string;
+      details: string;
+      capturedAt: string;
+      resolved: boolean;
+    }>,
+    omittedAuthorityClaims: authorityClaims.length,
+    authorityConflict: authorityClaimsConflict(authorityClaims),
+    authorityResolution: authorityResolution
+      ? {
+          claimId: authorityResolution.claimId,
+          resolvedAt: authorityResolution.resolvedAt,
+        }
+      : null,
     sources: [] as (ReturnType<typeof sourcePassage> & {
       id: string;
       title: string;
@@ -83,6 +116,26 @@ export function lensContext(state: Snapshot, question = ""): string {
     ) {
       context.memories.pop();
       context.omittedMemories++;
+      break;
+    }
+  }
+  for (const claim of authorityClaims) {
+    const entry = {
+      id: claim.id,
+      fact: claim.fact,
+      value: claim.value,
+      authorityKind: claim.authorityKind,
+      confidence: claim.confidence,
+      sourceLabel: claim.sourceLabel,
+      details: claim.details.slice(0, 1200),
+      capturedAt: claim.capturedAt,
+      resolved: authorityResolution?.claimId === claim.id,
+    };
+    context.authorityClaims.push(entry);
+    context.omittedAuthorityClaims--;
+    if (JSON.stringify(context).length > 20000) {
+      context.authorityClaims.pop();
+      context.omittedAuthorityClaims++;
       break;
     }
   }

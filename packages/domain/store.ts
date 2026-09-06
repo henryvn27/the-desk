@@ -19,6 +19,8 @@ import {
   type GradeEntry,
   type Assessment,
   type TeacherEvidence,
+  type AuthorityClaim,
+  type AuthorityResolution,
   type RebalancePreview,
   type PlanChange,
   type StudyBlock,
@@ -41,7 +43,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 30) {
+    if (version > 31) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -132,6 +134,11 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE IF NOT EXISTS teacher_evidence(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),assessment_id TEXT REFERENCES assessments(id) ON DELETE SET NULL,task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,data TEXT NOT NULL); PRAGMA user_version=30; COMMIT;",
       );
+    if (version <= 30)
+      this.db.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS authority_claims(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS authority_resolutions(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,fact TEXT NOT NULL,claim_id TEXT NOT NULL REFERENCES authority_claims(id),data TEXT NOT NULL,UNIQUE(task_id,fact));
+      PRAGMA user_version=31; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -255,6 +262,14 @@ export class DeskStore {
         .prepare("SELECT data FROM teacher_evidence ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as TeacherEvidence),
+      authorityClaims: this.db
+        .prepare("SELECT data FROM authority_claims ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as AuthorityClaim),
+      authorityResolutions: this.db
+        .prepare("SELECT data FROM authority_resolutions ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as AuthorityResolution),
       concepts: this.db
         .prepare("SELECT data FROM concepts ORDER BY rowid")
         .all()
@@ -636,6 +651,135 @@ export class DeskStore {
             .prepare("DELETE FROM teacher_evidence WHERE id=?")
             .run(entityId);
         }
+      }
+      if (
+        c.type === "authority.claim.create" ||
+        c.type === "authority.claim.update" ||
+        c.type === "authority.claim.forget"
+      ) {
+        const previous =
+          c.type === "authority.claim.create"
+            ? undefined
+            : state.authorityClaims.find((claim) => claim.id === c.id);
+        if (
+          c.type !== "authority.claim.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This authority claim changed elsewhere. Reopen it before saving.",
+          );
+        if (
+          previous &&
+          state.authorityResolutions.some(
+            (resolution) => resolution.claimId === previous.id,
+          )
+        )
+          throw Error(
+            "Resolve this task with another claim before changing the selected authority claim.",
+          );
+        const input = c.type === "authority.claim.forget" ? undefined : c.input;
+        const task = state.tasks.find(
+          (candidate) => candidate.id === (input?.taskId ?? previous?.taskId),
+        );
+        const classId = input?.classId ?? previous?.classId;
+        if (!task || !classId || task.classId !== classId)
+          throw Error("Choose an existing task and its class for this claim.");
+        if (input?.sourceId) {
+          const source = state.sources.find(
+            (candidate) => candidate.id === input.sourceId,
+          );
+          if (
+            !source ||
+            (!source.classIds.includes(classId) &&
+              !source.taskIds.includes(task.id))
+          )
+            throw Error("The linked source must belong to this class or task.");
+        }
+        if (input?.evidenceId) {
+          const evidence = state.teacherEvidence.find(
+            (candidate) => candidate.id === input.evidenceId,
+          );
+          if (!evidence || evidence.classId !== classId)
+            throw Error(
+              "The linked teacher evidence must belong to this class.",
+            );
+          if (evidence.taskId && evidence.taskId !== task.id)
+            throw Error(
+              "The linked teacher evidence must belong to this task.",
+            );
+        }
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const claim: AuthorityClaim = {
+            ...input,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO authority_claims VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,task_id=excluded.task_id,data=excluded.data",
+            )
+            .run(entityId, claim.classId, claim.taskId, JSON.stringify(claim));
+        } else {
+          this.db
+            .prepare("DELETE FROM authority_claims WHERE id=?")
+            .run(entityId);
+        }
+      }
+      if (c.type === "authority.resolve") {
+        if (!c.resolutionApproved)
+          throw Error("Choose an authority claim before applying a due date.");
+        const task = state.tasks.find((candidate) => candidate.id === c.taskId);
+        const claim = state.authorityClaims.find(
+          (candidate) => candidate.id === c.claimId,
+        );
+        if (!task || !claim || claim.taskId !== task.id)
+          throw Error("Choose a claim belonging to this assignment.");
+        if ((task.revision ?? 0) !== c.taskRevision)
+          throw Error(
+            "This assignment changed elsewhere. Reopen the conflict before resolving it.",
+          );
+        if (claim.revision !== c.claimRevision)
+          throw Error(
+            "This authority claim changed elsewhere. Reopen the conflict before resolving it.",
+          );
+        const updated: Task = {
+          ...task,
+          dueAt: claim.value,
+          deadlineConfirmed: claim.value !== null,
+          revision: (task.revision ?? 0) + 1,
+        };
+        const prior = state.authorityResolutions.find(
+          (resolution) =>
+            resolution.taskId === task.id && resolution.fact === claim.fact,
+        );
+        const resolution: AuthorityResolution = {
+          id: prior?.id ?? randomUUID(),
+          taskId: task.id,
+          fact: claim.fact,
+          claimId: claim.id,
+          claimRevision: claim.revision,
+          resolvedAt: timestamp,
+          revision: (prior?.revision ?? -1) + 1,
+          authority: "user-resolved",
+        };
+        entityId = task.id;
+        this.db
+          .prepare("UPDATE tasks SET class_id=?,data=? WHERE id=?")
+          .run(updated.classId, JSON.stringify(updated), task.id);
+        this.db
+          .prepare(
+            "INSERT INTO authority_resolutions VALUES(?,?,?,?,?) ON CONFLICT(task_id,fact) DO UPDATE SET id=excluded.id,claim_id=excluded.claim_id,data=excluded.data",
+          )
+          .run(
+            resolution.id,
+            resolution.taskId,
+            resolution.fact,
+            resolution.claimId,
+            JSON.stringify(resolution),
+          );
       }
       if (c.type === "planning.rebalance") {
         const pending = this.rebalance;

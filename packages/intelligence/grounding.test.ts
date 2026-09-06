@@ -105,6 +105,57 @@ test("within one reported source type lexical coverage precedes task association
   assert.equal(result.sources[1].selectionMethod, "opening-fallback");
 });
 
+test("Lens exposes due-date authority conflicts without choosing for the student", () => {
+  const result = JSON.parse(
+    lensContext({
+      ...state,
+      authorityClaims: [
+        {
+          id: "syllabus-claim",
+          classId: "class",
+          taskId: "task",
+          fact: "due-date",
+          value: "2026-09-09T23:00:00.000Z",
+          authorityKind: "syllabus",
+          confidence: "high",
+          sourceLabel: "Syllabus",
+          details: "Wednesday",
+          sourceId: null,
+          evidenceId: null,
+          capturedAt: "2026-09-05T12:00:00.000Z",
+          revision: 0,
+          createdAt: "",
+          updatedAt: "",
+        },
+        {
+          id: "lms-claim",
+          classId: "class",
+          taskId: "task",
+          fact: "due-date",
+          value: "2026-09-08T23:00:00.000Z",
+          authorityKind: "live-lms",
+          confidence: "medium",
+          sourceLabel: "Classroom",
+          details: "Tuesday",
+          sourceId: null,
+          evidenceId: null,
+          capturedAt: "2026-09-05T13:00:00.000Z",
+          revision: 0,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      authorityResolutions: [],
+    } as unknown as Snapshot),
+  );
+  assert.deepEqual(
+    result.authorityClaims.map((claim: { id: string }) => claim.id),
+    ["lms-claim", "syllabus-claim"],
+  );
+  assert.equal(result.authorityConflict, true);
+  assert.equal(result.authorityResolution, null);
+});
+
 test("explicit memory context includes global/current-class statements and discloses its budget", () => {
   const memories = Array.from({ length: 20 }, (_, i) => ({
     id: String(i),
