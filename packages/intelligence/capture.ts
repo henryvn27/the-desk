@@ -32,7 +32,8 @@ export type CaptureDraft = {
   confidence: Record<CaptureField, CaptureConfidence>;
   uncertainties: CaptureUncertainty[];
   provenance: {
-    source: "pasted-text";
+    source: "pasted-text" | "text-file";
+    sourceName?: string;
     authority: "user-provided-text";
     capturedAt: string;
     originalText: string;

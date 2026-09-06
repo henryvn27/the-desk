@@ -41,10 +41,10 @@ export function CapturePolicySettings({
       </label>
       <p>
         {mode === "conservative"
-          ? "Every pasted capture goes to Inbox for review."
+          ? "Every pasted or imported capture goes to Inbox for review."
           : mode === "balanced"
-            ? "Complete, high-confidence pasted assignments can file automatically. Everything else stays in Inbox."
-            : "Complete pasted assignments may also use a unique partial class-name match. Ambiguous or incomplete captures still require review."}
+            ? "Complete, high-confidence pasted or imported assignments can file automatically. Everything else stays in Inbox."
+            : "Complete pasted or imported assignments may also use a unique partial class-name match. Ambiguous or incomplete captures still require review."}
       </p>
       <p className="muted">
         Automatic filing requires a future deadline with an explicit time zone

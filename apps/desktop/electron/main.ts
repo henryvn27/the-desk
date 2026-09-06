@@ -1,3 +1,4 @@
+import { readCaptureTextFiles } from "../../../packages/intake/text-files";
 import {
   app,
   BrowserWindow,
@@ -166,6 +167,24 @@ app.whenReady().then(() => {
       ? undefined
       : join(app.getAppPath(), ".env.local"),
   );
+  ipcMain.handle("desk:capture-import", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Capture in the main Desk window to import files.");
+    const selection = await dialog.showOpenDialog(main, {
+      title: "Import academic text",
+      buttonLabel: "Import",
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "Text and Markdown", extensions: ["txt", "md"] }],
+    });
+    if (selection.canceled || !selection.filePaths.length) return null;
+    const files = await readCaptureTextFiles(selection.filePaths);
+    return store.execute({
+      type: "inbox.import",
+      files,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  });
   ipcMain.handle("desk:provider-status", (event) => {
     check(event);
     return credentials.status();

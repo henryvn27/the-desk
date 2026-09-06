@@ -63,6 +63,8 @@ export const taskInput = z.object({
   importance: z.enum(["low", "normal", "high"]).optional(),
   captureEvidence: z
     .object({
+      source: z.enum(["pasted-text", "text-file"]).optional(),
+      sourceName: z.string().max(255).optional(),
       originalText: z.string().max(20000),
       sourceText: z.string().max(20000),
       capturedAt: z.iso.datetime(),
@@ -221,6 +223,27 @@ export type Snapshot = {
 export const command = z.discriminatedUnion("type", [
   z.object({ type: z.literal("capture.policy"), mode: capturePolicy }),
   z.object({
+    type: z.literal("inbox.import"),
+    files: z
+      .array(
+        z.object({
+          name: z
+            .string()
+            .min(1)
+            .max(255)
+            .refine((value) => !/[\\/]/.test(value)),
+          text: z
+            .string()
+            .min(1)
+            .max(20000)
+            .refine((value) => value.trim().length > 0),
+        }),
+      )
+      .min(1)
+      .max(10),
+    timeZone: z.string().min(1).max(100),
+  }),
+  z.object({
     type: z.literal("inbox.capture"),
     text: z
       .string()
@@ -370,6 +393,7 @@ export interface DeskAPI {
     source: "development-env" | "saved-user-key" | null;
   }>;
   importProviderKey(): Promise<boolean>;
+  importCaptureFiles(): Promise<Snapshot | null>;
   removeProviderKey(): Promise<void>;
   captureScreen(): Promise<LensCapture>;
   snapshot(): Promise<Snapshot>;

@@ -612,6 +612,22 @@ function App() {
           tasks={data.tasks}
           sessions={data.sessions}
           busy={busy}
+          onImport={async () => {
+            setBusy(true);
+            try {
+              const next = await window.desk.importCaptureFiles();
+              if (!next) return;
+              setData(next);
+              const items = next.captureInbox.slice(data.captureInbox.length);
+              setCaptureNotice(
+                `Import saved: ${items.filter((i) => i.status === "accepted").length} filed, ${items.filter((i) => i.status === "pending").length} waiting for review.`,
+              );
+              setCapture(false);
+              setPage("Capture Inbox");
+            } finally {
+              setBusy(false);
+            }
+          }}
           onQueue={async (text) => {
             const next = await act(
               {

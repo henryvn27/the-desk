@@ -55,8 +55,10 @@ export function CaptureInbox({
         <article key={item.id} className="card">
           <h2>{item.draft.title || "Untitled capture"}</h2>
           <p className="muted">
-            Pasted text ·{" "}
-            {new Date(item.draft.provenance.capturedAt).toLocaleString()}
+            {item.draft.provenance.sourceName
+              ? `File: ${item.draft.provenance.sourceName}`
+              : "Pasted text"}{" "}
+            · {new Date(item.draft.provenance.capturedAt).toLocaleString()}
           </p>
           {view === "accepted" ? (
             <p>

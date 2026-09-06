@@ -34,7 +34,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 19) {
+    if (version > 20) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -93,6 +93,7 @@ export class DeskStore {
         "BEGIN; CREATE TABLE capture_inbox(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=18; COMMIT;",
       );
     if (version <= 18) this.db.exec("BEGIN; PRAGMA user_version=19; COMMIT;");
+    if (version <= 19) this.db.exec("BEGIN; PRAGMA user_version=20; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -240,12 +241,21 @@ export class DeskStore {
           )
           .run(JSON.stringify(c.mode));
       }
-      if (c.type === "inbox.capture") {
-        const drafts = interpretCapture(c.text, {
-          classes: state.classes,
-          now,
-          timeZone: c.timeZone,
-        });
+      if (c.type === "inbox.capture" || c.type === "inbox.import") {
+        const context = { classes: state.classes, now, timeZone: c.timeZone };
+        const drafts =
+          c.type === "inbox.capture"
+            ? interpretCapture(c.text, context)
+            : c.files.flatMap((file) =>
+                interpretCapture(file.text, context).map((draft) => ({
+                  ...draft,
+                  provenance: {
+                    ...draft.provenance,
+                    source: "text-file" as const,
+                    sourceName: file.name,
+                  },
+                })),
+              );
         if (
           !drafts.length ||
           drafts.length > 50 ||
@@ -988,6 +998,10 @@ export class DeskStore {
       ...(item
         ? {
             captureEvidence: {
+              source: item.draft.provenance.source,
+              ...(item.draft.provenance.sourceName
+                ? { sourceName: item.draft.provenance.sourceName }
+                : {}),
               originalText: item.draft.provenance.originalText,
               sourceText: item.draft.provenance.sourceText,
               capturedAt: item.draft.provenance.capturedAt,

@@ -204,14 +204,14 @@
       "acceptance": [
         "Accept typed assignments, syllabi, PDF worksheets, screenshots, whiteboard photos, Classroom notifications, teacher email, Canvas/Schoology capture, websites, Khan pages, Quizlet/Knowt sets, textbooks, handwritten notes, Notability exports, Google Docs, calendar events, and spoken input."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "Capture.tsx; Electron main/preload; packages/intake/text-files.ts; packages/domain; packages/intelligence/capture.ts",
+      "automated": "85 tests plus typecheck/lint/build; bounded UTF-8 import, invalid-file/credential-marker rejection, atomic batches and filename/source preservation.",
+      "live": "Development and installed text-import smoke exercise synthetic native-dialog selections, cancellation, failed mixed batch, successful review, Lens import denial and restart.",
+      "mac": "Unsigned installed schema-20 build; app archives match; imported-text screenshot inspected and operated video captured. Native dialog selections are stubbed in automation.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Typed/pasted assignments and native plain-text/Markdown import supported. PDF/image/OCR, rich documents, browser integrations, voice, email and drag/drop intake remain unimplemented or unverified; Windows interactive proof remains open."
     },
     {
       "id": "CAP-002",
@@ -224,12 +224,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
-      "mac": "Installed unsigned arm64 development build smoke passes",
+      "implementation": "Capture.tsx; Electron main/preload; packages/intake/text-files.ts; packages/domain; packages/intelligence/capture.ts",
+      "automated": "85 tests plus typecheck/lint/build; bounded UTF-8 import, invalid-file/credential-marker rejection, atomic batches and filename/source preservation.",
+      "live": "Development and installed text-import smoke exercise synthetic native-dialog selections, cancellation, failed mixed batch, successful review, Lens import denial and restart.",
+      "mac": "Unsigned installed schema-20 build; app archives match; imported-text screenshot inspected and operated video captured. Native dialog selections are stubbed in automation.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+      "blocker": "Typed/pasted assignments and native plain-text/Markdown import supported. PDF/image/OCR, rich documents, browser integrations, voice, email and drag/drop intake remain unimplemented or unverified; Windows interactive proof remains open."
     },
     {
       "id": "CAP-003",

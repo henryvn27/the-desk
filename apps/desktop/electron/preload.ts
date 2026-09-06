@@ -13,6 +13,7 @@ const api: DeskAPI = {
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
   providerStatus: () => ipcRenderer.invoke("desk:provider-status"),
+  importCaptureFiles: () => ipcRenderer.invoke("desk:capture-import"),
   importProviderKey: () => ipcRenderer.invoke("desk:provider-import"),
   removeProviderKey: () => ipcRenderer.invoke("desk:provider-remove"),
   captureScreen: () => ipcRenderer.invoke("desk:capture-screen"),

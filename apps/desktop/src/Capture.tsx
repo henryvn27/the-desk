@@ -25,10 +25,12 @@ export function Capture({
   policy = "balanced",
   initialDraft,
   onQueue,
+  onImport,
 }: {
   policy?: CapturePolicy;
   initialDraft?: CaptureDraft;
   onQueue?: (text: string) => Promise<void>;
+  onImport?: () => Promise<void>;
   classes: Class[];
   gradeCategories: GradeCategory[];
   tasks: Task[];
@@ -124,6 +126,24 @@ export function Capture({
           >
             Interpret text
           </button>
+          {onImport && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setError("");
+                void onImport().catch((e) => setError(userError(e)));
+              }}
+            >
+              Import text files
+            </button>
+          )}
+          {onImport && (
+            <p className="muted">
+              Import up to 10 UTF-8 .txt or .md files, 20,000 characters each.
+              Imported text follows your capture policy.
+            </p>
+          )}
           <button type="button" onClick={() => setManual(true)}>
             Enter manually
           </button>
@@ -219,6 +239,8 @@ export function Capture({
                 ...(draft
                   ? {
                       captureEvidence: {
+                        source: draft.provenance.source,
+                        sourceName: draft.provenance.sourceName,
                         originalText: draft.provenance.originalText,
                         sourceText: draft.provenance.sourceText,
                         capturedAt: draft.provenance.capturedAt,
