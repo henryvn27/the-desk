@@ -2,6 +2,7 @@ import { userError } from "./errors";
 import { useEffect, useRef, useState } from "react";
 import type {
   Class,
+  GradeCategory,
   TaskInput,
   Task,
 } from "../../../packages/domain/contracts";
@@ -11,12 +12,14 @@ import {
 } from "../../../packages/intelligence/capture";
 export function Capture({
   classes,
+  gradeCategories,
   busy,
   onSave,
   onClose,
   existing,
 }: {
   classes: Class[];
+  gradeCategories: GradeCategory[];
   busy: boolean;
   onSave: (
     input: TaskInput,
@@ -130,6 +133,12 @@ export function Capture({
             void onSave(
               {
                 title: String(f.get("title")),
+                gradeContext: f.get("gradeCategory")
+                  ? {
+                      categoryId: String(f.get("gradeCategory")),
+                      possiblePoints: Number(f.get("possiblePoints")),
+                    }
+                  : null,
                 workKind: String(f.get("workKind")) as TaskInput["workKind"],
                 importance: String(
                   f.get("importance"),
@@ -239,6 +248,43 @@ export function Capture({
               </select>
             </label>
           </div>
+          {!!gradeCategories.length && (
+            <details>
+              <summary>Grade context (optional)</summary>
+              <p>
+                Link the category and possible points for an upcoming item not
+                already recorded in the gradebook. These are inputs to a
+                points-weighted model, not predicted score gains.
+              </p>
+              <label>
+                Assignment grade category
+                <select
+                  aria-label="Assignment grade category"
+                  name="gradeCategory"
+                  defaultValue={existing?.gradeContext?.categoryId ?? ""}
+                >
+                  <option value="">Not linked</option>
+                  {gradeCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {classes.find((course) => course.id === c.classId)?.name}{" "}
+                      · {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Item possible points
+                <input
+                  name="possiblePoints"
+                  type="number"
+                  min="0.01"
+                  max="1000000"
+                  step="0.01"
+                  defaultValue={existing?.gradeContext?.possiblePoints ?? ""}
+                />
+              </label>
+            </details>
+          )}
           <label>
             Estimated minutes
             <input

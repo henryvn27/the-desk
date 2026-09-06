@@ -301,3 +301,61 @@ test("recorded importance and assessment kind guide flexible work", () => {
   assert.match(result.blocks[0]!.why, /high importance/);
   assert.match(result.blocks[1]!.why, /Assessment preparation/);
 });
+
+test("complete grade context can rank potential influence, but unknown work is not treated as zero", () => {
+  const context = {
+    gradeCategories: [
+      { id: "large", classId: "class", name: "Tests", weight: 80, revision: 0 },
+      { id: "small", classId: "class", name: "Work", weight: 20, revision: 0 },
+    ],
+    gradeEntries: [],
+  };
+  const a = {
+    ...task("a", 30, null),
+    gradeContext: { categoryId: "small", possiblePoints: 10 },
+  };
+  const b = {
+    ...task("b", 30, null),
+    gradeContext: { categoryId: "large", possiblePoints: 10 },
+  };
+  const start = new Date("2026-09-07T08:00:00Z"),
+    end = new Date("2026-09-07T10:00:00Z");
+  const complete = plan([a, b], start, end, 0, end, context);
+  assert.deepEqual(
+    complete.blocks.map((b) => b.taskId),
+    ["b", "a"],
+  );
+  assert.match(
+    complete.blocks[0]!.why,
+    /potential influence, not predicted improvement/,
+  );
+  const incomplete = plan(
+    [a, b, task("c", 30, null)],
+    start,
+    end,
+    0,
+    end,
+    context,
+  );
+  assert.deepEqual(
+    incomplete.blocks.map((b) => b.taskId),
+    ["a", "b", "c"],
+  );
+});
+
+test("earlier imminent deadlines remain ahead of later high-importance work", () => {
+  const result = plan(
+    [
+      { ...task("later", 60, "2026-09-07T10:00:00Z"), importance: "high" },
+      { ...task("early", 30, "2026-09-07T08:30:00Z"), importance: "low" },
+    ],
+    new Date("2026-09-07T08:00:00Z"),
+    new Date("2026-09-07T10:00:00Z"),
+    0,
+  );
+  assert.deepEqual(
+    result.blocks.map((b) => b.taskId),
+    ["early", "later"],
+  );
+  assert.equal(result.overloadMinutes, 0);
+});

@@ -159,6 +159,7 @@ function App() {
     new Date(tick),
     data.planning,
     data.studyBlocks,
+    data,
   );
   const schedule = {
     blocks: [
@@ -492,6 +493,7 @@ function App() {
       {editing && (
         <Capture
           classes={data.classes}
+          gradeCategories={data.gradeCategories}
           busy={busy}
           existing={editing}
           onClose={() => setEditing(undefined)}
@@ -513,6 +515,7 @@ function App() {
       {capture && (
         <Capture
           classes={data.classes}
+          gradeCategories={data.gradeCategories}
           busy={busy}
           onClose={() => setCapture(false)}
           onSave={async (input) => {

@@ -99,3 +99,27 @@ test("scenarios can fill an unscored category but reject impossible ranges", asy
     /category/,
   );
 });
+
+test("potential grade influence is model sensitivity, and missing context stays unknown", async () => {
+  const { gradeInfluence } = await import("./index");
+  const task = {
+    id: "a",
+    classId: "physics",
+    title: "Next test",
+    minutes: 30,
+    dueAt: null,
+    resource: null,
+    notes: "",
+    deadlineConfirmed: true,
+    completed: false,
+    createdAt: "2026-09-05T12:00:00Z",
+    gradeContext: { categoryId: "tests", possiblePoints: 100 },
+  };
+  const context = {
+    gradeCategories: categories,
+    gradeEntries: [entry("old", "tests", 90, 100)],
+  };
+  assert.equal(gradeInfluence(task, context)!.pointsPerTen, 4);
+  assert.equal(gradeInfluence({ ...task, gradeContext: null }, context), null);
+  assert.equal(gradeInfluence({ ...task, classId: "other" }, context), null);
+});

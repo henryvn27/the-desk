@@ -50,3 +50,6 @@ Schema 11 adds weighted grade categories and manual score entries. Category weig
 
 
 Grade scenarios model one additional item with a user-supplied earned-point interval. They recalculate the selected category using recorded points plus hypothetical points, retain unknown weight in the range, and never write grade entries. Scenario drafts remain in renderer memory and are cleared on restart/class change. This does not model correlated future outcomes, dropped scores, extra credit, or official-grade policy.
+
+
+Schema 12 adds optional assignment links to same-class grade categories and upcoming possible points. Potential influence measures the modeled course-percentage sensitivity to a 10-percentage-point score change, using the recorded category weight and points plus the upcoming item. It is not expected improvement. Ranking protects required work and earliest imminent deadlines, then explicit importance. Grade sensitivity divided by days to deadline (minimum one; flexible work seven) participates only when all eligible required work has grade context. Missing required context falls back to deadline/importance/assessment ordering. Grade inputs join the rebalance preview basis, so changes invalidate pending approval. Grade linkage is for upcoming items not already entered as scores.

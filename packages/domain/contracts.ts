@@ -51,6 +51,13 @@ export type GradeEntry = z.infer<typeof gradeEntryInput> & {
   authority: "user-entered";
 };
 export const taskInput = z.object({
+  gradeContext: z
+    .object({
+      categoryId: id,
+      possiblePoints: z.number().positive().max(1000000),
+    })
+    .nullable()
+    .optional(),
   workKind: z.enum(["assignment", "assessment", "optional-review"]).optional(),
   importance: z.enum(["low", "normal", "high"]).optional(),
   captureEvidence: z

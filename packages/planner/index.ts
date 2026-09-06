@@ -1,10 +1,14 @@
+import { gradeInfluence } from "../grades";
 import {
   planningPreferences,
   type PlanningPreferences,
   type Block,
   type Task,
   type StudyBlock,
+  type Snapshot,
 } from "../domain/contracts";
+type GradeData = Pick<Snapshot, "gradeCategories" | "gradeEntries">;
+const noGrades: GradeData = { gradeCategories: [], gradeEntries: [] };
 const optional = (t: Task) => t.workKind === "optional-review";
 const importance = (t: Task) =>
   ({ low: 0, normal: 1, high: 2 })[t.importance ?? "normal"];
@@ -33,6 +37,7 @@ export function planWeek(
   now: Date,
   preferences: PlanningPreferences,
   commitments: StudyBlock[] = [],
+  grades: GradeData = noGrades,
 ) {
   const residual = tasks.filter((t) => !t.completed).map((t) => ({ ...t }));
   // Elapsed blocks remain visible history; they are not evidence of completed work.
@@ -93,11 +98,12 @@ export function planWeek(
         new Date(Math.min(end, start + budget * 60000)),
         0,
         capacity.end,
+        grades,
       );
       for (const block of daily.blocks) {
         blocks.push({
           ...block,
-          why: `${priorityReason(residual.find((t) => t.id === block.taskId)!)} Fits around saved blocks; daily capacity includes a ${preferences.bufferPercent}% buffer.`,
+          why: `${block.why} Fits around saved blocks; daily capacity includes a ${preferences.bufferPercent}% buffer.`,
         });
         residual.find((t) => t.id === block.taskId)!.minutes -= block.minutes;
         budget -= block.minutes;
@@ -132,6 +138,7 @@ export function plan(
   end: Date,
   buffer = 0.15,
   urgencyEnd = end,
+  grades: GradeData = noGrades,
 ): {
   blocks: Block[];
   unscheduled: { taskId: string; minutes: number; reason: string }[];
@@ -151,6 +158,17 @@ export function plan(
   let cursor = +start;
   const blocks: Block[] = [];
   const unscheduled: { taskId: string; minutes: number; reason: string }[] = [];
+  const influences = new Map(
+    tasks.map((t) => [t.id, gradeInfluence(t, grades)]),
+  );
+  const eligible = tasks.filter(
+    (t) => !t.completed && t.deadlineConfirmed && !optional(t),
+  );
+  const useGradeInfluence =
+    eligible.length > 0 && eligible.every((t) => influences.get(t.id) !== null);
+  const influenceScore = (t: Task) =>
+    (influences.get(t.id)?.pointsPerTen ?? 0) /
+    Math.max(1, t.dueAt ? (Date.parse(t.dueAt) - +start) / 86400000 : 7);
   const pending = tasks
     .filter((t) => !t.completed)
     .sort(
@@ -170,7 +188,16 @@ export function plan(
               Date.parse(a.dueAt) <= +urgencyEnd,
             ),
           ) ||
+        (a.deadlineConfirmed &&
+        b.deadlineConfirmed &&
+        a.dueAt &&
+        b.dueAt &&
+        Date.parse(a.dueAt) <= +urgencyEnd &&
+        Date.parse(b.dueAt) <= +urgencyEnd
+          ? Date.parse(a.dueAt) - Date.parse(b.dueAt)
+          : 0) ||
         importance(b) - importance(a) ||
+        (useGradeInfluence ? influenceScore(b) - influenceScore(a) : 0) ||
         Number(b.workKind === "assessment") -
           Number(a.workKind === "assessment") ||
         (a.dueAt ? Date.parse(a.dueAt) : Infinity) -
@@ -199,7 +226,7 @@ export function plan(
         start: new Date(cursor).toISOString(),
         end: new Date(cursor + minutes * 60000).toISOString(),
         minutes,
-        why: `${priorityReason(task)} Imminent required deadlines come first, then importance and assessments; capacity includes a ${Math.round(buffer * 100)}% buffer.`,
+        why: `${priorityReason(task)} ${influences.get(task.id) ? `In the recorded ${influences.get(task.id)!.category} model, a 10-percentage-point score change on this item shifts the course model by ${influences.get(task.id)!.pointsPerTen.toFixed(2)} percentage points; this is potential influence, not predicted improvement. ` : ""}${useGradeInfluence ? "After imminent deadlines and your importance choice, potential influence is divided by days until due (minimum one; flexible work uses seven). " : "Incomplete grade context: using deadline and importance ordering. "}`,
       });
       cursor += minutes * 60000;
       remaining -= minutes;

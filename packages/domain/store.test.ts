@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 11);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 12);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -819,5 +819,58 @@ test("grade records enforce weights, bounds, class ownership and stale correctio
   } finally {
     store.close();
     rmSync(dir, { recursive: true });
+  }
+});
+
+test("assignment grade links reject cross-class context and grade changes invalidate rebalance", () => {
+  const store = new DeskStore(":memory:");
+  try {
+    const state = store.execute({ type: "class.create", name: "Physics" });
+    const classId = state.classes[0]!.id;
+    const category = store.execute({
+      type: "grade.category",
+      input: { classId, name: "Tests", weight: 80 },
+    }).gradeCategories[0]!;
+    const other = store
+      .execute({ type: "class.create", name: "Stats" })
+      .classes.find((c) => c.id !== classId)!;
+    const input = {
+      title: "Next test",
+      classId,
+      minutes: 30,
+      dueAt: null,
+      deadlineConfirmed: true,
+      resource: null,
+      notes: "",
+      gradeContext: { categoryId: category.id, possiblePoints: 100 },
+    };
+    assert.throws(
+      () =>
+        store.execute({
+          type: "task.create",
+          input: { ...input, classId: other.id },
+        }),
+      /belonging/,
+    );
+    const saved = store.execute({ type: "task.create", input });
+    assert.deepEqual(saved.tasks[0]!.gradeContext, input.gradeContext);
+    const preview = store.previewRebalance();
+    store.execute({
+      type: "grade.category",
+      id: category.id,
+      revision: category.revision,
+      input: { classId, name: "Tests", weight: 70 },
+    });
+    assert.throws(
+      () =>
+        store.execute({
+          type: "planning.rebalance",
+          previewId: preview.id,
+          approved: true,
+        }),
+      /changed/,
+    );
+  } finally {
+    store.close();
   }
 });

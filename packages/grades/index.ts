@@ -77,3 +77,24 @@ export function projectGrade(
     scoredWeight: lower.scoredWeight,
   };
 }
+
+export function gradeInfluence(
+  task: import("../domain/contracts").Task,
+  context: { gradeCategories: GradeCategory[]; gradeEntries: GradeEntry[] },
+) {
+  if (!task.gradeContext) return null;
+  const category = context.gradeCategories.find(
+    (c) => c.id === task.gradeContext!.categoryId && c.classId === task.classId,
+  );
+  if (!category) return null;
+  const recordedPoints = context.gradeEntries
+    .filter((e) => e.categoryId === category.id)
+    .reduce((sum, e) => sum + e.possible, 0);
+  return {
+    category: category.name,
+    pointsPerTen:
+      ((category.weight * task.gradeContext.possiblePoints) /
+        (recordedPoints + task.gradeContext.possiblePoints)) *
+      0.1,
+  };
+}

@@ -107,6 +107,36 @@ try {
     .getByRole("region", { name: "Grade scenario result", exact: true })
     .scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(output, "grade-projection.png") });
+  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Enter manually", exact: true })
+    .click();
+  await page.getByLabel("What needs doing?").fill("Next test preparation");
+  await page.getByLabel("Estimated minutes", { exact: true }).fill("30");
+  await page.getByLabel("I have confirmed").check();
+  await page.getByText("Grade context (optional)", { exact: true }).click();
+  await page
+    .getByLabel("Assignment grade category", { exact: true })
+    .selectOption({ label: "Physics · Tests" });
+  await page.getByLabel("Item possible points", { exact: true }).fill("100");
+  await page
+    .getByRole("button", { name: "Save assignment", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await page
+    .getByText(/potential influence, not predicted improvement/)
+    .first()
+    .waitFor();
+  assert.ok(await page.getByText(/7.27 percentage points/).count());
+  const linked = (await page.evaluate(() => window.desk.snapshot())).tasks[0]
+    .gradeContext;
+  assert.equal(linked.possiblePoints, 100);
+  await page
+    .getByText(/potential influence, not predicted improvement/)
+    .first()
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(output, "grade-context-plan.png") });
   await app.close();
   app = undefined;
   await launch();
@@ -116,6 +146,7 @@ try {
   const restored = await page.evaluate(() => window.desk.snapshot());
   assert.deepEqual(restored.gradeCategories, saved.gradeCategories);
   assert.deepEqual(restored.gradeEntries, saved.gradeEntries);
+  assert.deepEqual(restored.tasks[0].gradeContext, linked);
   assert.equal(
     await page
       .getByRole("region", { name: "Grade scenario result", exact: true })
@@ -124,7 +155,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: weighted categories, rejection above 100%, score correction, range assumptions, non-mutating future-score scenario and restart persistence",
+    "PASS: weighted categories, rejection above 100%, score correction, range assumptions, non-mutating future-score scenario, linked planner explanation and restart persistence",
   );
 } finally {
   if (app) await app.close();

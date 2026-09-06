@@ -29,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 11) {
+    if (version > 12) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -77,6 +77,7 @@ export class DeskStore {
       CREATE TABLE grade_categories(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL);
       CREATE TABLE grade_entries(id TEXT PRIMARY KEY,category_id TEXT NOT NULL REFERENCES grade_categories(id),data TEXT NOT NULL);
       PRAGMA user_version=11; COMMIT;`);
+    if (version <= 11) this.db.exec("BEGIN; PRAGMA user_version=12; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -88,7 +89,13 @@ export class DeskStore {
       (b) => !b.locked && Date.parse(b.start) > +planningStart,
     );
     const kept = live.filter((b) => !replaced.some((r) => r.id === b.id));
-    const result = planWeek(state.tasks, planningStart, state.planning, kept);
+    const result = planWeek(
+      state.tasks,
+      planningStart,
+      state.planning,
+      kept,
+      state,
+    );
     const preview: RebalancePreview = {
       id: randomUUID(),
       createdAt: now.toISOString(),
@@ -114,6 +121,8 @@ export class DeskStore {
       state.studyBlocks,
       state.planning,
       state.sessions,
+      state.gradeCategories,
+      state.gradeEntries,
     ]);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
@@ -480,6 +489,18 @@ export class DeskStore {
         this.db
           .prepare("INSERT INTO classes VALUES(?,?,?)")
           .run(entityId, c.name, "#50705A");
+      }
+      if (
+        (c.type === "task.create" || c.type === "task.update") &&
+        c.input.gradeContext
+      ) {
+        const category = state.gradeCategories.find(
+          (category) => category.id === c.input.gradeContext!.categoryId,
+        );
+        if (!category || category.classId !== c.input.classId)
+          throw Error(
+            "Choose a grade category belonging to this assignment's class.",
+          );
       }
       if (c.type === "task.create") {
         entityId = randomUUID();
