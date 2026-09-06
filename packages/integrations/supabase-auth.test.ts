@@ -2,11 +2,22 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   sessionFromAuthResponse,
+  supabaseAuthError,
   supabaseAuthResponse,
   supabaseAuthUrl,
   supabaseEmail,
   supabasePassword,
 } from "./supabase-auth";
+
+test("Supabase auth failures discard untrusted provider error details", () => {
+  const secret = "synthetic-password-material";
+  const message = supabaseAuthError(
+    { error_description: `Invalid password: ${secret}` },
+    401,
+  );
+  assert.equal(message, "Account request failed (HTTP 401).");
+  assert.equal(message.includes(secret), false);
+});
 
 test("Supabase account boundary validates credentials and keeps auth URLs bounded", () => {
   assert.equal(

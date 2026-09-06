@@ -52,6 +52,11 @@ export type SupabaseAccountResult = SupabaseAccountStatus & {
   message?: string;
 };
 
+/** Provider response bodies are untrusted and may echo submitted credentials. */
+export function supabaseAuthError(_payload: unknown, status: number) {
+  return `Account request failed (HTTP ${status}).`;
+}
+
 export function supabaseAuthUrl(baseUrl: string, path: string) {
   const base = new URL(baseUrl);
   if (base.protocol !== "https:" && base.hostname !== "127.0.0.1" && base.hostname !== "localhost")
