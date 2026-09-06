@@ -798,7 +798,7 @@
       "automated": "103 tests plus typecheck/lint/build: schema-26 persistence, revision-safe editing/forgetting, same-class validation, practice generation, planner influence, restart and Session Kit inclusion.",
       "live": "Development Electron smoke records every field, edits, generates practice, restarts, forgets only the mistake, and confirms no renderer errors.",
       "mac": "Unsigned installed arm64 smoke passes against /Users/henry/Applications/The Desk V1.app; screenshot and operated video retained, and app.asar matches the packaged artifact.",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34014144659; no requirement-specific Windows UI proof.",
       "blocker": "Windows interactive evidence remains to be recorded; broader academic graph and live tutoring use remain outside this slice."
     },
     {
