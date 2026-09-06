@@ -1,3 +1,4 @@
+import { startNotebook, addNotebookPage } from "../canvas/notebook";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -402,11 +403,17 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
       /linked source/,
     );
     assert.equal(store.canvas(board.id).revision, 1);
-    const recoveredScene = {
-      ...scene,
-      sourceIds: [source.id],
-      viewBackgroundColor: "#fefefe",
-    };
+    const recoveredScene = addNotebookPage(
+      startNotebook(
+        {
+          ...scene,
+          sourceIds: [source.id],
+          viewBackgroundColor: "#fefefe",
+        },
+        "ea884835-4c77-4da4-b159-9772ac1e682a",
+      ),
+      "3c397a5a-dc6c-41d5-bee8-e4bd2173db28",
+    );
     const recovered = store
       .execute({ type: "canvas.recover", id: board.id, scene: recoveredScene })
       .canvases.at(-1)!;
@@ -420,6 +427,16 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
     assert.deepEqual(store.canvas(board.id).scene, scene);
     assert.equal(store.canvas(board.id).revision, 1);
     assert.deepEqual(store.canvas(recovered.id).scene, recoveredScene);
+    store.execute({
+      type: "canvas.save",
+      id: board.id,
+      revision: 1,
+      scene: recoveredScene,
+    });
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.canvas(board.id).scene, recoveredScene);
+    assert.equal(store.canvas(board.id).revision, 2);
     assert.throws(() => store.execute({ type: "task.undo", id: taskId }));
   } finally {
     store.close();

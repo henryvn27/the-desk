@@ -55,16 +55,63 @@ const binaryFile = z
     }
   });
 
+const notebookPage = z.strictObject({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1).max(120),
+  width: z.number().int().min(200).max(2400),
+  height: z.number().int().min(200).max(4000),
+  elements: z.array(element).max(10_000),
+});
+
+export const notebook = z.strictObject({
+  activePageId: z.string().uuid(),
+  pages: z.array(notebookPage).min(1).max(100),
+});
+
 export const canvasScene = z
   .strictObject({
     engine: z.literal("excalidraw"),
     version: z.literal(1),
     sourceIds: z.array(z.string().uuid()).max(100).optional(),
+    notebook: notebook.optional(),
     elements: z.array(element).max(10_000),
     files: z.record(id, binaryFile),
     viewBackgroundColor: z.string(),
   })
   .superRefine((scene, context) => {
+    if (scene.notebook) {
+      const ids = scene.notebook.pages.map((page) => page.id);
+      if (
+        new Set(ids).size !== ids.length ||
+        !ids.includes(scene.notebook.activePageId)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["notebook"],
+          message:
+            "Notebook pages must have unique IDs and an existing active page",
+        });
+      }
+      if (scene.elements.length) {
+        context.addIssue({
+          code: "custom",
+          path: ["elements"],
+          message: "Notebook drawing content must belong to a page",
+        });
+      }
+      const elements = scene.notebook.pages.flatMap((page) => page.elements);
+      if (
+        elements.length > 10_000 ||
+        new Set(elements.map((item) => item.id)).size !== elements.length
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["notebook", "pages"],
+          message:
+            "Notebook element IDs must be unique and total at most 10000",
+        });
+      }
+    }
     for (const [key, file] of Object.entries(scene.files)) {
       if (file.id !== key) {
         context.addIssue({
