@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Task, Source, StudySession } from "../domain/contracts";
+import type { Mistake, Task, Source, StudySession } from "../domain/contracts";
 import { sessionKit } from "./kit";
 const task: Task = {
   id: "task",
@@ -37,6 +37,7 @@ test("session kit keeps explicit task sources separate from general class notes"
     ["class"],
   );
   assert.deepEqual(kit.previousReviews, []);
+  assert.deepEqual(kit.mistakes, []);
 });
 test("session kit selects the latest three nonblank ended reviews for this task", () => {
   const sessions: StudySession[] = Array.from({ length: 7 }, (_, i) => ({
@@ -60,4 +61,49 @@ test("session kit selects the latest three nonblank ended reviews for this task"
     ["3", "2", "1"],
   );
   assert.equal(sessions.length, 7);
+});
+
+test("session kit includes same-class mistakes and excludes other classes", () => {
+  const mistakes: Mistake[] = [
+    {
+      id: "physics-mistake",
+      classId: task.classId,
+      taskId: task.id,
+      concept: "Friction",
+      source: "Worksheet 4 #7",
+      originalAttempt: "Added forces directly",
+      whatWentWrong: "Components were mixed",
+      correction: "Resolve components first",
+      helpUsed: "Teacher feedback",
+      confidence: "medium",
+      reviewDue: null,
+      practiceTaskIds: [],
+      revision: 0,
+      createdAt: "2026-09-05T12:00:00Z",
+      updatedAt: "2026-09-05T12:00:00Z",
+    },
+    {
+      id: "history-mistake",
+      classId: "history",
+      taskId: null,
+      concept: "Causation",
+      source: "Essay",
+      originalAttempt: "Listed events",
+      whatWentWrong: "No causal link",
+      correction: "Explain the link",
+      helpUsed: "None",
+      confidence: "low",
+      reviewDue: null,
+      practiceTaskIds: [],
+      revision: 0,
+      createdAt: "2026-09-05T12:00:00Z",
+      updatedAt: "2026-09-05T12:00:00Z",
+    },
+  ];
+  assert.deepEqual(
+    sessionKit(task, { sources: [], sessions: [], mistakes }).mistakes.map(
+      (mistake) => mistake.id,
+    ),
+    ["physics-mistake"],
+  );
 });

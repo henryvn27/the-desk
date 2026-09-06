@@ -34,7 +34,7 @@ The product contract §4 defines the required academic graph. This document desc
 
 ## Required graph still missing
 
-User identity, academic periods, tracks, units, teachers, assessments, artifacts/concepts, attempts, mistakes, persistent plan versions, durable memory, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
+User identity, academic periods, tracks, units, teachers, assessments, artifacts/concepts, attempts, persistent plan versions, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
 
 The current local profile is not a multi-user security boundary. JSON payload persistence is not evidence that absent objects, synchronization, provenance corrections or confidence history are supported.
 
@@ -99,3 +99,6 @@ Schema 24 fences inferred-memory controls. Settings persist learning enabled and
 
 
 Schema 25 fences immutable duration-memory observations: source session/task IDs, revisions, task title/class/work type, actual and estimated minutes, and ratio. Confirmation copies this evidence; later review changes cannot rewrite it. UI displays the saved numbers rather than current session values. Missing or changed evidence keeps the note visible but makes it ineligible for tutoring. Older memories are not backfilled with fabricated historical numbers.
+
+
+Schema 26 adds durable `mistakes`. Each record belongs to an existing class, may link one same-class task, and stores concept, source, original attempt, what went wrong, correction, help used, confidence, review due, revisions, timestamps and generated practice-task IDs. Create/edit/forget compare revisions transactionally; practice generation creates a normal optional-review task and advances the mistake revision. Mistake-linked or due review work receives a planner influence explanation without overriding required-work ordering. The Mistakes view exposes every field and retains the record beyond its source assignment; forgetting the record does not erase generated practice tasks. Session Kit shows same-class mistake notes as read-only study context. Mistakes are student-entered evidence, not automatic mastery or correctness claims.

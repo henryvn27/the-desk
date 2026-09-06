@@ -76,11 +76,37 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.mistakes.length > 0 && (
+        <div>
+          <h4>Previous mistakes</h4>
+          <p className="muted">
+            Review notes from this class; they do not claim mastery or
+            completion.
+          </p>
+          {kit.mistakes.map((mistake) => (
+            <details key={mistake.id}>
+              <summary>
+                {mistake.concept} · Confidence {mistake.confidence}
+              </summary>
+              <p>
+                <strong>Source:</strong> {mistake.source}
+              </p>
+              <p>
+                <strong>What went wrong:</strong> {mistake.whatWentWrong}
+              </p>
+              <p>
+                <strong>Correction:</strong> {mistake.correction}
+              </p>
+            </details>
+          ))}
+        </div>
+      )}
       {!task.resource &&
         !task.notes &&
         !kit.linkedSources.length &&
         !kit.classSources.length &&
-        !kit.previousReviews.length && (
+        !kit.previousReviews.length &&
+        !kit.mistakes.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source
             in Library.

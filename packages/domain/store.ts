@@ -26,6 +26,7 @@ import {
   type StudySession,
   type Source,
   type CanvasRecord,
+  type Mistake,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -36,7 +37,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 25) {
+    if (version > 26) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -107,6 +108,10 @@ export class DeskStore {
       );
     if (version <= 23) this.db.exec("BEGIN; PRAGMA user_version=24; COMMIT;");
     if (version <= 24) this.db.exec("BEGIN; PRAGMA user_version=25; COMMIT;");
+    if (version <= 25)
+      this.db.exec(
+        "BEGIN; CREATE TABLE IF NOT EXISTS mistakes(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=26; COMMIT;",
+      );
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -153,6 +158,7 @@ export class DeskStore {
       state.sessions,
       state.gradeCategories,
       state.gradeEntries,
+      state.mistakes,
     ]);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
@@ -172,6 +178,10 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      mistakes: this.db
+        .prepare("SELECT data FROM mistakes ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Mistake),
       inference: JSON.parse(
         String(
           this.db
@@ -656,6 +666,89 @@ export class DeskStore {
             "INSERT INTO settings VALUES('inference',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
           )
           .run(JSON.stringify(inference));
+      }
+      if (
+        c.type === "mistake.create" ||
+        c.type === "mistake.update" ||
+        c.type === "mistake.forget"
+      ) {
+        const previous =
+          c.type === "mistake.create"
+            ? undefined
+            : state.mistakes.find((mistake) => mistake.id === c.id);
+        if (
+          c.type !== "mistake.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This mistake changed elsewhere. Reopen it before saving.",
+          );
+        if (c.type !== "mistake.forget") {
+          if (!state.classes.some((course) => course.id === c.input.classId))
+            throw Error("Choose an existing class for this mistake.");
+          if (
+            c.input.taskId &&
+            !state.tasks.some(
+              (task) =>
+                task.id === c.input.taskId && task.classId === c.input.classId,
+            )
+          )
+            throw Error("The linked task must belong to the selected class.");
+        }
+        entityId = previous?.id ?? randomUUID();
+        if (c.type === "mistake.forget") {
+          this.db.prepare("DELETE FROM mistakes WHERE id=?").run(entityId);
+        } else {
+          const mistake: Mistake = {
+            ...c.input,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            practiceTaskIds: previous?.practiceTaskIds ?? [],
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO mistakes VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(entityId, JSON.stringify(mistake));
+        }
+      }
+      if (c.type === "mistake.practice") {
+        const mistake = state.mistakes.find((item) => item.id === c.id);
+        if (!mistake || mistake.revision !== c.revision)
+          throw Error(
+            "This mistake changed elsewhere. Reopen it before practicing.",
+          );
+        const taskId = randomUUID();
+        const practice: Task = {
+          title: `Practice: ${mistake.concept}`,
+          classId: mistake.classId,
+          dueAt: null,
+          minutes: 20,
+          resource: null,
+          notes: `Practice generated from mistake ${mistake.id}.\n\nCorrection: ${mistake.correction}\nWhat went wrong: ${mistake.whatWentWrong}`,
+          deadlineConfirmed: true,
+          workKind: "optional-review",
+          importance: "high",
+          id: taskId,
+          completed: false,
+          revision: 0,
+          createdAt: timestamp,
+        };
+        this.db
+          .prepare("INSERT INTO tasks VALUES(?,?,?)")
+          .run(taskId, practice.classId, JSON.stringify(practice));
+        const updated: Mistake = {
+          ...mistake,
+          practiceTaskIds: [...mistake.practiceTaskIds, taskId],
+          revision: mistake.revision + 1,
+          updatedAt: timestamp,
+        };
+        this.db
+          .prepare("UPDATE mistakes SET data=? WHERE id=? AND data=?")
+          .run(JSON.stringify(updated), mistake.id, JSON.stringify(mistake));
+        entityId = taskId;
       }
       if (c.type === "memory.confirm") {
         const candidate = durationMemories(state).find(

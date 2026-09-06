@@ -1,5 +1,6 @@
 import { learningSessions } from "../../../packages/learning/memory";
 import { Memory } from "./Memory";
+import { Mistakes } from "./Mistakes";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
@@ -35,6 +36,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  mistakes: [],
   memories: [],
   inference: { enabled: true, excludedSessionIds: [] },
   tutoringMode: "balanced",
@@ -305,7 +307,14 @@ function App() {
       <aside>
         <div className="brand">The Desk</div>
         <nav aria-label="Main">
-          {["Home", "Plan", "Library", "Capture Inbox", "Memory"].map((p) => (
+          {[
+            "Home",
+            "Plan",
+            "Library",
+            "Capture Inbox",
+            "Memory",
+            "Mistakes",
+          ].map((p) => (
             <button
               key={p}
               aria-current={page === p ? "page" : undefined}
@@ -501,6 +510,8 @@ function App() {
           </>
         ) : page === "Memory" ? (
           <Memory data={data} save={(c) => act(c, true)} />
+        ) : page === "Mistakes" ? (
+          <Mistakes data={data} save={(c) => act(c, true)} />
         ) : page === "Plan" ? (
           <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
         ) : page === "Settings" ? (

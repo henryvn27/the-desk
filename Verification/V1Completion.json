@@ -560,7 +560,7 @@
       "live": "Installed unsigned macOS checklist and Session Kit regression pass. UI adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot. Controller fit check confirms no scroll in the exercised layout; screenshots inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Prior f881ffd hosted macOS/Windows checks/build/package pass (34007577938); checklist/controller Windows interaction unverified.",
-      "blocker": "Partial only: richer objectives, verified mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
+      "blocker": "Partial only: richer objectives, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
     },
     {
       "id": "SESSION-003",
@@ -792,14 +792,14 @@
         "Record concept, source, original attempt, what went wrong, correction, help used, confidence, and review due.",
         "Mistakes influence future plans, appear in an inspectable view, feed practice generation, and persist beyond the assignment/test."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; apps/desktop/src/Mistakes.tsx; packages/study/kit.ts",
+      "automated": "103 tests plus typecheck/lint/build: schema-26 persistence, revision-safe editing/forgetting, same-class validation, practice generation, planner influence, restart and Session Kit inclusion.",
+      "live": "Development Electron smoke records every field, edits, generates practice, restarts, forgets only the mistake, and confirms no renderer errors.",
+      "mac": "Unsigned installed arm64 smoke passes against /Users/henry/Applications/The Desk V1.app; screenshot and operated video retained, and app.asar matches the packaged artifact.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Windows interactive evidence remains to be recorded; broader academic graph and live tutoring use remain outside this slice."
     },
     {
       "id": "TUTOR-001",

@@ -237,7 +237,28 @@ export type AcademicMemory = z.infer<typeof memoryInput> & {
   createdAt: string;
   updatedAt: string;
 };
+export const mistakeInput = z.object({
+  classId: id,
+  taskId: id.nullable(),
+  concept: z.string().trim().min(1).max(300),
+  source: z.string().trim().min(1).max(500),
+  originalAttempt: z.string().trim().min(1).max(5000),
+  whatWentWrong: z.string().trim().min(1).max(5000),
+  correction: z.string().trim().min(1).max(5000),
+  helpUsed: z.string().trim().max(2000),
+  confidence: z.enum(["low", "medium", "high"]),
+  reviewDue: z.iso.datetime().nullable(),
+});
+export type MistakeInput = z.infer<typeof mistakeInput>;
+export type Mistake = MistakeInput & {
+  id: string;
+  revision: number;
+  practiceTaskIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
 export type Snapshot = {
+  mistakes: Mistake[];
   memories: AcademicMemory[];
   inference: { enabled: boolean; excludedSessionIds: string[] };
   tutoringMode: TutoringMode;
@@ -388,6 +409,23 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("memory.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("mistake.create"), input: mistakeInput }),
+  z.object({
+    type: z.literal("mistake.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: mistakeInput,
+  }),
+  z.object({
+    type: z.literal("mistake.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("mistake.practice"),
     id,
     revision: z.number().int().nonnegative(),
   }),
