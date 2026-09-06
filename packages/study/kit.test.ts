@@ -8,6 +8,7 @@ import type {
   Task,
   Source,
   StudySession,
+  TeacherEvidence,
 } from "../domain/contracts";
 import { sessionKit } from "./kit";
 const task: Task = {
@@ -259,5 +260,76 @@ test("session kit includes linked assessment context and excludes other tasks", 
       assessments,
     }).assessments.map((assessment) => assessment.id),
     ["linked-assessment"],
+  );
+});
+
+test("session kit keeps linked teacher evidence separate from Desk context", () => {
+  const teacherEvidence: TeacherEvidence[] = [
+    {
+      id: "linked-evidence",
+      classId: task.classId,
+      assessmentId: "linked-assessment",
+      taskId: null,
+      title: "Marked test",
+      kind: "graded-work",
+      source: "manual",
+      scoreEarned: 8,
+      scorePossible: 10,
+      teacherComments: "Show the sign convention.",
+      rubric: "Method and units",
+      observations: "Lost points on units.",
+      conceptIds: [],
+      includeInTeacherModeling: true,
+      capturedAt: "2026-09-05T15:00:00Z",
+      authority: "teacher-reported",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "other-evidence",
+      classId: task.classId,
+      assessmentId: "other-assessment",
+      taskId: null,
+      title: "Other marked work",
+      kind: "teacher-feedback",
+      source: "manual",
+      scoreEarned: null,
+      scorePossible: null,
+      teacherComments: "",
+      rubric: "",
+      observations: "",
+      conceptIds: [],
+      includeInTeacherModeling: true,
+      capturedAt: "2026-09-05T16:00:00Z",
+      authority: "teacher-reported",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  const assessments: Assessment[] = [
+    {
+      id: "linked-assessment",
+      classId: task.classId,
+      title: "Kinematics test",
+      kind: "test",
+      taskIds: [task.id],
+      dueAt: null,
+      gradeCategoryId: null,
+      notes: "",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  assert.deepEqual(
+    sessionKit(task, {
+      sources: [],
+      sessions: [],
+      assessments,
+      teacherEvidence,
+    }).teacherEvidence.map((evidence) => evidence.id),
+    ["linked-evidence"],
   );
 });

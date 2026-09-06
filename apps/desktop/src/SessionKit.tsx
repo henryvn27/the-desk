@@ -161,6 +161,43 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.teacherEvidence.length > 0 && (
+        <div>
+          <h4>Teacher evidence</h4>
+          <p className="muted">
+            Teacher-reported evidence is shown separately from Desk inference.
+          </p>
+          {kit.teacherEvidence.map((evidence) => (
+            <details key={evidence.id}>
+              <summary>
+                {evidence.title} · {evidence.kind.replace("-", " ")}
+              </summary>
+              {evidence.scoreEarned !== null &&
+                evidence.scorePossible !== null && (
+                  <p>
+                    <strong>Score:</strong> {evidence.scoreEarned}/
+                    {evidence.scorePossible}
+                  </p>
+                )}
+              {evidence.teacherComments && (
+                <p>
+                  <strong>Teacher comments:</strong> {evidence.teacherComments}
+                </p>
+              )}
+              {evidence.observations && (
+                <p>
+                  <strong>Observed:</strong> {evidence.observations}
+                </p>
+              )}
+              <p className="muted">
+                {evidence.includeInTeacherModeling
+                  ? "Included in teacher-pattern review"
+                  : "Excluded from teacher-pattern review"}
+              </p>
+            </details>
+          ))}
+        </div>
+      )}
       {!task.resource &&
         !task.notes &&
         !kit.linkedSources.length &&
@@ -169,7 +206,8 @@ export function SessionKit({
         !kit.mistakes.length &&
         !kit.concepts.length &&
         !kit.attempts.length &&
-        !kit.assessments.length && (
+        !kit.assessments.length &&
+        !kit.teacherEvidence.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source
             in Library.

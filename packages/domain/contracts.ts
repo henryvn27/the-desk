@@ -85,6 +85,53 @@ export type Assessment = AssessmentInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const evidenceKind = z.enum([
+  "graded-work",
+  "teacher-feedback",
+  "rubric",
+  "other",
+]);
+export const evidenceSource = z.enum(["manual", "text-import", "image-import"]);
+export const teacherEvidenceInput = z
+  .object({
+    classId: id,
+    assessmentId: id.nullable(),
+    taskId: id.nullable(),
+    title: z.string().trim().min(1).max(500),
+    kind: evidenceKind,
+    source: evidenceSource,
+    scoreEarned: z.number().min(0).max(1000000).nullable(),
+    scorePossible: z.number().positive().max(1000000).nullable(),
+    teacherComments: z.string().trim().max(10000),
+    rubric: z.string().trim().max(10000),
+    observations: z.string().trim().max(10000),
+    conceptIds: z.array(id).max(100),
+    includeInTeacherModeling: z.boolean(),
+    capturedAt: z.iso.datetime(),
+  })
+  .superRefine((input, ctx) => {
+    if (
+      (input.scoreEarned === null) !== (input.scorePossible === null) ||
+      (input.scoreEarned !== null &&
+        input.scorePossible !== null &&
+        input.scoreEarned > input.scorePossible)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["scoreEarned"],
+        message:
+          "Enter both score values with earned points no greater than possible points.",
+      });
+    }
+  });
+export type TeacherEvidenceInput = z.infer<typeof teacherEvidenceInput>;
+export type TeacherEvidence = TeacherEvidenceInput & {
+  id: string;
+  revision: number;
+  authority: "teacher-reported";
+  createdAt: string;
+  updatedAt: string;
+};
 export const taskInput = z.object({
   gradeContext: z
     .object({
@@ -375,6 +422,7 @@ export type Snapshot = {
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
   assessments: Assessment[];
+  teacherEvidence: TeacherEvidence[];
   concepts: Concept[];
   attempts: Attempt[];
   planChanges: PlanChange[];
@@ -472,6 +520,18 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("assessment.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("evidence.create"), input: teacherEvidenceInput }),
+  z.object({
+    type: z.literal("evidence.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: teacherEvidenceInput,
+  }),
+  z.object({
+    type: z.literal("evidence.forget"),
     id,
     revision: z.number().int().nonnegative(),
   }),

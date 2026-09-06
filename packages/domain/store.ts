@@ -18,6 +18,7 @@ import {
   type GradeCategory,
   type GradeEntry,
   type Assessment,
+  type TeacherEvidence,
   type RebalancePreview,
   type PlanChange,
   type StudyBlock,
@@ -40,7 +41,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 29) {
+    if (version > 30) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -126,6 +127,10 @@ export class DeskStore {
     if (version <= 28)
       this.db.exec(
         "BEGIN; CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL); PRAGMA user_version=29; COMMIT;",
+      );
+    if (version <= 29)
+      this.db.exec(
+        "BEGIN; CREATE TABLE IF NOT EXISTS teacher_evidence(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),assessment_id TEXT REFERENCES assessments(id) ON DELETE SET NULL,task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,data TEXT NOT NULL); PRAGMA user_version=30; COMMIT;",
       );
   }
   previewRebalance(now = new Date()): RebalancePreview {
@@ -246,6 +251,10 @@ export class DeskStore {
         .prepare("SELECT data FROM assessments ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as Assessment),
+      teacherEvidence: this.db
+        .prepare("SELECT data FROM teacher_evidence ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as TeacherEvidence),
       concepts: this.db
         .prepare("SELECT data FROM concepts ORDER BY rowid")
         .all()
@@ -545,6 +554,87 @@ export class DeskStore {
             .run(entityId, assessment.classId, JSON.stringify(assessment));
         } else {
           this.db.prepare("DELETE FROM assessments WHERE id=?").run(entityId);
+        }
+      }
+      if (
+        c.type === "evidence.create" ||
+        c.type === "evidence.update" ||
+        c.type === "evidence.forget"
+      ) {
+        const previous =
+          c.type === "evidence.create"
+            ? undefined
+            : state.teacherEvidence.find((evidence) => evidence.id === c.id);
+        if (
+          c.type !== "evidence.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This teacher evidence changed elsewhere. Reopen it before saving.",
+          );
+        const input = c.type === "evidence.forget" ? undefined : c.input;
+        const classId = input?.classId ?? previous?.classId;
+        if (!classId || !state.classes.some((course) => course.id === classId))
+          throw Error("Choose an existing class for this teacher evidence.");
+        if (
+          input?.assessmentId &&
+          !state.assessments.some(
+            (assessment) =>
+              assessment.id === input.assessmentId &&
+              assessment.classId === classId,
+          )
+        )
+          throw Error(
+            "The linked assessment must belong to the selected class.",
+          );
+        if (
+          input?.taskId &&
+          !state.tasks.some(
+            (task) => task.id === input.taskId && task.classId === classId,
+          )
+        )
+          throw Error("The linked task must belong to the selected class.");
+        const conceptIds = [
+          ...new Set(input?.conceptIds ?? previous?.conceptIds ?? []),
+        ];
+        if (
+          conceptIds.some(
+            (conceptId) =>
+              !state.concepts.some(
+                (concept) =>
+                  concept.id === conceptId && concept.classId === classId,
+              ),
+          )
+        )
+          throw Error(
+            "Every linked concept must belong to the selected class.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const evidence: TeacherEvidence = {
+            ...input,
+            conceptIds,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            authority: "teacher-reported",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO teacher_evidence VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,assessment_id=excluded.assessment_id,task_id=excluded.task_id,data=excluded.data",
+            )
+            .run(
+              entityId,
+              evidence.classId,
+              evidence.assessmentId,
+              evidence.taskId,
+              JSON.stringify(evidence),
+            );
+        } else {
+          this.db
+            .prepare("DELETE FROM teacher_evidence WHERE id=?")
+            .run(entityId);
         }
       }
       if (c.type === "planning.rebalance") {

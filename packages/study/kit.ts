@@ -5,6 +5,7 @@ import type {
   Mistake,
   Snapshot,
   Task,
+  TeacherEvidence,
 } from "../domain/contracts";
 
 /** Explicit associations only; class-wide notes are distinct from assignment sources. */
@@ -15,6 +16,7 @@ export function sessionKit(
     mistakes?: Mistake[];
     concepts?: Concept[];
     attempts?: Attempt[];
+    teacherEvidence?: TeacherEvidence[];
   },
 ) {
   const linkedSources = state.sources.filter((source) =>
@@ -85,6 +87,21 @@ export function sessionKit(
           (b.dueAt ? Date.parse(b.dueAt) : Infinity) ||
         a.title.localeCompare(b.title),
     );
+  const teacherEvidence = [...(state.teacherEvidence ?? [])]
+    .filter((evidence) => {
+      if (evidence.classId !== task.classId) return false;
+      const linkedTask = evidence.taskId === task.id;
+      const linkedAssessment = assessments.some(
+        (assessment) => assessment.id === evidence.assessmentId,
+      );
+      return linkedTask || linkedAssessment;
+    })
+    .sort(
+      (a, b) =>
+        Date.parse(b.capturedAt) - Date.parse(a.capturedAt) ||
+        b.createdAt.localeCompare(a.createdAt),
+    )
+    .slice(0, 5);
   return {
     linkedSources,
     classSources,
@@ -93,5 +110,6 @@ export function sessionKit(
     concepts,
     attempts,
     assessments,
+    teacherEvidence,
   };
 }
