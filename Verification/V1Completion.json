@@ -171,12 +171,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/intelligence/authority.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Assessments.tsx; apps/desktop/src/Evidence.tsx; apps/desktop/src/Authority.tsx; apps/desktop/src/Teachers.tsx; apps/desktop/src/Attempts.tsx",
-      "automated": "119 tests plus typecheck/lint/build: schema-29/30/31/32 assessment, teacher-evidence, Teacher identity/class-link and authority-claim persistence, explicit typed kinds/scores, same-class links, revision-safe CRUD, conflict preservation, explicit resolution, Lens conflict context and restart coverage, alongside existing source/task/concept/attempt graph checks.",
-      "live": "Installed unsigned macOS smoke creates and edits a Teacher across two classes, links teacher evidence, restarts, blocks unsafe identity removal, and forgets after unlinking; authority, teacher-evidence, assessment, Attempts, broad desktop and checklist regressions also pass.",
-      "mac": "Unsigned installed arm64 teacher, authority, evidence, assessment, Attempts, broad desktop and checklist regressions and app.asar/package byte comparison pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
-      "blocker": "Partial graph only. Text sources, classes, tasks, sessions, preferences, concepts, attempts, explicit assessments, teacher identity/class links, teacher-reported evidence and bounded due-date authority claims exist; most required entities, graded-work extraction, synchronization and Windows interaction remain incomplete."
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/units.test.ts; packages/intelligence/authority.ts; packages/planner/index.ts; packages/study/kit.ts; packages/study/kit.test.ts; apps/desktop/src/Assessments.tsx; apps/desktop/src/Evidence.tsx; apps/desktop/src/Authority.tsx; apps/desktop/src/Teachers.tsx; apps/desktop/src/Units.tsx; apps/desktop/src/Attempts.tsx; scripts/smoke-units.mjs",
+      "automated": "123 tests plus typecheck/lint/build: schema-29/30/31/32/33 assessment, teacher-evidence, Teacher identity/class-link, authority-claim, Track and Unit/Module persistence, explicit typed kinds/scores, same-class links, revision-safe CRUD, conflict preservation, explicit resolution, linked task protections, Lens conflict context and restart coverage, alongside existing source/task/concept/attempt graph checks.",
+      "live": "Installed unsigned macOS hierarchy smoke creates a Track, links a Unit to a task, restarts, blocks unsafe Track removal, maintains the nested Unit and forgets safely; Teacher, evidence, authority, assessment, Attempts, desktop, checklist and Session Kit regressions also pass.",
+      "mac": "Unsigned installed arm64 hierarchy, teacher, authority, evidence, assessment, Attempts, desktop, checklist and Session Kit smokes and app.asar/package byte comparison pass",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
+      "blocker": "Partial graph only. User identity, academic periods, persistent plan versions, integrations, connection capabilities, graded-work extraction, synchronization, prerequisites, hierarchy-aware planner behavior and Windows interaction remain incomplete."
     },
     {
       "id": "DOMAIN-002",
@@ -190,10 +190,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence; packages/domain; apps/desktop/src/Authority.tsx; apps/desktop/src/Teachers.tsx",
-      "automated": "119 tests plus typecheck/lint/build: provenance fields, confidence, explicit authority classes, revision-safe conflict resolution, durable explicit Teacher identity and Lens disclosure of competing claims.",
+      "automated": "123 tests plus typecheck/lint/build: provenance fields, confidence, explicit authority classes, revision-safe conflict resolution, durable explicit Teacher identity, class-scoped Track/Unit hierarchy and Lens disclosure of competing claims.",
       "live": "Installed authority smoke preserves competing claims and requires an explicit choice; installed Teacher smoke keeps identity/evidence links explicit and separate from Desk inference. No live provider response yet.",
       "mac": "Unsigned installed authority and Teacher smokes",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Live provider response/grounding quality/cost and broader inferred-fact criteria remain unverified; teacher-pattern inference and the authority ledger remain bounded/manual."
     },
     {
@@ -279,10 +279,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/intelligence/authority.ts; packages/domain/contracts.ts; packages/domain/store.ts; apps/desktop/src/Authority.tsx; packages/intelligence/grounding.ts",
-      "automated": "119 tests plus typecheck/lint/build: authority class ordering, confidence/provenance fields, same-class source/evidence links, stale claim/task revisions, conflict preservation, explicit resolution, durable Teacher identity and Lens disclosure.",
+      "automated": "123 tests plus typecheck/lint/build: authority class ordering, confidence/provenance fields, same-class source/evidence links, stale claim/task revisions, conflict preservation, explicit resolution, durable Teacher identity, class-scoped Track/Unit links and Lens disclosure.",
       "live": "Installed unsigned macOS authority and Teacher smokes record explicit due-date claims and teacher identity, show the conflict, require a choice, preserve the linked evidence context, and persist across restart.",
       "mac": "Unsigned installed arm64 authority and Teacher smokes plus app.asar/package byte comparison pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Bounded manual due-date authority and explicit Teacher identity are implemented. Live LMS/email/board integrations, automatic conflict generation, teacher-pattern inference, broader fact types and Windows interaction remain unimplemented or unverified."
     },
     {
@@ -555,11 +555,11 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/Assessments.tsx; apps/desktop/src/Evidence.tsx; apps/desktop/src/Teachers.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain; apps/desktop/src/TaskChecklist.tsx",
-      "automated": "119 tests plus typecheck/lint/build: checklist item revision/ownership validation, assessment, Teacher identity and teacher-evidence context filtering, archive/restore, unchanged task completion on check, scope revisions and immutable session-end checklist snapshots. Prior session/kit/correction/duration tests retained.",
-      "live": "Installed unsigned macOS Teacher, evidence, assessment, checklist and Session Kit regressions pass. The app creates explicit teacher identity and linked evidence context, adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot; controller fit check confirms no scroll in the exercised layout.",
-      "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
+      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/Units.tsx; apps/desktop/src/Assessments.tsx; apps/desktop/src/Evidence.tsx; apps/desktop/src/Teachers.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain; apps/desktop/src/TaskChecklist.tsx",
+      "automated": "123 tests plus typecheck/lint/build: checklist item revision/ownership validation, explicit assessment, Teacher identity and teacher-evidence context filtering, class-scoped Track/Unit hierarchy context, archive/restore, unchanged task completion on check, scope revisions and immutable session-end checklist snapshots. Prior session/kit/correction/duration tests retained.",
+      "live": "Installed unsigned macOS Units, Teacher, evidence, assessment, checklist and Session Kit regressions pass. The app nests a linked Unit under its Track, exposes explicit task context, creates teacher identity/evidence, adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot; controller fit check confirms no scroll in the exercised layout.",
+      "mac": "Installed unsigned arm64 hierarchy, Teacher, evidence, assessment, checklist and Session Kit smokes pass",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Partial only: richer objectives, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
     },
     {
@@ -574,10 +574,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/SessionReview.tsx; apps/desktop/src/SessionCorrection.tsx; apps/desktop/src/Attempts.tsx; packages/domain; packages/learning/duration.ts; packages/study/kit.ts; apps/desktop/src/TaskChecklist.tsx",
-      "automated": "119 tests plus typecheck/lint/build: explicit attempt, assessment, Teacher identity and teacher-reported evidence, schema-28/29/30/31/32 persistence, revision-safe edits, reversible linked concept counters and Session Kit inclusion, alongside checklist/session correction/duration coverage.",
-      "live": "Installed unsigned macOS Teacher, evidence, assessment, checklist and Session Kit regression passes plus the Attempts smoke. The app records/edits/restarts/forgets assignment-linked evidence and preserves task, assessment, concept and teacher state; screenshots and operated videos are retained.",
-      "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
+      "automated": "123 tests plus typecheck/lint/build: explicit attempt, assessment, Teacher identity and teacher-reported evidence, schema-28/29/30/31/32/33 persistence, class-scoped Track/Unit context, revision-safe edits, reversible linked concept counters and Session Kit inclusion, alongside checklist/session correction/duration coverage.",
+      "live": "Installed unsigned macOS Units, Teacher, evidence, assessment, checklist and Session Kit regressions pass plus the Attempts smoke. The app records/edits/restarts/forgets assignment-linked evidence, preserves task, assessment, concept, hierarchy and teacher state, and retains screenshots and operated videos.",
+      "mac": "Installed unsigned arm64 hierarchy, Teacher, evidence, assessment, checklist, Session Kit and Attempts smokes pass",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Partial only: automatic work detection, mistake/mastery/preparedness updates beyond explicit attempt counters, and Windows interaction remain unfinished."
     },
     {
@@ -739,10 +739,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Assessments.tsx; apps/desktop/src/Teachers.tsx; apps/desktop/src/Evidence.tsx",
-      "automated": "119 tests plus typecheck/lint/build: schema-29 assessment records with explicit contract kinds, due dates, revision-safe CRUD, duplicate-title rejection, same-class preparation-task/grade-category validation, schema-30/32 Teacher identity and teacher-reported evidence records with score/rubric/comments/observations, modeling exclusion and Session Kit context.",
+      "automated": "123 tests plus typecheck/lint/build: schema-29 assessment records with explicit contract kinds, due dates, revision-safe CRUD, duplicate-title rejection, same-class preparation-task/grade-category validation, schema-30/32 Teacher identity and teacher-reported evidence records with score/rubric/comments/observations, modeling exclusion and Session Kit context.",
       "live": "Development and unsigned installed Electron smoke creates a typed assessment, durable Teacher and teacher-reported scored evidence, links preparation task, concept, assessment and class identity, edits by revision, restarts, forgets evidence without deleting academic context, and confirms no renderer errors. Screenshots and operated videos are retained.",
       "mac": "Unsigned installed arm64 teacher and assessment smokes pass against /Users/henry/Applications/The Desk V1.app; screenshot and operated video retained, and app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Photo/OCR/graded-work extraction and Windows interaction remain unfinished; this slice models explicit assessment metadata plus durable Teacher and teacher-reported evidence records, while score/question/comment/rubric fields remain manually entered."
     },
     {
@@ -758,10 +758,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop/src/Gradebook.tsx; apps/desktop/src/Teachers.tsx; apps/desktop/src/Evidence.tsx; packages/grades; packages/domain",
-      "automated": "119 tests plus typecheck/lint/build pass; point-weighted ranges, missing/zero scores, invalid scenarios, unchanged originals, bounds, class ownership, stale corrections, schema-30 teacher-reported evidence, schema-32 Teacher identity, score bounds, modeling inclusion choice and restart coverage tested.",
+      "automated": "123 tests plus typecheck/lint/build pass; point-weighted ranges, missing/zero scores, invalid scenarios, unchanged originals, bounds, class ownership, stale corrections, schema-30 teacher-reported evidence, schema-32 Teacher identity, score bounds, modeling inclusion choice and restart coverage tested.",
       "live": "Installed macOS Teacher, evidence and gradebook smokes pass manual teacher-reported scores/comments/rubrics, explicit identity/class links, modeling exclusion, grade categories/scores/corrections, what-if bounds and restart persistence. Screenshots inspected; operated videos captured.",
       "mac": "Unsigned installed arm64 Teacher and gradebook smokes pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at the teacher checkpoint; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Teacher identity/pattern inference, generated practice from observed structure, screenshot/OCR extraction, grading exceptions, learned grade-impact planning and Windows interaction remain unfinished; projections cover one additional item under stated assumptions."
     },
     {
@@ -777,10 +777,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Concepts.tsx; apps/desktop/src/Attempts.tsx; apps/desktop/src/SessionKit.tsx",
-      "automated": "114 tests plus typecheck/lint/build: schema-27/28/29/30 persistence, revision-safe concept, attempt, assessment and teacher-evidence CRUD, same-class task/concept/assessment validation, duplicate-name and impossible-evidence rejection, reversible attempt counters, planner influence, Session Kit filtering and restart coverage.",
+      "automated": "123 tests plus typecheck/lint/build: schema-27/28/29/30 persistence, revision-safe concept, attempt, assessment and teacher-evidence CRUD, same-class task/concept/assessment validation, duplicate-name and impossible-evidence rejection, reversible attempt counters, planner influence, Session Kit filtering and restart coverage.",
       "live": "Development and installed Electron smoke records concept and assignment-linked attempt evidence, edits by revision, updates linked counters, restarts, forgets only the attempt/concept, and confirms no renderer errors.",
       "mac": "Unsigned installed arm64 smoke passes against /Users/henry/Applications/The Desk V1.app; screenshot and operated video retained, and app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34017304936; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34020056285; no requirement-specific Windows UI proof.",
       "blocker": "Windows interactive evidence remains to be recorded; broader cumulative recall, automatic preparedness inference, final-exam retention scheduling, categorical mastery transitions and live tutoring use remain outside this slice."
     },
     {

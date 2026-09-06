@@ -7,6 +7,8 @@ The product contract §4 defines the required academic graph. This document desc
 | Object | Storage and relationships | Evidence or authority |
 |---|---|---|
 | Class | `classes`; one class has many tasks | Student-entered name |
+| Track | `tracks`; class foreign key; one track groups same-class units/modules | Student-entered name and notes; explicit class hierarchy |
+| Unit / Module | `units`; class and optional track foreign keys; many-to-many task IDs | Student-entered kind, sequence, notes and task links; explicit hierarchy context |
 | Task | `tasks.class_id` foreign key; JSON payload; one task has many sessions | Student-confirmed title, due instant, estimate, optional HTTPS resource and notes |
 | Source | `sources` plus `source_classes`/`source_tasks` join tables; many-to-many links | Exact pasted text and capture time; user-provided authority |
 | Canvas / notebook | `canvases`, task foreign key, revision-checked scene; optional ordered pages with shared files/source links | Original drawing content; page identity and dimensions owned by Desk |
@@ -37,11 +39,11 @@ The product contract §4 defines the required academic graph. This document desc
 - Changing a confirmed deadline or revoking its confirmation requires explicit approval. Capture provenance survives the edit.
 - Uncertain deadlines are excluded from automatic planning. Capacity respects the configured local same-day window and buffer.
 - Remaining-time review cannot modify completed work or overwrite an estimate after a newer session of the same task.
-- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Schema 7 adds saved study blocks; schema 8 fences cancellation-aware clients; schema 9 adds rebalance records; schema 26 adds durable mistakes; schema 27 adds concepts and preparedness evidence; schema 28 adds explicit attempts; schema 29 adds assessments; schema 30 adds teacher-reported evidence; schema 31 adds authority claims and explicit resolutions; schema 32 adds durable Teacher identity and class links. Opening a future schema fails closed.
+- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Schema 7 adds saved study blocks; schema 8 fences cancellation-aware clients; schema 9 adds rebalance records; schema 26 adds durable mistakes; schema 27 adds concepts and preparedness evidence; schema 28 adds explicit attempts; schema 29 adds assessments; schema 30 adds teacher-reported evidence; schema 31 adds authority claims and explicit resolutions; schema 32 adds durable Teacher identity and class links; schema 33 adds durable Tracks and Units/Modules with class-safe task links. Opening a future schema fails closed.
 
 ## Required graph still missing
 
-User identity, academic periods, tracks, units, persistent plan versions, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
+User identity, academic periods, persistent plan versions, integrations and connection capabilities remain unimplemented. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
 
 The current local profile is not a multi-user security boundary. JSON payload persistence is not evidence that absent objects, synchronization, provenance corrections or confidence history are supported.
 
@@ -123,3 +125,5 @@ Schema 31 adds the local-first authority ledger. A due-date claim belongs to one
 
 
 Schema 32 adds durable `teachers` and the `teacher_classes` many-to-many class link. A Teacher stores explicit name, optional email, notes, revision and user-entered authority. Create/edit/forget is revision-safe, rejects duplicate names within an overlapping class set, and prevents removing a class or identity while linked teacher evidence would lose its class or teacher target. Teacher evidence may link a same-class Teacher; the Teachers view exposes the identity and linked-evidence count, while Session Kit shows explicit teacher context separately from Desk inference. This is a local identity and linkage slice, not teacher-pattern inference, external roster sync or graded-work extraction.
+
+Schema 33 adds durable `tracks` and `units`. Tracks belong to one class and group units/modules by explicit student-entered names and notes. Units belong to one class, may link one same-class Track, carry an explicit unit/module kind and sequence, and may link many same-class tasks. Create/edit/forget compares revisions, rejects duplicate class-local names and cross-class links, and blocks unsafe Track removal while Units still target it. Task class changes and undo are blocked while a Unit still links the task. The Units view exposes hierarchy and maintenance controls; Session Kit includes only Units explicitly linked to the active task and their Tracks. The planner keeps its conservative ordering and does not infer prerequisites or reorder work from hierarchy alone.
