@@ -571,7 +571,16 @@ function App() {
         ) : page === "Settings" ? (
           <>
             <h1>Settings</h1>
-            <UserSettings user={data.user} save={(c) => act(c, true)} />
+            <UserSettings
+              user={data.user}
+              save={(c) => act(c, true)}
+              exportData={() => window.desk.exportData()}
+              deleteData={async () => {
+                const next = await window.desk.deleteLocalData();
+                setData(next);
+                return next;
+              }}
+            />
             <PlanningSettings
               preferences={data.planning}
               mode={data.planningMode}

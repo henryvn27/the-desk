@@ -18,7 +18,7 @@ import {
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdirSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { DeskStore } from "../../../packages/domain/store";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
@@ -37,6 +37,7 @@ if (process.env.DESK_DATA_DIR)
   app.setPath("userData", resolve(process.env.DESK_DATA_DIR));
 if (!app.requestSingleInstanceLock()) app.exit(0);
 let store: DeskStore;
+let databasePath = "";
 let quitRequested = false;
 app.on("before-quit", () => {
   quitRequested = true;
@@ -153,7 +154,8 @@ app.whenReady().then(() => {
   );
   session.defaultSession.setPermissionCheckHandler(() => false);
   mkdirSync(app.getPath("userData"), { recursive: true });
-  store = new DeskStore(join(app.getPath("userData"), "desk.sqlite"));
+  databasePath = join(app.getPath("userData"), "desk.sqlite");
+  store = new DeskStore(databasePath);
   const check = (event: Electron.IpcMainInvokeEvent) => {
     if (
       ![...windows].some((w) => w.webContents === event.sender) ||
@@ -246,6 +248,57 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("desk:snapshot", (event) => {
     check(event);
+    return store.snapshot();
+  });
+  ipcMain.handle("desk:data-export", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to export data.");
+    const result = await dialog.showSaveDialog(main, {
+      title: "Export local Desk data",
+      defaultPath: "the-desk-data.json",
+      filters: [{ name: "JSON data", extensions: ["json"] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    await writeFile(
+      result.filePath,
+      JSON.stringify(
+        {
+          format: "the-desk-local-export",
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          snapshot: store.snapshot(),
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    return true;
+  });
+  ipcMain.handle("desk:data-delete", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to delete local data.");
+    const result = await dialog.showMessageBox(main, {
+      type: "warning",
+      title: "Delete local Desk data?",
+      message: "Delete the local academic workspace from this Mac?",
+      detail:
+        "This removes classes, tasks, sources, sessions, settings and local sync history. Export first if you may need a copy.",
+      buttons: ["Cancel", "Delete local data"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (result.response !== 1) return store.snapshot();
+    store.close();
+    await Promise.all([
+      rm(databasePath, { force: true }),
+      rm(`${databasePath}-wal`, { force: true }),
+      rm(`${databasePath}-shm`, { force: true }),
+    ]);
+    store = new DeskStore(databasePath);
     return store.snapshot();
   });
   ipcMain.handle("desk:canvas", (event, id) => {

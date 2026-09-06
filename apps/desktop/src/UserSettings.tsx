@@ -10,13 +10,18 @@ import { userError } from "./errors";
 export function UserSettings({
   user,
   save,
+  exportData,
+  deleteData,
 }: {
   user: User | null;
   save: (command: Command) => Promise<unknown>;
+  exportData: () => Promise<boolean>;
+  deleteData: () => Promise<unknown>;
 }) {
   const [editing, setEditing] = useState(user !== null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [dataBusy, setDataBusy] = useState(false);
   async function change(command: Command) {
     setBusy(true);
     setStatus("");
@@ -32,6 +37,31 @@ export function UserSettings({
       setStatus(userError(caught));
     } finally {
       setBusy(false);
+    }
+  }
+  async function exportLocalData() {
+    setDataBusy(true);
+    setStatus("");
+    try {
+      const saved = await exportData();
+      setStatus(saved ? "Local data exported." : "Export canceled.");
+    } catch (caught) {
+      setStatus(userError(caught));
+    } finally {
+      setDataBusy(false);
+    }
+  }
+  async function deleteLocalData() {
+    setDataBusy(true);
+    setStatus("");
+    try {
+      await deleteData();
+      setEditing(false);
+      setStatus("Local data deleted.");
+    } catch (caught) {
+      setStatus(userError(caught));
+    } finally {
+      setDataBusy(false);
     }
   }
   return (
@@ -141,6 +171,25 @@ export function UserSettings({
         </form>
       )}
       {status && <p role="status">{status}</p>}
+      <section>
+        <h2>Local data</h2>
+        <p>
+          Export a JSON copy of the local SQLite snapshot, or delete this
+          computer's local academic workspace after an explicit confirmation.
+          Provider keys and credentials are not part of the export.
+        </p>
+        <div className="actions">
+          <button disabled={dataBusy} onClick={() => void exportLocalData()}>
+            Export local data
+          </button>
+          <button
+            disabled={dataBusy}
+            onClick={() => void deleteLocalData()}
+          >
+            Delete local data
+          </button>
+        </div>
+      </section>
     </section>
   );
 }

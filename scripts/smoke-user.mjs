@@ -1,5 +1,5 @@
 import { _electron as electron } from "playwright";
-import { mkdtemp, mkdir, rm, copyFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, copyFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -55,6 +55,35 @@ try {
   assert.equal(snapshot.user.displayName, "Henry");
   assert.equal(snapshot.user.timeZone, "America/New_York");
   const userId = snapshot.user.id;
+  snapshot = await page.evaluate((className) => {
+    return window.desk.command({ type: "class.create", name: className });
+  }, "Physics");
+  snapshot = await page.evaluate((classId) => {
+    return window.desk.command({
+      type: "task.create",
+      input: {
+        title: "Export proof",
+        classId,
+        dueAt: null,
+        minutes: 15,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: false,
+      },
+    });
+  }, snapshot.classes[0].id);
+  const exportPath = join(data, "desk-export.json");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+  }, exportPath);
+  await page.getByRole("button", { name: "Export local data", exact: true }).click();
+  await page.getByText("Local data exported.", { exact: true }).waitFor();
+  const exported = JSON.parse(await readFile(exportPath, "utf8"));
+  assert.equal(exported.format, "the-desk-local-export");
+  assert.equal(exported.snapshot.user.displayName, "Henry");
+  assert.equal(exported.snapshot.classes[0].name, "Physics");
+  assert.equal(exported.snapshot.tasks[0].title, "Export proof");
+  assert.equal(JSON.stringify(exported).includes("OPENROUTER_API_KEY"), false);
   await page.screenshot({ path: join(output, "user.png") });
   const firstVideo = page.video();
   await app.close();
@@ -81,9 +110,25 @@ try {
     .waitFor();
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.user, null);
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = async () => ({ response: 1 });
+  });
+  await page.getByRole("button", { name: "Delete local data", exact: true }).click();
+  await page.getByText("Local data deleted.", { exact: true }).waitFor();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(snapshot.user, null);
+  assert.deepEqual(snapshot.classes, []);
+  assert.deepEqual(snapshot.tasks, []);
+  await app.close();
+  app = undefined;
+  await launch();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const emptied = await page.evaluate(() => window.desk.snapshot());
+  assert.deepEqual(emptied.classes, []);
+  assert.deepEqual(emptied.tasks, []);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: local user profile creates, persists across restart, updates by revision, and forgets without touching academic data.",
+    "PASS: local profile and academic data export without credentials; explicit local-data deletion resets SQLite and survives restart.",
   );
 } finally {
   if (app) await app.close();

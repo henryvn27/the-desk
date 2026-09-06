@@ -989,6 +989,8 @@ export interface DeskAPI {
   onEdit(listener: (action: "undo" | "redo") => void): () => void;
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
+  exportData(): Promise<boolean>;
+  deleteLocalData(): Promise<Snapshot>;
   canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   providerStatus(): Promise<{
