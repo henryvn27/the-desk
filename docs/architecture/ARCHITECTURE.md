@@ -10,6 +10,11 @@ Decision 2026-09-05: full Electron/React/TypeScript rebuild. Legacy Swift and Py
 - Lens currently owns a temporary native transparent Electron window with freehand paths and session context. An explicit one-shot display capture is implemented but permission behavior remains unverified. Typed model requests and normalized teaching marks are implemented with contract tests; live credential-based response quality remains unverified. Voice remains unimplemented. Selection alone is not Lens acceptance.
 - Domain entities are added through real vertical slices. Current tasks/classes/sessions are not the complete academic graph.
 
+The tracked V1 surface is guarded by `scripts/check-electron-only.mjs`, which
+fails `npm run check` if Swift, Xcode project, or Xcode workspace files appear.
+Historical Swift references in the contract and completion records describe
+what was removed; they are not executable product code.
+
 Development identifier `com.henryvanness.thedesk.v1` and separate user-data directory isolate the new app from the installed prototype and real academic data. Release identity and migration require deliberate review before replacement.
 
 Security reference: https://www.electronjs.org/docs/latest/tutorial/security
