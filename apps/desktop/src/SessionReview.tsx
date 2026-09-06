@@ -1,3 +1,4 @@
+import { SessionCorrection } from "./SessionCorrection";
 import { useState } from "react";
 import type {
   Command,
@@ -12,6 +13,7 @@ export function SessionReview({
   task,
   save,
   busy,
+  canCorrect,
 }: {
   session: StudySession;
   task: Task;
@@ -20,6 +22,7 @@ export function SessionReview({
     reportToCaller: boolean,
   ) => Promise<Snapshot | undefined>;
   busy: boolean;
+  canCorrect: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -101,6 +104,13 @@ export function SessionReview({
           </button>
           <button onClick={() => setEditing(true)}>Add details</button>
         </div>
+      )}
+      {!editing && canCorrect && (
+        <SessionCorrection
+          session={session}
+          task={task}
+          save={(command) => save(command, true)}
+        />
       )}
     </section>
   );

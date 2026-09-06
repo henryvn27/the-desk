@@ -29,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 15) {
+    if (version > 16) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -81,6 +81,7 @@ export class DeskStore {
     if (version <= 12) this.db.exec("BEGIN; PRAGMA user_version=13; COMMIT;");
     if (version <= 13) this.db.exec("BEGIN; PRAGMA user_version=14; COMMIT;");
     if (version <= 14) this.db.exec("BEGIN; PRAGMA user_version=15; COMMIT;");
+    if (version <= 15) this.db.exec("BEGIN; PRAGMA user_version=16; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -194,7 +195,7 @@ export class DeskStore {
         .all()
         .map((r) => JSON.parse(r.data as string) as Task),
       sessions: this.db
-        .prepare("SELECT data FROM sessions")
+        .prepare("SELECT data FROM sessions ORDER BY rowid")
         .all()
         .map((r) => JSON.parse(r.data as string) as StudySession),
     };
@@ -653,6 +654,60 @@ export class DeskStore {
           ))
             this.reserveCapturedTask(task, now);
       }
+      if (c.type === "session.correct") {
+        const session = state.sessions.find((s) => s.id === c.id);
+        if (!session?.endedAt)
+          throw Error("End this session before correcting it.");
+        const task = state.tasks.find((t) => t.id === session.taskId)!;
+        if (
+          (session.revision ?? 0) !== c.revision ||
+          (task.revision ?? 0) !== c.taskRevision
+        )
+          throw Error(
+            "This task or review changed. Close and reopen the correction.",
+          );
+        if (
+          state.sessions.filter((s) => s.taskId === task.id).at(-1)?.id !==
+          session.id
+        )
+          throw Error(
+            "A newer session exists. Correct the latest session instead.",
+          );
+        if (c.completed && c.remainingMinutes !== null)
+          throw Error("Completed work cannot have remaining study time.");
+        if (!c.completed && c.remainingMinutes === null)
+          throw Error("Enter the minutes still needed for unfinished work.");
+        session.corrections = [
+          ...(session.corrections ?? []),
+          {
+            correctedAt: timestamp,
+            fromCompleted: session.completionReported ?? null,
+            toCompleted: c.completed,
+            previousReview: session.review ?? null,
+            remainingMinutes: c.remainingMinutes,
+          },
+        ];
+        session.completionReported = c.completed;
+        session.review = {
+          reviewedAt: timestamp,
+          notes: c.notes,
+          remainingMinutes: c.remainingMinutes,
+        };
+        session.revision = (session.revision ?? 0) + 1;
+        task.completed = c.completed;
+        if (c.remainingMinutes !== null) {
+          task.minutes = c.remainingMinutes;
+          task.revision = (task.revision ?? 0) + 1;
+        }
+        entityId = session.id;
+        this.db
+          .prepare("UPDATE sessions SET data=? WHERE id=?")
+          .run(JSON.stringify(session), session.id);
+        this.db
+          .prepare("UPDATE tasks SET data=? WHERE id=?")
+          .run(JSON.stringify(task), task.id);
+        this.queue(task.id, "task.completion-corrected", timestamp);
+      }
       if (c.type === "session.review") {
         const session = state.sessions.find((s) => s.id === c.id);
         if (!session?.endedAt)
@@ -679,6 +734,7 @@ export class DeskStore {
             .run(JSON.stringify(task), task.id);
           this.queue(task.id, "task.remaining-time", timestamp);
         }
+        session.revision = (session.revision ?? 0) + 1;
         session.review = {
           reviewedAt: timestamp,
           notes: c.notes,

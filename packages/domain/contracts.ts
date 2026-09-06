@@ -95,6 +95,14 @@ export type Task = TaskInput & {
   createdAt: string;
 };
 export type StudySession = {
+  revision?: number;
+  corrections?: Array<{
+    correctedAt: string;
+    fromCompleted: boolean | null;
+    toCompleted: boolean;
+    previousReview: StudySession["review"] | null;
+    remainingMinutes: number | null;
+  }>;
   id: string;
   taskId: string;
   startedAt: string;
@@ -258,6 +266,15 @@ export const command = z.discriminatedUnion("type", [
   z.object({ type: z.literal("session.pause") }),
   z.object({ type: z.literal("session.resume") }),
   z.object({ type: z.literal("session.end"), completed: z.boolean() }),
+  z.object({
+    type: z.literal("session.correct"),
+    id,
+    revision: z.number().int().nonnegative(),
+    taskRevision: z.number().int().nonnegative(),
+    completed: z.boolean(),
+    notes: z.string().trim().max(20000),
+    remainingMinutes: z.number().int().min(5).max(2400).nullable(),
+  }),
   z.object({
     type: z.literal("session.review"),
     id,

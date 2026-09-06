@@ -573,12 +573,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop; packages/domain; packages/planner; packages/learning/duration.ts",
-      "automated": "68 tests plus typecheck/lint/build: durable start estimates, revision exclusion, same-class/work-type median, minimum samples, partial/legacy/multiple-session exclusion; prior scheduling/review coverage retained.",
-      "live": "Installed unsigned macOS duration smoke: synthetic historical timing through real store commands; UI applies optional estimate, starts/ends unfinished, corrects remaining time, restarts and verifies unchanged start baseline. Screenshot inspected and operated video captured.",
+      "implementation": "apps/desktop/src/SessionReview.tsx; apps/desktop/src/SessionCorrection.tsx; packages/domain; packages/learning/duration.ts",
+      "automated": "70 tests plus typecheck/lint/build: completion correction is atomic, requires current task/session revisions, rejects active or superseded sessions, retains timing/start estimates and previous review across restart. Duration-learning exclusions remain covered.",
+      "live": "Installed unsigned macOS correction smoke operates capture/start/finish, reopens work, inspects history, rejects a stale correction after an injected concurrent review, corrects completion and verifies restart. Installed duration regression also passes. Screenshot inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Prior 230551a hosted macOS/Windows checks/build/package pass (34006442962); this duration change has no Windows interaction proof.",
-      "blocker": "Partial only: automatic work detection, attempts/mistake/mastery/preparedness updates and completion correction remain unfinished; duration learning is conservative and opt-in."
+      "windows": "Prior 086eac5 hosted macOS/Windows checks/build/package pass (34006977441); no correction-specific Windows interaction proof.",
+      "blocker": "Partial only: automatic work detection and attempts/mistake/mastery/preparedness updates remain unfinished; duration learning is conservative and opt-in."
     },
     {
       "id": "LENS-001",

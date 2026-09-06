@@ -18,6 +18,7 @@ import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
 import { Lens } from "./Lens";
+import { SessionCorrection } from "./SessionCorrection";
 import { SessionReview } from "./SessionReview";
 declare global {
   interface Window {
@@ -353,6 +354,10 @@ function App() {
               <SessionReview
                 key={unreviewed.id}
                 session={unreviewed}
+                canCorrect={
+                  data.sessions.filter((s) => s.taskId === reviewTask.id).at(-1)
+                    ?.id === unreviewed.id
+                }
                 task={reviewTask}
                 save={act}
                 busy={busy}
@@ -478,6 +483,7 @@ function App() {
             open={open}
             edit={setEditing}
             saveGrade={(c) => act(c, true)}
+            saveSession={(c) => act(c, true)}
             saveSource={(input) => act({ type: "source.create", input }, true)}
             openCanvas={openCanvas}
             newNotebook={newNotebook}
@@ -545,6 +551,7 @@ function Library({
   edit,
   saveSource,
   saveGrade,
+  saveSession,
   openCanvas,
   newNotebook,
 }: {
@@ -553,6 +560,7 @@ function Library({
   open: (id: string) => Promise<void>;
   edit: (task: Task) => void;
   saveGrade: (c: Command) => Promise<unknown>;
+  saveSession: (c: Command) => Promise<unknown>;
   saveSource: (
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
@@ -636,6 +644,13 @@ function Library({
                           {new Date(s.endedAt!).toLocaleString()} ·{" "}
                           {Math.round(s.actualMinutes ?? 0)} min tracked
                         </p>
+                        <p>
+                          {s.completionReported === undefined
+                            ? "Completion not reported"
+                            : s.completionReported
+                              ? "Reported finished"
+                              : "Reported unfinished"}
+                        </p>
                         {s.estimateAtStart && (
                           <p>
                             {s.estimateAtStart.minutes} min estimated remaining
@@ -643,6 +658,51 @@ function Library({
                           </p>
                         )}
                         {s.review?.notes && <p>{s.review.notes}</p>}
+                        {!!s.corrections?.length && (
+                          <details>
+                            <summary>Correction history</summary>
+                            {s.corrections.map((correction, index) => (
+                              <div key={index}>
+                                <p>
+                                  {new Date(
+                                    correction.correctedAt,
+                                  ).toLocaleString()}{" "}
+                                  ·{" "}
+                                  {correction.fromCompleted === null
+                                    ? "Unreported"
+                                    : correction.fromCompleted
+                                      ? "Finished"
+                                      : "Unfinished"}{" "}
+                                  →{" "}
+                                  {correction.toCompleted
+                                    ? "Finished"
+                                    : "Unfinished"}
+                                </p>
+                                {correction.previousReview?.notes && (
+                                  <p>
+                                    Previous notes:{" "}
+                                    {correction.previousReview.notes}
+                                  </p>
+                                )}
+                                {correction.remainingMinutes !== null && (
+                                  <p>
+                                    {correction.remainingMinutes} minutes
+                                    remaining after correction
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </details>
+                        )}
+                        {data.sessions
+                          .filter((session) => session.taskId === t.id)
+                          .at(-1)?.id === s.id && (
+                          <SessionCorrection
+                            session={s}
+                            task={t}
+                            save={saveSession}
+                          />
+                        )}
                         {s.review?.remainingMinutes != null && (
                           <p>
                             {s.review.remainingMinutes} minutes remaining,
