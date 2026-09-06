@@ -29,6 +29,13 @@ type SupabaseConfig = {
   source: "development-env" | "process-env";
 };
 
+export type SupabaseSyncContext = {
+  url: string;
+  publishableKey: string;
+  accessToken: string;
+  userId: string;
+};
+
 export class SupabaseAccount {
   private readonly sessionPath: string;
   private readonly config: SupabaseConfig | null;
@@ -39,7 +46,7 @@ export class SupabaseAccount {
   }
 
   status(): SupabaseAccountStatus {
-    const session = this.readSession();
+    const session = this.activeSession();
     return {
       configured: this.config !== null,
       authenticated: session !== null,
@@ -47,6 +54,17 @@ export class SupabaseAccount {
       userId: session?.userId ?? null,
       secureStorage: safeStorage.isEncryptionAvailable(),
       source: this.config?.source ?? null,
+    };
+  }
+
+  syncContext(): SupabaseSyncContext | null {
+    const session = this.activeSession();
+    if (!session || !this.config) return null;
+    return {
+      url: this.config.url,
+      publishableKey: this.config.publishableKey,
+      accessToken: session.accessToken,
+      userId: session.userId,
     };
   }
 
@@ -137,6 +155,13 @@ export class SupabaseAccount {
     } catch {
       return null;
     }
+  }
+
+  private activeSession(): SupabaseSession | null {
+    const session = this.readSession();
+    return session && (session.expiresAt === null || session.expiresAt > Date.now())
+      ? session
+      : null;
   }
 
   private saveSession(session: SupabaseSession) {

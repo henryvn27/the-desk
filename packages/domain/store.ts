@@ -41,7 +41,9 @@ import {
   type Attempt,
   type Plan,
   type OutboxOperation,
+  type SyncEnvelope,
   type SyncConflict,
+  type SyncConflictInput,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -52,7 +54,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 37) {
+    if (version > 38) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -205,6 +207,20 @@ export class DeskStore {
         resolved_at TEXT
       );`);
       this.db.exec("PRAGMA user_version=37; COMMIT;");
+    }
+    if (version <= 37) {
+      this.db.exec("BEGIN;");
+      const columns = new Set(
+        this.db
+          .prepare("PRAGMA table_info(outbox)")
+          .all()
+          .map((row) => row.name as string),
+      );
+      if (!columns.has("payload"))
+        this.db.exec(
+          "ALTER TABLE outbox ADD COLUMN payload TEXT NOT NULL DEFAULT '{}';",
+        );
+      this.db.exec("PRAGMA user_version=38; COMMIT;");
     }
   }
   previewRebalance(now = new Date()): RebalancePreview {
@@ -504,6 +520,52 @@ export class DeskStore {
         .all()
         .map((r) => JSON.parse(r.data as string) as StudySession),
     };
+  }
+  syncBatch(limit = 25): SyncEnvelope[] {
+    const bounded = Math.max(1, Math.min(100, Math.trunc(limit)));
+    return this.db
+      .prepare(
+        "SELECT id,entity_id,operation,created_at,status,attempts,last_attempt_at,last_error,payload FROM outbox WHERE status IN ('queued','retrying') ORDER BY rowid ASC LIMIT ?",
+      )
+      .all(bounded)
+      .map(
+        (row) =>
+          ({
+            id: row.id,
+            entityId: row.entity_id,
+            operation: row.operation,
+            createdAt: row.created_at,
+            status: row.status,
+            attempts: row.attempts,
+            lastAttemptAt: row.last_attempt_at,
+            lastError: row.last_error,
+            payload: row.payload,
+          }) as SyncEnvelope,
+      );
+  }
+  markSyncAttempt(operationId: string, at: string) {
+    this.db
+      .prepare(
+        "UPDATE outbox SET status='retrying',attempts=attempts+1,last_attempt_at=?,last_error=NULL WHERE id=? AND status IN ('queued','retrying')",
+      )
+      .run(at, operationId);
+  }
+  markSyncFailure(operationId: string, at: string, error: string) {
+    this.db
+      .prepare(
+        "UPDATE outbox SET status='retrying',last_attempt_at=?,last_error=? WHERE id=? AND status='retrying'",
+      )
+      .run(at, error.slice(0, 500), operationId);
+  }
+  markSynced(operationId: string, at: string) {
+    this.db
+      .prepare(
+        "UPDATE outbox SET status='synced',last_attempt_at=?,last_error=NULL WHERE id=? AND status='retrying'",
+      )
+      .run(at, operationId);
+  }
+  recordSyncConflict(input: SyncConflictInput, now = new Date()): Snapshot {
+    return this.execute({ type: "sync.conflict.record", input }, now);
   }
   execute(raw: Command, now = new Date()): Snapshot {
     const c = command.parse(raw);
@@ -2525,9 +2587,74 @@ export class DeskStore {
   private queue(id: string, operation: string, at: string) {
     this.db
       .prepare(
-        "INSERT INTO outbox(id,entity_id,operation,created_at,status,attempts,last_attempt_at,last_error) VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO outbox(id,entity_id,operation,created_at,status,attempts,last_attempt_at,last_error,payload) VALUES(?,?,?,?,?,?,?,?,?)",
       )
-      .run(randomUUID(), id, operation, at, "queued", 0, null, null);
+      .run(
+        randomUUID(),
+        id,
+        operation,
+        at,
+        "queued",
+        0,
+        null,
+        null,
+        this.syncPayload(id, operation),
+      );
+  }
+  private syncPayload(entityId: string, operation: string) {
+    const candidates: Array<[string, string]> = [
+      ["classes", "SELECT id,name,color FROM classes WHERE id=?"],
+      ["tasks", "SELECT id,class_id,data FROM tasks WHERE id=?"],
+      ["sessions", "SELECT id,task_id,data,active FROM sessions WHERE id=?"],
+      [
+        "sources",
+        "SELECT id,title,text,createdAt,authority FROM sources WHERE id=?",
+      ],
+      ["canvases", "SELECT id,taskId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
+      ["study_blocks", "SELECT id,task_id,data FROM study_blocks WHERE id=?"],
+      ["plan_changes", "SELECT id,appliedAt,data FROM plan_changes WHERE id=?"],
+      ["grade_categories", "SELECT id,class_id,data FROM grade_categories WHERE id=?"],
+      ["grade_entries", "SELECT id,category_id,data FROM grade_entries WHERE id=?"],
+      ["assessments", "SELECT id,class_id,data FROM assessments WHERE id=?"],
+      ["teacher_evidence", "SELECT id,class_id,data FROM teacher_evidence WHERE id=?"],
+      ["authority_claims", "SELECT id,class_id,task_id,data FROM authority_claims WHERE id=?"],
+      ["authority_resolutions", "SELECT id,task_id,fact,claim_id,data FROM authority_resolutions WHERE id=?"],
+      ["teachers", "SELECT id,data FROM teachers WHERE id=?"],
+      ["tracks", "SELECT id,class_id,data FROM tracks WHERE id=?"],
+      ["units", "SELECT id,class_id,track_id,data FROM units WHERE id=?"],
+      ["academic_periods", "SELECT id,data FROM academic_periods WHERE id=?"],
+      ["spaces", "SELECT id,data FROM spaces WHERE id=?"],
+      ["users", "SELECT id,data FROM users WHERE id=?"],
+      ["plans", "SELECT id,data FROM plans WHERE id=?"],
+      ["mistakes", "SELECT id,data FROM mistakes WHERE id=?"],
+      ["concepts", "SELECT id,data FROM concepts WHERE id=?"],
+      ["attempts", "SELECT id,data FROM attempts WHERE id=?"],
+      ["capture_inbox", "SELECT id,data FROM capture_inbox WHERE id=?"],
+      ["memories", "SELECT id,data FROM memories WHERE id=?"],
+      ["settings", "SELECT id,data FROM settings WHERE id=?"],
+    ];
+    for (const [table, query] of candidates) {
+      const row = this.db.prepare(query).get(entityId);
+      if (!row) continue;
+      const record: Record<string, unknown> = { table, row };
+      if (table === "sources") {
+        record.classIds = this.db
+          .prepare("SELECT class_id FROM source_classes WHERE source_id=?")
+          .all(entityId)
+          .map((item) => item.class_id);
+        record.taskIds = this.db
+          .prepare("SELECT task_id FROM source_tasks WHERE source_id=?")
+          .all(entityId)
+          .map((item) => item.task_id);
+      }
+      if (table === "teachers")
+        record.classIds = this.db
+          .prepare("SELECT class_id FROM teacher_classes WHERE teacher_id=?")
+          .all(entityId)
+          .map((item) => item.class_id);
+      return JSON.stringify({ entityId, operation, record });
+    }
+    return JSON.stringify({ entityId, operation, deleted: true });
   }
   canvas(id: string): CanvasRecord {
     const row = this.db.prepare("SELECT * FROM canvases WHERE id=?").get(id);

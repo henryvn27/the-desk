@@ -21,6 +21,8 @@ const api: DeskAPI = {
   accountSignUp: (email, password) =>
     ipcRenderer.invoke("desk:account-sign-up", email, password),
   accountSignOut: () => ipcRenderer.invoke("desk:account-sign-out"),
+  syncStatus: () => ipcRenderer.invoke("desk:sync-status"),
+  syncNow: () => ipcRenderer.invoke("desk:sync-now"),
   importCaptureFiles: () => ipcRenderer.invoke("desk:capture-import"),
   importProviderKey: () => ipcRenderer.invoke("desk:provider-import"),
   removeProviderKey: () => ipcRenderer.invoke("desk:provider-remove"),

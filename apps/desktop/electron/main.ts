@@ -23,6 +23,7 @@ import { DeskStore } from "../../../packages/domain/store";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
 import { SupabaseAccount } from "./supabase";
+import { SupabaseSyncCoordinator } from "./supabase-sync";
 import {
   askLens,
   lensInputSchema,
@@ -40,6 +41,7 @@ if (!app.requestSingleInstanceLock()) app.exit(0);
 let store: DeskStore;
 let databasePath = "";
 let account: SupabaseAccount;
+let sync: SupabaseSyncCoordinator;
 let quitRequested = false;
 app.on("before-quit", () => {
   quitRequested = true;
@@ -178,6 +180,7 @@ app.whenReady().then(() => {
       ? undefined
       : join(app.getAppPath(), ".env.local"),
   );
+  sync = new SupabaseSyncCoordinator(() => store, account);
   ipcMain.handle("desk:capture-import", async (event) => {
     check(event);
     if (event.sender !== main?.webContents || !main)
@@ -208,19 +211,35 @@ app.whenReady().then(() => {
     check(event);
     if (event.sender !== main?.webContents || !main)
       throw Error("Open Settings in the main Desk window to sign in.");
-    return account.signIn(email, password);
+    const result = await account.signIn(email, password);
+    sync.schedule();
+    return result;
   });
   ipcMain.handle("desk:account-sign-up", async (event, email, password) => {
     check(event);
     if (event.sender !== main?.webContents || !main)
       throw Error("Open Settings in the main Desk window to create an account.");
-    return account.signUp(email, password);
+    const result = await account.signUp(email, password);
+    sync.schedule();
+    return result;
   });
   ipcMain.handle("desk:account-sign-out", async (event) => {
     check(event);
     if (event.sender !== main?.webContents || !main)
       throw Error("Open Settings in the main Desk window to sign out.");
-    return account.signOut();
+    const result = await account.signOut();
+    sync.close();
+    return result;
+  });
+  ipcMain.handle("desk:sync-status", (event) => {
+    check(event);
+    return sync.status();
+  });
+  ipcMain.handle("desk:sync-now", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to sync.");
+    return sync.syncNow();
   });
   ipcMain.handle("desk:provider-import", async (event) => {
     check(event);
@@ -329,6 +348,7 @@ app.whenReady().then(() => {
       rm(`${databasePath}-shm`, { force: true }),
     ]);
     store = new DeskStore(databasePath);
+    sync.schedule();
     return store.snapshot();
   });
   ipcMain.handle("desk:canvas", (event, id) => {
@@ -368,6 +388,7 @@ app.whenReady().then(() => {
   ipcMain.handle("desk:command", (event, value) => {
     check(event);
     const state = store.execute(value);
+    sync.schedule();
     if (
       state.sessions.some((s) => !s.endedAt) &&
       (!controller || controller.isDestroyed())
@@ -444,6 +465,7 @@ app.whenReady().then(() => {
     if (lens?.webContents === event.sender) lens.close();
   });
   main = makeWindow("main");
+  sync.schedule();
   if (store.snapshot().sessions.some((s) => !s.endedAt)) {
     controller = makeWindow("controller");
     controller.on("closed", () => {
@@ -465,6 +487,7 @@ app.whenReady().then(() => {
 });
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  sync?.close();
   store?.close();
 });
 app.on("window-all-closed", () => {

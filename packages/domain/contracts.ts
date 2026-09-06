@@ -156,10 +156,13 @@ export type OutboxOperation = {
   entityId: string;
   operation: string;
   createdAt: string;
-  status: "queued" | "retrying" | "conflict" | "resolved";
+  status: "queued" | "retrying" | "conflict" | "resolved" | "synced";
   attempts: number;
   lastAttemptAt: string | null;
   lastError: string | null;
+};
+export type SyncEnvelope = OutboxOperation & {
+  payload: string;
 };
 export const syncConflictResolution = z.enum(["keep-local", "keep-remote"]);
 export type SyncConflict = {
@@ -1002,6 +1005,8 @@ export interface DeskAPI {
   accountSignIn(email: string, password: string): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
   accountSignUp(email: string, password: string): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
   accountSignOut(): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
+  syncStatus(): Promise<import("../integrations/supabase-sync").DeskSyncStatus>;
+  syncNow(): Promise<import("../integrations/supabase-sync").DeskSyncStatus>;
   importProviderKey(): Promise<boolean>;
   importCaptureFiles(): Promise<Snapshot | null>;
   removeProviderKey(): Promise<void>;

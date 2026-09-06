@@ -3,6 +3,7 @@ import type {
   OutboxOperation,
   SyncConflict,
 } from "../../../packages/domain/contracts";
+import type { DeskSyncStatus } from "../../../packages/integrations/supabase-sync";
 import { useState } from "react";
 import { userError } from "./errors";
 
@@ -10,10 +11,14 @@ export function SyncSettings({
   outbox,
   conflicts,
   save,
+  status,
+  syncNow,
 }: {
   outbox: OutboxOperation[];
   conflicts: SyncConflict[];
   save: (command: Command) => Promise<unknown>;
+  status: DeskSyncStatus;
+  syncNow: () => Promise<DeskSyncStatus>;
 }) {
   const [error, setError] = useState("");
   const waiting = outbox.filter(
@@ -28,21 +33,43 @@ export function SyncSettings({
       setError(userError(caught));
     }
   }
+  async function runSync() {
+    setError("");
+    try {
+      await syncNow();
+    } catch (caught) {
+      setError(userError(caught));
+    }
+  }
+  const cloudLabel =
+    status.phase === "syncing"
+      ? "Cloud sync: syncing"
+      : status.phase === "synced"
+        ? "Cloud sync: ready"
+        : status.phase === "error"
+          ? "Cloud sync: unavailable"
+          : status.authenticated
+            ? "Cloud sync: connected"
+            : "Cloud sync: not connected";
   return (
     <section>
       <h2>Local sync boundary</h2>
       <p>
         SQLite is the authoritative store on this computer. Desk records local
-        change intent in an outbox so a future account can sync it; this build
-        does not upload those operations anywhere.
+        change intent in an outbox and uploads it asynchronously only after a
+        signed-in account and the approved Supabase table policy are available.
       </p>
       <div className="sync-status" role="status">
-        <strong>Cloud sync: not connected</strong>
+        <strong>{cloudLabel}</strong>
         <span>
           {waiting.length === 0
             ? "No local operations are waiting."
             : `${waiting.length} local operation${waiting.length === 1 ? "" : "s"} waiting for a future sync.`}
         </span>
+        {status.lastSyncedAt && (
+          <span>Last synced {new Date(status.lastSyncedAt).toLocaleString()}.</span>
+        )}
+        {status.uploaded > 0 && <span>{status.uploaded} operation(s) uploaded this run.</span>}
       </div>
       <div className="actions">
         <button
@@ -51,7 +78,14 @@ export function SyncSettings({
         >
           Retry queued operations
         </button>
+        <button
+          disabled={!status.authenticated || waiting.length === 0 || status.phase === "syncing"}
+          onClick={() => void runSync()}
+        >
+          Sync now
+        </button>
       </div>
+      {status.lastError && <p role="status">{status.lastError}</p>}
       {outbox.some((operation) => operation.status === "conflict") && (
         <p className="attention">
           Some local changes are paused because both local and remote copies

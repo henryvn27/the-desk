@@ -14,10 +14,17 @@ test("local outbox records durable intent without claiming cloud sync", async ()
     assert.ok(created.outbox.length > 0);
     assert.equal(created.outbox.at(-1)?.operation, "class.create");
     const operationId = created.outbox.at(-1)?.id;
+    const envelope = store.syncBatch()[0]!;
+    assert.equal(envelope.id, operationId);
+    assert.match(envelope.payload, /Physics/);
+    store.markSyncAttempt(operationId!, "2026-09-06T12:01:00.000Z");
+    store.markSynced(operationId!, "2026-09-06T12:02:00.000Z");
+    assert.equal(store.snapshot().outbox.at(-1)?.status, "synced");
     store.close();
 
     const restarted = new DeskStore(database);
     assert.equal(restarted.snapshot().outbox.at(-1)?.id, operationId);
+    assert.equal(restarted.snapshot().outbox.at(-1)?.status, "synced");
     assert.equal(restarted.snapshot().classes[0]?.name, "Physics");
     restarted.close();
   } finally {

@@ -23,6 +23,7 @@ import type {
   Command,
   Task,
 } from "../../../packages/domain/contracts";
+import type { DeskSyncStatus } from "../../../packages/integrations/supabase-sync";
 import { planWeek, todayWindow } from "../../../packages/planner";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
 import { StudyPlan } from "./StudyPlan";
@@ -81,6 +82,16 @@ const empty: Snapshot = {
   sessions: [],
   planning: defaultPlanningPreferences,
 };
+const emptySync: DeskSyncStatus = {
+  configured: false,
+  authenticated: false,
+  phase: "disabled",
+  queued: 0,
+  unresolvedConflicts: 0,
+  lastSyncedAt: null,
+  lastError: null,
+  uploaded: 0,
+};
 function App() {
   const [data, setData] = useState(empty),
     [page, setPage] = useState("Home"),
@@ -90,10 +101,27 @@ function App() {
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
   const [captureNotice, setCaptureNotice] = useState("");
+  const [syncStatus, setSyncStatus] = useState(emptySync);
   const [editing, setEditing] = useState<Task>();
   const [reviewingCapture, setReviewingCapture] = useState<CaptureInboxItem>();
   const [canvas, setCanvas] =
     useState<import("../../../packages/domain/contracts").CanvasRecord>();
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      void window.desk
+        .syncStatus()
+        .then((next) => {
+          if (active) setSyncStatus(next);
+        })
+        .catch(() => undefined);
+    refresh();
+    const timer = window.setInterval(refresh, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
   async function openCanvas(taskId: string, canvasId?: string) {
     try {
       const existing = data.canvases.find(
@@ -600,6 +628,13 @@ function App() {
             <SyncSettings
               outbox={data.outbox}
               conflicts={data.syncConflicts}
+              status={syncStatus}
+              syncNow={async () => {
+                const next = await window.desk.syncNow();
+                setSyncStatus(next);
+                setData(await window.desk.snapshot());
+                return next;
+              }}
               save={(c) => act(c, true)}
             />
             <h2>Lens</h2>
