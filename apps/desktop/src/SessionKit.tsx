@@ -101,12 +101,41 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.concepts.length > 0 && (
+        <div>
+          <h4>Concepts to review</h4>
+          <p className="muted">
+            Explicit preparedness evidence for this class; it does not claim
+            mastery or completion.
+          </p>
+          {kit.concepts.map((concept) => (
+            <details key={concept.id}>
+              <summary>
+                {concept.name} · {concept.preparedness.replace("-", " ")}
+              </summary>
+              <p>
+                <strong>Status:</strong> {concept.status.replace("-", " ")}
+              </p>
+              <p>
+                <strong>Retention:</strong>{" "}
+                {concept.retentionMode === "long-term" ? "Long-term" : "Course"}
+              </p>
+              {concept.evidenceNote && (
+                <p>
+                  <strong>Evidence:</strong> {concept.evidenceNote}
+                </p>
+              )}
+            </details>
+          ))}
+        </div>
+      )}
       {!task.resource &&
         !task.notes &&
         !kit.linkedSources.length &&
         !kit.classSources.length &&
         !kit.previousReviews.length &&
-        !kit.mistakes.length && (
+        !kit.mistakes.length &&
+        !kit.concepts.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source
             in Library.

@@ -1,6 +1,7 @@
 import { learningSessions } from "../../../packages/learning/memory";
 import { Memory } from "./Memory";
 import { Mistakes } from "./Mistakes";
+import { Concepts } from "./Concepts";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
@@ -45,6 +46,7 @@ const empty: Snapshot = {
   planningMode: "auto-plan",
   gradeCategories: [],
   gradeEntries: [],
+  concepts: [],
   planChanges: [],
   studyBlocks: [],
   canvases: [],
@@ -314,6 +316,7 @@ function App() {
             "Capture Inbox",
             "Memory",
             "Mistakes",
+            "Concepts",
           ].map((p) => (
             <button
               key={p}
@@ -512,6 +515,8 @@ function App() {
           <Memory data={data} save={(c) => act(c, true)} />
         ) : page === "Mistakes" ? (
           <Mistakes data={data} save={(c) => act(c, true)} />
+        ) : page === "Concepts" ? (
+          <Concepts data={data} save={(c) => act(c, true)} />
         ) : page === "Plan" ? (
           <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
         ) : page === "Settings" ? (

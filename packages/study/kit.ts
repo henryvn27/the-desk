@@ -1,9 +1,12 @@
-import type { Mistake, Snapshot, Task } from "../domain/contracts";
+import type { Concept, Mistake, Snapshot, Task } from "../domain/contracts";
 
 /** Explicit associations only; class-wide notes are distinct from assignment sources. */
 export function sessionKit(
   task: Task,
-  state: Pick<Snapshot, "sources" | "sessions"> & { mistakes?: Mistake[] },
+  state: Pick<Snapshot, "sources" | "sessions"> & {
+    mistakes?: Mistake[];
+    concepts?: Concept[];
+  },
 ) {
   const linkedSources = state.sources.filter((source) =>
     source.taskIds.includes(task.id),
@@ -29,5 +32,26 @@ export function sessionKit(
           (b.reviewDue ? Date.parse(b.reviewDue) : Infinity) ||
         b.createdAt.localeCompare(a.createdAt),
     );
-  return { linkedSources, classSources, previousReviews, mistakes };
+  const concepts = [...(state.concepts ?? [])]
+    .filter((concept) => {
+      if (concept.classId !== task.classId) return false;
+      const linked = concept.taskIds.includes(task.id);
+      const weak =
+        concept.preparedness === "not-ready" ||
+        concept.preparedness === "developing" ||
+        concept.status === "review-due";
+      const due =
+        concept.reviewDue !== null &&
+        Date.parse(concept.reviewDue) <= Date.now();
+      return linked || weak || due;
+    })
+    .sort(
+      (a, b) =>
+        Number(b.taskIds.includes(task.id)) -
+          Number(a.taskIds.includes(task.id)) ||
+        (a.reviewDue ? Date.parse(a.reviewDue) : Infinity) -
+          (b.reviewDue ? Date.parse(b.reviewDue) : Infinity) ||
+        a.name.localeCompare(b.name),
+    );
+  return { linkedSources, classSources, previousReviews, mistakes, concepts };
 }

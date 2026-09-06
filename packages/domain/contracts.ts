@@ -257,6 +257,52 @@ export type Mistake = MistakeInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const conceptStatus = z.enum([
+  "not-started",
+  "learning",
+  "developing",
+  "strong",
+  "review-due",
+]);
+export const preparednessState = z.enum([
+  "not-ready",
+  "developing",
+  "mostly-ready",
+  "ready",
+  "strong",
+]);
+export const retentionMode = z.enum(["course", "long-term"]);
+export const conceptInput = z
+  .object({
+    classId: id,
+    taskIds: z.array(id).max(100),
+    name: z.string().trim().min(1).max(300),
+    status: conceptStatus,
+    preparedness: preparednessState,
+    retentionMode,
+    reviewDue: z.iso.datetime().nullable(),
+    attempts: z.number().int().min(0).max(10000),
+    unaidedCorrect: z.number().int().min(0).max(10000),
+    unaidedTotal: z.number().int().min(0).max(10000),
+    hintCount: z.number().int().min(0).max(10000),
+    lastReviewedAt: z.iso.datetime().nullable(),
+    evidenceNote: z.string().trim().max(2000),
+  })
+  .superRefine((input, ctx) => {
+    if (input.unaidedCorrect > input.unaidedTotal)
+      ctx.addIssue({
+        code: "custom",
+        path: ["unaidedCorrect"],
+        message: "Unaided correct cannot exceed unaided attempts.",
+      });
+  });
+export type ConceptInput = z.infer<typeof conceptInput>;
+export type Concept = ConceptInput & {
+  id: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
 export type Snapshot = {
   mistakes: Mistake[];
   memories: AcademicMemory[];
@@ -267,6 +313,7 @@ export type Snapshot = {
   planningMode: PlanningMode;
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
+  concepts: Concept[];
   planChanges: PlanChange[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
@@ -426,6 +473,18 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("mistake.practice"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("concept.create"), input: conceptInput }),
+  z.object({
+    type: z.literal("concept.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: conceptInput,
+  }),
+  z.object({
+    type: z.literal("concept.forget"),
     id,
     revision: z.number().int().nonnegative(),
   }),

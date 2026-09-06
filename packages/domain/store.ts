@@ -27,6 +27,7 @@ import {
   type Source,
   type CanvasRecord,
   type Mistake,
+  type Concept,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -37,7 +38,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 26) {
+    if (version > 27) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -112,6 +113,10 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE IF NOT EXISTS mistakes(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=26; COMMIT;",
       );
+    if (version <= 26)
+      this.db.exec(
+        "BEGIN; CREATE TABLE IF NOT EXISTS concepts(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=27; COMMIT;",
+      );
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -159,6 +164,7 @@ export class DeskStore {
       state.gradeCategories,
       state.gradeEntries,
       state.mistakes,
+      state.concepts,
     ]);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
@@ -224,6 +230,10 @@ export class DeskStore {
         .prepare("SELECT data FROM grade_entries")
         .all()
         .map((r) => JSON.parse(r.data as string) as GradeEntry),
+      concepts: this.db
+        .prepare("SELECT data FROM concepts ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Concept),
       planChanges: this.db
         .prepare(
           "SELECT data FROM plan_changes ORDER BY appliedAt DESC,rowid DESC LIMIT 50",
@@ -749,6 +759,65 @@ export class DeskStore {
           .prepare("UPDATE mistakes SET data=? WHERE id=? AND data=?")
           .run(JSON.stringify(updated), mistake.id, JSON.stringify(mistake));
         entityId = taskId;
+      }
+      if (
+        c.type === "concept.create" ||
+        c.type === "concept.update" ||
+        c.type === "concept.forget"
+      ) {
+        const previous =
+          c.type === "concept.create"
+            ? undefined
+            : state.concepts.find((concept) => concept.id === c.id);
+        if (
+          c.type !== "concept.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This concept changed elsewhere. Reopen it before saving.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (c.type === "concept.forget") {
+          this.db.prepare("DELETE FROM concepts WHERE id=?").run(entityId);
+        } else {
+          if (!state.classes.some((course) => course.id === c.input.classId))
+            throw Error("Choose an existing class for this concept.");
+          const taskIds = [...new Set(c.input.taskIds)];
+          if (
+            taskIds.some(
+              (taskId) =>
+                !state.tasks.some(
+                  (task) =>
+                    task.id === taskId && task.classId === c.input.classId,
+                ),
+            )
+          )
+            throw Error("Every linked task must belong to the selected class.");
+          if (
+            state.concepts.some(
+              (concept) =>
+                concept.id !== entityId &&
+                concept.classId === c.input.classId &&
+                concept.name.toLowerCase() === c.input.name.toLowerCase(),
+            )
+          )
+            throw Error(
+              "A concept with this name already exists in the class.",
+            );
+          const concept: Concept = {
+            ...c.input,
+            taskIds,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO concepts VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(entityId, JSON.stringify(concept));
+        }
       }
       if (c.type === "memory.confirm") {
         const candidate = durationMemories(state).find(

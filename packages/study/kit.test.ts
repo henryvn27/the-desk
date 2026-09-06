@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Mistake, Task, Source, StudySession } from "../domain/contracts";
+import type {
+  Concept,
+  Mistake,
+  Task,
+  Source,
+  StudySession,
+} from "../domain/contracts";
 import { sessionKit } from "./kit";
 const task: Task = {
   id: "task",
@@ -105,5 +111,73 @@ test("session kit includes same-class mistakes and excludes other classes", () =
       (mistake) => mistake.id,
     ),
     ["physics-mistake"],
+  );
+});
+
+test("session kit includes linked or weak same-class concepts and excludes unrelated concepts", () => {
+  const concepts: Concept[] = [
+    {
+      id: "linked-concept",
+      classId: task.classId,
+      taskIds: [task.id],
+      name: "Vectors",
+      status: "strong",
+      preparedness: "ready",
+      retentionMode: "course",
+      reviewDue: null,
+      attempts: 2,
+      unaidedCorrect: 2,
+      unaidedTotal: 2,
+      hintCount: 0,
+      lastReviewedAt: null,
+      evidenceNote: "Solid setup.",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "weak-concept",
+      classId: task.classId,
+      taskIds: [],
+      name: "Components",
+      status: "learning",
+      preparedness: "developing",
+      retentionMode: "long-term",
+      reviewDue: null,
+      attempts: 1,
+      unaidedCorrect: 0,
+      unaidedTotal: 1,
+      hintCount: 1,
+      lastReviewedAt: null,
+      evidenceNote: "Needs another example.",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "other-concept",
+      classId: "history",
+      taskIds: [],
+      name: "Causation",
+      status: "learning",
+      preparedness: "developing",
+      retentionMode: "course",
+      reviewDue: null,
+      attempts: 0,
+      unaidedCorrect: 0,
+      unaidedTotal: 0,
+      hintCount: 0,
+      lastReviewedAt: null,
+      evidenceNote: "",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  assert.deepEqual(
+    sessionKit(task, { sources: [], sessions: [], concepts }).concepts.map(
+      (concept) => concept.id,
+    ),
+    ["linked-concept", "weak-concept"],
   );
 });

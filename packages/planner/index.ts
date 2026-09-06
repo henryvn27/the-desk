@@ -7,9 +7,11 @@ import {
   type StudyBlock,
   type Snapshot,
   type Mistake,
+  type Concept,
 } from "../domain/contracts";
 type GradeData = Pick<Snapshot, "gradeCategories" | "gradeEntries"> & {
   mistakes?: Mistake[];
+  concepts?: Concept[];
 };
 const noGrades: GradeData = { gradeCategories: [], gradeEntries: [] };
 const optional = (t: Task) => t.workKind === "optional-review";
@@ -25,6 +27,22 @@ function mistakePriority(task: Task, mistakes: Mistake[], horizon: number) {
       mistake.taskId === task.id || mistake.practiceTaskIds.includes(task.id);
     if (linked) return Math.max(score, 3);
     if (mistake.classId === task.classId && due) return Math.max(score, 1);
+    return score;
+  }, 0);
+}
+function conceptPriority(task: Task, concepts: Concept[], horizon: number) {
+  return concepts.reduce((score, concept) => {
+    const linked = concept.taskIds.includes(task.id);
+    const due =
+      (concept.reviewDue && Date.parse(concept.reviewDue) <= horizon) ||
+      concept.status === "review-due";
+    const weak =
+      concept.preparedness === "not-ready" ||
+      concept.preparedness === "developing";
+    if (concept.classId !== task.classId) return score;
+    if (linked && (due || weak)) return Math.max(score, 3);
+    if (linked) return Math.max(score, 2);
+    if (due || weak) return Math.max(score, 1);
     return score;
   }, 0);
 }
@@ -175,6 +193,7 @@ export function plan(
     tasks.map((t) => [t.id, gradeInfluence(t, grades)]),
   );
   const mistakes = grades.mistakes ?? [];
+  const concepts = grades.concepts ?? [];
   const eligible = tasks.filter(
     (t) => !t.completed && t.deadlineConfirmed && !optional(t),
   );
@@ -187,6 +206,8 @@ export function plan(
     .filter((t) => !t.completed)
     .sort(
       (a, b) =>
+        conceptPriority(b, concepts, +urgencyEnd) -
+          conceptPriority(a, concepts, +urgencyEnd) ||
         mistakePriority(b, mistakes, +urgencyEnd) -
           mistakePriority(a, mistakes, +urgencyEnd) ||
         Number(optional(a)) - Number(optional(b)) ||
@@ -242,7 +263,7 @@ export function plan(
         start: new Date(cursor).toISOString(),
         end: new Date(cursor + minutes * 60000).toISOString(),
         minutes,
-        why: `${mistakePriority(task, mistakes, +urgencyEnd) > 0 ? "Prioritized because a linked or due mistake needs review. " : ""}${priorityReason(task)} ${influences.get(task.id) ? `In the recorded ${influences.get(task.id)!.category} model, a 10-percentage-point score change on this item shifts the course model by ${influences.get(task.id)!.pointsPerTen.toFixed(2)} percentage points; this is potential influence, not predicted improvement. ` : ""}${useGradeInfluence ? "After imminent deadlines and your importance choice, potential influence is divided by days until due (minimum one; flexible work uses seven). " : "Incomplete grade context: using deadline and importance ordering. "}`,
+        why: `${conceptPriority(task, concepts, +urgencyEnd) > 0 ? "Prioritized because a linked or due concept needs review. " : ""}${mistakePriority(task, mistakes, +urgencyEnd) > 0 ? "Prioritized because a linked or due mistake needs review. " : ""}${priorityReason(task)} ${influences.get(task.id) ? `In the recorded ${influences.get(task.id)!.category} model, a 10-percentage-point score change on this item shifts the course model by ${influences.get(task.id)!.pointsPerTen.toFixed(2)} percentage points; this is potential influence, not predicted improvement. ` : ""}${useGradeInfluence ? "After imminent deadlines and your importance choice, potential influence is divided by days until due (minimum one; flexible work uses seven). " : "Incomplete grade context: using deadline and importance ordering. "}`,
       });
       cursor += minutes * 60000;
       remaining -= minutes;
