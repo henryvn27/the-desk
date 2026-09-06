@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 10);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 11);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -727,5 +727,97 @@ test("rebalance previews are atomic, stale-safe, expire, and retain locks and hi
   } finally {
     store.close();
     rmSync(directory, { recursive: true });
+  }
+});
+
+test("grade records enforce weights, bounds, class ownership and stale corrections across restart", () => {
+  const dir = mkdtempSync(join(tmpdir(), "desk-grades-"));
+  const path = join(dir, "test.sqlite");
+  let store = new DeskStore(path);
+  try {
+    const classId = store.execute({ type: "class.create", name: "Physics" })
+      .classes[0]!.id;
+    const category = store.execute({
+      type: "grade.category",
+      input: { classId, name: "Tests", weight: 80 },
+    }).gradeCategories[0]!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "grade.category",
+          input: { classId, name: "Work", weight: 21 },
+        }),
+      /100%/,
+    );
+    assert.equal(store.snapshot().gradeCategories.length, 1);
+    const score = store.execute({
+      type: "grade.entry",
+      input: {
+        categoryId: category.id,
+        title: "Forces",
+        earned: 8,
+        possible: 10,
+      },
+    }).gradeEntries[0]!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "grade.entry",
+          input: {
+            categoryId: category.id,
+            title: "Bad",
+            earned: 11,
+            possible: 10,
+          },
+        }),
+      /Earned points/,
+    );
+    const updated = store.execute({
+      type: "grade.entry",
+      id: score.id,
+      revision: score.revision,
+      input: {
+        categoryId: category.id,
+        title: score.title,
+        earned: 9,
+        possible: 10,
+      },
+    }).gradeEntries[0]!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "grade.entry",
+          id: score.id,
+          revision: score.revision,
+          input: {
+            categoryId: category.id,
+            title: score.title,
+            earned: 10,
+            possible: 10,
+          },
+        }),
+      /changed/,
+    );
+    const other = store
+      .execute({ type: "class.create", name: "Stats" })
+      .classes.find((c) => c.id !== classId)!;
+    assert.throws(
+      () =>
+        store.execute({
+          type: "grade.category",
+          id: category.id,
+          revision: category.revision,
+          input: { classId: other.id, name: "Tests", weight: 80 },
+        }),
+      /between classes/,
+    );
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.snapshot().gradeEntries, [updated]);
+    assert.equal(updated.authority, "user-entered");
+    assert.equal(updated.recordedAt, score.recordedAt);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true });
   }
 });

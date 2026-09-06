@@ -12,6 +12,7 @@ import { planWeek, todayWindow } from "../../../packages/planner";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
 import { StudyPlan } from "./StudyPlan";
 import { PlanningSettings } from "./PlanningSettings";
+import { Gradebook } from "./Gradebook";
 import { Sources } from "./Sources";
 import "./style.css";
 import { Capture } from "./Capture";
@@ -26,6 +27,8 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  gradeCategories: [],
+  gradeEntries: [],
   planChanges: [],
   studyBlocks: [],
   canvases: [],
@@ -470,6 +473,7 @@ function App() {
             classId={data.classes.some((c) => c.id === page) ? page : undefined}
             open={open}
             edit={setEditing}
+            saveGrade={(c) => act(c, true)}
             saveSource={(input) => act({ type: "source.create", input }, true)}
             openCanvas={openCanvas}
             newNotebook={newNotebook}
@@ -530,6 +534,7 @@ function Library({
   open,
   edit,
   saveSource,
+  saveGrade,
   openCanvas,
   newNotebook,
 }: {
@@ -537,6 +542,7 @@ function Library({
   classId?: string;
   open: (id: string) => Promise<void>;
   edit: (task: Task) => void;
+  saveGrade: (c: Command) => Promise<unknown>;
   saveSource: (
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
@@ -547,6 +553,14 @@ function Library({
   return (
     <>
       <h1>{data.classes.find((c) => c.id === classId)?.name ?? "Library"}</h1>
+      {classId && (
+        <Gradebook
+          key={classId}
+          data={data}
+          classId={classId}
+          save={saveGrade}
+        />
+      )}
       <label htmlFor="search">Search tasks, notes and sources</label>
       <input
         id="search"

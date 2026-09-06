@@ -23,6 +23,33 @@ export type Source = SourceInput & {
   createdAt: string;
   authority: "user-provided-text";
 };
+export const gradeCategoryInput = z.object({
+  classId: id,
+  name: z.string().trim().min(1).max(100),
+  weight: z.number().min(0.01).max(100),
+});
+export type GradeCategory = z.infer<typeof gradeCategoryInput> & {
+  id: string;
+  revision: number;
+};
+export const gradeEntryInput = z
+  .object({
+    categoryId: id,
+    title: z.string().trim().min(1).max(300),
+    earned: z.number().min(0).max(1000000),
+    possible: z.number().positive().max(1000000),
+  })
+  .refine(
+    (v) => v.earned <= v.possible,
+    "Earned points cannot exceed possible points in this grade model.",
+  );
+export type GradeEntry = z.infer<typeof gradeEntryInput> & {
+  id: string;
+  revision: number;
+  recordedAt: string;
+  updatedAt: string;
+  authority: "user-entered";
+};
 export const taskInput = z.object({
   workKind: z.enum(["assignment", "assessment", "optional-review"]).optional(),
   importance: z.enum(["low", "normal", "high"]).optional(),
@@ -122,6 +149,8 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type Snapshot = {
+  gradeCategories: GradeCategory[];
+  gradeEntries: GradeEntry[];
   planChanges: PlanChange[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
@@ -132,6 +161,18 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("grade.category"),
+    id: id.optional(),
+    revision: z.number().int().nonnegative().optional(),
+    input: gradeCategoryInput,
+  }),
+  z.object({
+    type: z.literal("grade.entry"),
+    id: id.optional(),
+    revision: z.number().int().nonnegative().optional(),
+    input: gradeEntryInput,
+  }),
   z.object({
     type: z.literal("planning.rebalance"),
     previewId: id,

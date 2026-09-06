@@ -8,6 +8,8 @@ import {
   defaultPlanningPreferences,
   planningPreferences,
   type Command,
+  type GradeCategory,
+  type GradeEntry,
   type RebalancePreview,
   type PlanChange,
   type StudyBlock,
@@ -27,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 10) {
+    if (version > 11) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -70,6 +72,11 @@ export class DeskStore {
         "BEGIN; CREATE TABLE plan_changes(id TEXT PRIMARY KEY,appliedAt TEXT NOT NULL,data TEXT NOT NULL); PRAGMA user_version=9; COMMIT;",
       );
     if (version <= 9) this.db.exec("BEGIN; PRAGMA user_version=10; COMMIT;");
+    if (version <= 10)
+      this.db.exec(`BEGIN;
+      CREATE TABLE grade_categories(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL);
+      CREATE TABLE grade_entries(id TEXT PRIMARY KEY,category_id TEXT NOT NULL REFERENCES grade_categories(id),data TEXT NOT NULL);
+      PRAGMA user_version=11; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -121,6 +128,14 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      gradeCategories: this.db
+        .prepare("SELECT data FROM grade_categories")
+        .all()
+        .map((r) => JSON.parse(r.data as string) as GradeCategory),
+      gradeEntries: this.db
+        .prepare("SELECT data FROM grade_entries")
+        .all()
+        .map((r) => JSON.parse(r.data as string) as GradeEntry),
       planChanges: this.db
         .prepare(
           "SELECT data FROM plan_changes ORDER BY appliedAt DESC,rowid DESC LIMIT 50",
@@ -173,6 +188,67 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "grade.category") {
+        if (!state.classes.some((course) => course.id === c.input.classId))
+          throw Error("Class no longer exists.");
+        const existing = state.gradeCategories.find(
+          (category) => category.id === c.id,
+        );
+        if (c.id && (!existing || existing.revision !== c.revision))
+          throw Error("This category changed. Refresh before editing.");
+        if (existing && existing.classId !== c.input.classId)
+          throw Error("A category cannot move between classes.");
+        const total =
+          state.gradeCategories
+            .filter(
+              (category) =>
+                category.classId === c.input.classId && category.id !== c.id,
+            )
+            .reduce((sum, category) => sum + category.weight, 0) +
+          c.input.weight;
+        if (total > 100.0000001)
+          throw Error("Category weights cannot exceed 100%.");
+        entityId = existing?.id ?? randomUUID();
+        const category: GradeCategory = {
+          ...c.input,
+          id: entityId,
+          revision: (existing?.revision ?? -1) + 1,
+        };
+        this.db
+          .prepare(
+            "INSERT INTO grade_categories VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(entityId, c.input.classId, JSON.stringify(category));
+      }
+      if (c.type === "grade.entry") {
+        const category = state.gradeCategories.find(
+          (category) => category.id === c.input.categoryId,
+        );
+        if (!category) throw Error("Grade category no longer exists.");
+        const existing = state.gradeEntries.find((entry) => entry.id === c.id);
+        if (c.id && (!existing || existing.revision !== c.revision))
+          throw Error("This score changed. Refresh before editing.");
+        if (
+          existing &&
+          state.gradeCategories.find((cat) => cat.id === existing.categoryId)
+            ?.classId !== category.classId
+        )
+          throw Error("A score cannot move between classes.");
+        entityId = existing?.id ?? randomUUID();
+        const entry: GradeEntry = {
+          ...c.input,
+          id: entityId,
+          revision: (existing?.revision ?? -1) + 1,
+          recordedAt: existing?.recordedAt ?? timestamp,
+          updatedAt: timestamp,
+          authority: "user-entered",
+        };
+        this.db
+          .prepare(
+            "INSERT INTO grade_entries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,data=excluded.data",
+          )
+          .run(entityId, c.input.categoryId, JSON.stringify(entry));
+      }
       if (c.type === "planning.rebalance") {
         const pending = this.rebalance;
         if (
