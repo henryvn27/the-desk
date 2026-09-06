@@ -96,6 +96,50 @@ try {
     (await page.evaluate(() => window.desk.snapshot())).studyBlocks[0],
     saved,
   );
+  await page
+    .locator(".plan-day-block")
+    .dragTo(page.locator(".plan-day").nth(2));
+  await page
+    .getByText("Review the new day and save to move this block.", {
+      exact: true,
+    })
+    .waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desk.snapshot())).studyBlocks[0],
+    saved,
+  );
+  await page.getByRole("button", { name: "Save block", exact: true }).click();
+  await page
+    .getByText("Confirm changing this locked block.", { exact: false })
+    .waitFor();
+  await page
+    .getByLabel("I approve moving or unlocking this locked block", {
+      exact: true,
+    })
+    .check();
+  await page.getByRole("button", { name: "Save block", exact: true }).click();
+  await page.getByText("Study block saved.", { exact: true }).waitFor();
+  const moved = (await page.evaluate(() => window.desk.snapshot()))
+    .studyBlocks[0];
+  const expected = new Date(saved.start);
+  const target = new Date();
+  target.setDate(target.getDate() + 2);
+  expected.setFullYear(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+  );
+  assert.equal(moved.start, expected.toISOString());
+  assert.equal(moved.locked, true);
+  saved = moved;
+  await page.evaluate(() => window.scrollTo(0, 0));
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+    "Day view must not widen the app window",
+  );
+  await page.screenshot({ path: join(output, "dragged-plan.png") });
   await page.getByRole("button", { name: "Edit block", exact: true }).click();
   await page
     .getByRole("button", { name: "Release reserved time", exact: true })
@@ -137,7 +181,7 @@ try {
   assert.equal(final.tasks[0].minutes, 90);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, locked cancellation approval and retained history",
+    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, drag-to-day approval, locked cancellation approval and retained history",
   );
 } finally {
   if (app) await app.close();

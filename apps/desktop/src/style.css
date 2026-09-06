@@ -65,7 +65,7 @@ textarea {
 }
 .shell {
   display: grid;
-  grid-template-columns: 224px 1fr;
+  grid-template-columns: 224px minmax(0, 1fr);
   min-height: 100vh;
 }
 aside {
@@ -356,22 +356,69 @@ button[aria-pressed="true"] {
   margin: 16px 0;
   padding: 12px 16px;
 }
-.study-days .check { margin: 0; }
+.study-days .check {
+  margin: 0;
+}
 
-.source { border-bottom: 1px solid #d8d2c6; padding: 16px 0; }
-.source-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 480px; overflow-y: auto; }
+.source {
+  border-bottom: 1px solid #d8d2c6;
+  padding: 16px 0;
+}
+.source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 480px;
+  overflow-y: auto;
+}
 
-.canvas-workspace { position: fixed; inset: 0; z-index: 20; background: #f7f4ed; display: flex; flex-direction: column; }
-.canvas-header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; }
-.canvas-header strong { flex: 1; }
-.canvas-engine { flex: 1; min-height: 0; }
+.canvas-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #f7f4ed;
+  display: flex;
+  flex-direction: column;
+}
+.canvas-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+}
+.canvas-header strong {
+  flex: 1;
+}
+.canvas-engine {
+  flex: 1;
+  min-height: 0;
+}
 
-.canvas-body { display: flex; flex: 1; min-height: 0; }
-.canvas-body .canvas-engine { min-width: 0; }
-.canvas-sources { width: 280px; flex-shrink: 0; overflow: auto; padding: 16px; border-right: 1px solid #d7d2c7; }
-.canvas-sources select { width: 100%; }
-.canvas-sources section { border-top: 1px solid #d7d2c7; margin-top: 16px; padding-top: 8px; }
-.canvas-header { flex-wrap: wrap; }
+.canvas-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.canvas-body .canvas-engine {
+  min-width: 0;
+}
+.canvas-sources {
+  width: 280px;
+  flex-shrink: 0;
+  overflow: auto;
+  padding: 16px;
+  border-right: 1px solid #d7d2c7;
+}
+.canvas-sources select {
+  width: 100%;
+}
+.canvas-sources section {
+  border-top: 1px solid #d7d2c7;
+  margin-top: 16px;
+  padding-top: 8px;
+}
+.canvas-header {
+  flex-wrap: wrap;
+}
 
 .notebook-pages {
   display: flex;
@@ -390,4 +437,46 @@ button[aria-pressed="true"] {
 .notebook-pages span {
   color: #65615a;
   font-size: 13px;
+}
+
+.plan-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(125px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  margin: 24px 0 12px;
+}
+.plan-day {
+  min-height: 150px;
+  padding: 12px;
+  border: 1px solid #d9d2c6;
+  border-radius: 10px;
+  background: #f4f0e8;
+}
+.plan-day h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.plan-day > small {
+  display: block;
+  color: #686e68;
+  font-size: 11px;
+  margin-top: 12px;
+}
+.plan-day-block {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  cursor: grab;
+  margin-bottom: 8px;
+}
+.plan-day-block strong,
+.plan-day-block span {
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.plan-day-block span {
+  margin-top: 6px;
+  color: #686e68;
 }

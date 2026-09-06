@@ -25,6 +25,16 @@ export function StudyPlan({
   const [editing, setEditing] = useState<Block | StudyBlock>();
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const days = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + offset);
+    return date;
+  });
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
   const label = (b: Block) =>
     data.tasks.find((t) => t.id === b.taskId)?.title ?? "Assignment";
   const row = (b: Block, saved: boolean) => (
@@ -81,12 +91,91 @@ export function StudyPlan({
         Saved blocks stay where you put them. Suggestions use the time around
         them.
       </p>
+      <div className="plan-week" aria-label="Seven-day saved blocks">
+        {days.map((day) => (
+          <section
+            className="plan-day"
+            key={day.toISOString()}
+            aria-label={day.toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("application/x-desk-block")) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (busy) return;
+              const block = data.studyBlocks.find(
+                (b) =>
+                  b.id === e.dataTransfer.getData("application/x-desk-block") &&
+                  !b.cancelledAt,
+              );
+              if (!block) return;
+              const start = new Date(block.start);
+              start.setFullYear(
+                day.getFullYear(),
+                day.getMonth(),
+                day.getDate(),
+              );
+              setEditing({
+                ...block,
+                start: start.toISOString(),
+                end: new Date(+start + block.minutes * 60000).toISOString(),
+              });
+              setStatus("Review the new day and save to move this block.");
+            }}
+          >
+            <h3>
+              {day.toLocaleDateString([], { weekday: "short", day: "numeric" })}
+            </h3>
+            {data.studyBlocks
+              .filter((b) => !b.cancelledAt && sameDay(new Date(b.start), day))
+              .map((b) => (
+                <button
+                  key={b.id}
+                  className="plan-day-block"
+                  draggable={!busy}
+                  disabled={busy}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/x-desk-block", b.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onClick={() => {
+                    setEditing(b);
+                    setStatus("");
+                  }}
+                >
+                  <strong>{label(b)}</strong>
+                  <span>
+                    {new Date(b.start).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}{" "}
+                    · {b.minutes}m{b.locked ? " · Locked" : ""}
+                  </span>
+                </button>
+              ))}
+            <small>Drop a block here</small>
+          </section>
+        ))}
+      </div>
+      <p className="muted">
+        Drag saved blocks between days, then review and save. You can also use
+        Edit block to choose an exact time.
+      </p>
       {editing && (
         <section>
           <h2>{"id" in editing ? "Edit saved block" : "Reserve study time"}</h2>
           <p>{label(editing)}</p>
           <form
-            key={"id" in editing ? editing.id : editing.taskId + editing.start}
+            key={
+              ("id" in editing ? editing.id : editing.taskId) + editing.start
+            }
             onSubmit={(e) => {
               e.preventDefault();
               const form = new FormData(e.currentTarget);
