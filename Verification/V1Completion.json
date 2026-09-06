@@ -774,14 +774,14 @@
         "Use NOT READY, DEVELOPING, MOSTLY READY, READY, and STRONG preparedness states with evidence such as unaided accuracy, weak concepts, attempts, recency, hints, and cumulative recall.",
         "Support course and long-term retention and trigger cumulative planning for finals."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Concepts.tsx; apps/desktop/src/SessionKit.tsx",
+      "automated": "106 tests plus typecheck/lint/build: schema-27 persistence, revision-safe concept CRUD, same-class task validation, duplicate-name and impossible-evidence rejection, planner influence, Session Kit filtering and restart coverage.",
+      "live": "Development and installed Electron smoke records concept links/status/preparedness/retention/evidence, edits by revision, restarts, forgets only the concept, and confirms no renderer errors.",
+      "mac": "Unsigned installed arm64 smoke passes against /Users/henry/Applications/The Desk V1.app; screenshot and operated video retained, and app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package run 34015001662 for ccaa45a; no requirement-specific Windows UI proof.",
+      "blocker": "Windows interactive evidence remains to be recorded; broader cumulative recall, automatic preparedness inference, final-exam retention scheduling and live tutoring use remain outside this slice."
     },
     {
       "id": "MISTAKE-001",
