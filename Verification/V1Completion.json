@@ -172,10 +172,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/user.test.ts; packages/domain/academic-context.test.ts; packages/domain/plan.test.ts; packages/study/kit.ts; packages/study/kit.test.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/AcademicContext.tsx; apps/desktop/src/StudyPlan.tsx; apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs; scripts/smoke-context.mjs; scripts/smoke-plans.mjs",
-      "automated": "130 tests plus typecheck/lint/build: schema-36 durable computed Plan versions and schema-35 local User profile with schema-34 Academic period/Space persistence, typed kinds/date validation, class-link deduplication, duplicate/unknown-link rejection, revision-safe CRUD, linked-record forget guards, restart persistence, telemetry profile association, planner basis hashing, saved block and unscheduled-work snapshots, and Session Kit class filtering, alongside prior domain, authority, teacher, hierarchy, assessment, attempt and session coverage.",
+      "automated": "131 tests plus typecheck/lint/build: schema-36 durable computed Plan versions and schema-35 local User profile with schema-34 Academic period/Space persistence, typed kinds/date validation, class-link deduplication, duplicate/unknown-link rejection, revision-safe CRUD, linked-record forget guards, restart persistence, telemetry profile association, planner basis hashing, saved block and unscheduled-work snapshots, and Session Kit class filtering, alongside prior domain, authority, teacher, hierarchy, assessment, attempt and session coverage.",
       "live": "Installed unsigned macOS Plan smoke creates a task, records Auto-plan, previews and approves a rebalance, confirms two persisted Plan versions after restart; User, Academic context, Units, Teacher, evidence, authority, assessment, Attempts, desktop, checklist and Session Kit regressions also pass.",
       "mac": "Unsigned installed arm64 Plan, User, Academic context, hierarchy, Teacher, evidence, assessment, Attempts, Authority, desktop, checklist and Session Kit smokes and app.asar/package byte comparison pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34044240864; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34045188001; no requirement-specific Windows UI proof.",
       "blocker": "Partial graph only. Account/login identity, integrations, connection capabilities, graded-work extraction, synchronization, prerequisites, hierarchy-aware planner behavior and Windows interaction remain incomplete."
     },
     {
@@ -298,10 +298,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/integrations/catalog.ts; packages/integrations/catalog.test.ts; apps/desktop/src/ConnectionsSettings.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-connections.mjs",
-      "automated": "130 tests plus typecheck/lint/build: static connection catalog covers official-sync, browser-assisted, browser-context, manual-fallback and experimental surfaces, requires explicit state/fallback text, and rejects treating unavailable school integrations as available.",
+      "automated": "131 tests plus typecheck/lint/build: static connection catalog covers official-sync, browser-assisted, browser-context, manual-fallback and experimental surfaces, requires explicit state/fallback text, and rejects treating unavailable school integrations as available.",
       "live": "Installed unsigned macOS connection smoke opens Settings, verifies all eight declared entries, asserts exactly one available generic fallback and no Synced claim, captures the cards, and confirms no renderer errors; the installed broad desktop regression also passes.",
       "mac": "Unsigned installed arm64 connection smoke and broad desktop regression pass; screenshot and operated video retained, and app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34044821153; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34045188001; no requirement-specific Windows UI proof.",
       "blocker": "The honest ladder and manual fallback are implemented, but OAuth/API adapters, browser extension/page adapters, email ingestion, real Classroom/Khan/Quizlet surfaces, account sync and Windows interaction remain incomplete."
     },
     {
@@ -409,10 +409,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/planner; packages/grades; packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/plan.test.ts; apps/desktop/src/StudyPlan.tsx; apps/desktop; scripts/smoke-plans.mjs",
-      "automated": "130 tests plus typecheck/lint/build pass. Default and deferred Auto-plan, restart, one-time scheduling, Suggest cancellation, manual override, existing commitment preservation, immutable computed Plan versions, saved block IDs, unscheduled work, overload and basis hashes are tested.",
+      "automated": "131 tests plus typecheck/lint/build pass. Default and deferred Auto-plan, restart, one-time scheduling, Suggest cancellation, manual override, existing commitment preservation, immutable computed Plan versions, saved block IDs, unscheduled work, overload and basis hashes are tested.",
       "live": "Installed macOS Plan smoke captures Auto-plan history, previews and approves a rebalance, shows both versions in Plan history and persists them after restart; earlier mode switch and deferred capture flows also pass. Screenshot inspected; operated video captured.",
       "mac": "Unsigned installed arm64 Plan smoke and grade/planner integration pass; installed app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34044240864; no requirement-specific Windows UI proof.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34045188001; no requirement-specific Windows UI proof.",
       "blocker": "Broader automatic updates/missed-block handling, Autopilot, learned behavior, mastery/dependencies/teacher/retention inputs and full planning layers remain unfinished; Windows interaction unverified."
     },
     {
@@ -870,14 +870,14 @@
         "Offline tasks, plan viewing, Canvas, local materials, Study Sessions, and basic capture continue where technically possible; AI/cloud features may degrade.",
         "Queue offline changes and preserve both copies for ambiguous conflicts, then request resolution."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/sync.test.ts; apps/desktop/src/SyncSettings.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-sync.mjs",
+      "automated": "131 tests plus typecheck/lint/build: SQLite outbox intent is exposed as bounded snapshot data, survives restart, and remains distinct from cloud sync; local class writes retain their operation ID and authoritative task data.",
+      "live": "Installed unsigned macOS sync smoke creates a local class, shows one queued operation and \u201cCloud sync: not connected,\u201d captures the boundary, restarts, and confirms the same outbox operation and class; installed connection and broad desktop regressions also pass.",
+      "mac": "Unsigned installed arm64 sync, connection and broad desktop smokes pass; screenshot and operated video retained, and app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34045188001; no requirement-specific Windows UI proof.",
+      "blocker": "SQLite local authority and durable outbox intent are visible, but account/auth, asynchronous Supabase transport, conflict preservation/resolution, retry/reconnect behavior and Windows interaction remain incomplete."
     },
     {
       "id": "ACCOUNT-001",

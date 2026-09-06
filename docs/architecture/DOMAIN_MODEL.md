@@ -33,7 +33,7 @@ The product contract §4 defines the required academic graph. This document desc
 | Planning preference | `settings` row `planning`; local study window, weekdays and buffer | Explicit student configuration |
 | Proposed block | Computed planner output; not persisted | Deterministic seven-day suggestion, not a calendar commitment |
 | AI run | `ai_runs`, feature and optional session id | Content-free provider usage and latency; unavailable usage is null |
-| Outbox operation | `outbox`, entity id, operation and timestamp | Local change intent only; not sufficient data for cloud replication |
+| Outbox operation | `outbox`, entity id, operation and timestamp; latest 100 are exposed in the local snapshot | Local change intent only; not sufficient data for cloud replication |
 
 ## Enforced invariants
 
