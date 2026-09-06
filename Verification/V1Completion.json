@@ -650,7 +650,7 @@
       "implementation": "packages/intelligence/lens-actions.ts; apps/desktop/src/Lens.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-lens-actions.mjs",
       "automated": "132 tests plus typecheck/lint/build pass; Lens answer source payloads are schema-validated and link only to the active class/task.",
       "live": "Synthetic Electron smoke exposes explicit Save answer as source and Open task resource actions; the trusted main process validates HTTPS resource URLs and provider tool/action calls remain unavailable.",
-      "mac": "Installed unsigned arm64 smoke passes synthetic Lens answer, linked-source persistence, HTTPS resource handoff and restart-safe local storage; screenshot and operated video retained at artifacts/lens-actions/.",
+      "mac": "Installed unsigned arm64 smoke passes synthetic Lens answer, linked-source persistence and HTTPS resource handoff; screenshot and operated video retained at artifacts/lens-actions/.",
       "windows": "Hosted macOS/Windows checks/build/directory package pass at 5b22b1a (run 34046577430); no requirement-specific Windows UI proof.",
       "blocker": "Task, mistake, note, artifact, Canvas, launch-app and resource-preparation actions remain open; arbitrary third-party UI automation is intentionally deferred. Live provider authentication remains HTTP 401, and Windows interactive proof is open."
     },
