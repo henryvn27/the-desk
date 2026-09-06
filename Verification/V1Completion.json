@@ -175,7 +175,7 @@
       "automated": "117 tests plus typecheck/lint/build: schema-29/30/31 assessment, teacher-evidence and authority-claim persistence, explicit typed kinds/scores, same-class links, revision-safe CRUD, conflict preservation, explicit resolution, Lens conflict context and restart coverage, alongside existing source/task/concept/attempt graph checks.",
       "live": "Installed unsigned macOS smoke creates two competing due-date claims, shows the conflict, applies one by explicit choice, restarts, and preserves the claims/resolution; teacher-evidence, assessment, Attempts, broad desktop and checklist regressions also pass.",
       "mac": "Unsigned installed arm64 authority smoke, evidence/assessment/Attempts/broad desktop/checklist regressions and app.asar/package byte comparison pass",
-      "windows": "Pending authority-slice hosted checks/build/package; previous hosted pass remains recorded for 34017304936.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34018079768; no requirement-specific Windows UI proof.",
       "blocker": "Partial graph only. Text sources, classes, tasks, sessions, preferences, concepts, attempts, explicit assessments, teacher-reported evidence and bounded due-date authority claims exist; durable Teacher identity/patterns, most required entities, graded-work extraction, synchronization and Windows interaction remain incomplete."
     },
     {
@@ -282,7 +282,7 @@
       "automated": "117 tests plus typecheck/lint/build: authority class ordering, confidence/provenance fields, same-class source/evidence links, stale claim/task revisions, conflict preservation, explicit resolution and Lens disclosure.",
       "live": "Installed unsigned macOS smoke records syllabus and live-LMS due dates, shows the conflict, requires a choice, applies one claim, and persists the ledger/resolution across restart.",
       "mac": "Unsigned installed arm64 authority smoke and app.asar/package byte comparison pass",
-      "windows": "Pending authority-slice hosted checks/build/package; previous hosted pass remains recorded for 34017304936.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34018079768; no requirement-specific Windows UI proof.",
       "blocker": "Bounded manual due-date authority is implemented. Live LMS/email/board integrations, automatic conflict generation from external systems, broader fact types and Windows interaction remain unimplemented or unverified."
     },
     {
