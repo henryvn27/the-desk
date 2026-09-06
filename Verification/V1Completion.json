@@ -171,12 +171,12 @@
       ],
       "status": "UNIMPLEMENTED",
       "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": "33 tests plus typecheck/lint/build: exact source text, many-to-many class/task links, invalid-link rollback, restart, task unlink without source deletion.",
-      "live": "Installed macOS smoke captures a text source, links class/task, searches original content and verifies exact text/links after restart.",
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/study/kit.ts; apps/desktop/src/Attempts.tsx",
+      "automated": "108 tests plus typecheck/lint/build: schema-28 attempts persistence, same-class task/concept links, revision-safe evidence edits, reversible concept counters, Session Kit filtering and restart coverage, alongside existing source/task graph checks.",
+      "live": "Installed unsigned macOS smoke captures and links text sources, records and edits assignment-linked attempts, verifies concept evidence after restart, and confirms the broader desktop regression flow.",
       "mac": null,
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Partial graph only. Text sources/classes/tasks/sessions/preferences exist; most required entities, source editing/imports and broader graph workflows remain incomplete."
+      "blocker": "Partial graph only. Text sources/classes/tasks/sessions/preferences and explicit attempts exist; most required entities, assessment/provenance graph workflows and Windows interaction remain incomplete."
     },
     {
       "id": "DOMAIN-002",
@@ -573,12 +573,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop/src/SessionReview.tsx; apps/desktop/src/SessionCorrection.tsx; packages/domain; packages/learning/duration.ts; apps/desktop/src/TaskChecklist.tsx",
-      "automated": "74 tests plus typecheck/lint/build: checklist item revision/ownership validation, archive/restore, unchanged task completion on check, scope revisions and immutable session-end checklist snapshots. Prior session/kit/correction/duration tests retained.",
-      "live": "Installed unsigned macOS checklist and Session Kit regression pass. UI adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot. Controller fit check confirms no scroll in the exercised layout; screenshots inspected and operated video captured.",
+      "implementation": "apps/desktop/src/SessionReview.tsx; apps/desktop/src/SessionCorrection.tsx; apps/desktop/src/Attempts.tsx; packages/domain; packages/learning/duration.ts; packages/study/kit.ts; apps/desktop/src/TaskChecklist.tsx",
+      "automated": "108 tests plus typecheck/lint/build: explicit attempt result/aid/hint evidence, schema-28 persistence, revision-safe edits, reversible linked concept counters and Session Kit inclusion, alongside checklist/session correction/duration coverage.",
+      "live": "Installed unsigned macOS checklist and Session Kit regression pass plus the Attempts smoke. The app records/edits/restarts/forgets assignment-linked evidence and preserves task state; screenshots inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Prior f881ffd hosted macOS/Windows checks/build/package pass (34007577938); checklist/controller Windows interaction unverified.",
-      "blocker": "Partial only: automatic work detection and attempts/mistake/mastery/preparedness updates remain unfinished."
+      "blocker": "Partial only: automatic work detection, mistake/mastery/preparedness updates beyond explicit attempt counters, and Windows interaction remain unfinished."
     },
     {
       "id": "LENS-001",
@@ -776,12 +776,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Concepts.tsx; apps/desktop/src/SessionKit.tsx",
-      "automated": "106 tests plus typecheck/lint/build: schema-27 persistence, revision-safe concept CRUD, same-class task validation, duplicate-name and impossible-evidence rejection, planner influence, Session Kit filtering and restart coverage.",
-      "live": "Development and installed Electron smoke records concept links/status/preparedness/retention/evidence, edits by revision, restarts, forgets only the concept, and confirms no renderer errors.",
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/planner/index.ts; packages/study/kit.ts; apps/desktop/src/Concepts.tsx; apps/desktop/src/Attempts.tsx; apps/desktop/src/SessionKit.tsx",
+      "automated": "108 tests plus typecheck/lint/build: schema-27/28 persistence, revision-safe concept and attempt CRUD, same-class task/concept validation, duplicate-name and impossible-evidence rejection, reversible attempt counters, planner influence, Session Kit filtering and restart coverage.",
+      "live": "Development and installed Electron smoke records concept and assignment-linked attempt evidence, edits by revision, updates linked counters, restarts, forgets only the attempt/concept, and confirms no renderer errors.",
       "mac": "Unsigned installed arm64 smoke passes against /Users/henry/Applications/The Desk V1.app; screenshot and operated video retained, and app.asar matches the packaged artifact.",
       "windows": "Hosted macOS/Windows checks/build/package run 34015001662 for ccaa45a; no requirement-specific Windows UI proof.",
-      "blocker": "Windows interactive evidence remains to be recorded; broader cumulative recall, automatic preparedness inference, final-exam retention scheduling and live tutoring use remain outside this slice."
+      "blocker": "Windows interactive evidence remains to be recorded; broader cumulative recall, automatic preparedness inference, final-exam retention scheduling, categorical mastery transitions and live tutoring use remain outside this slice."
     },
     {
       "id": "MISTAKE-001",
