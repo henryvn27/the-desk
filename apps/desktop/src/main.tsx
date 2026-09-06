@@ -100,6 +100,9 @@ function App() {
     [capture, setCapture] = useState(false),
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
+  const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
   const [captureNotice, setCaptureNotice] = useState("");
   const [syncStatus, setSyncStatus] = useState(emptySync);
   const [editing, setEditing] = useState<Task>();
@@ -178,18 +181,31 @@ function App() {
     .find((s) => s.endedAt && s.completionReported !== undefined && !s.review);
   const reviewTask = data.tasks.find((t) => t.id === unreviewed?.taskId);
   useEffect(() => {
-    const refresh = () =>
-      window.desk
-        .snapshot()
-        .then(setData)
-        .catch((e) => setError(userError(e)));
+    let active = true;
+    let request = 0;
+    const refresh = async () => {
+      const current = ++request;
+      try {
+        const next = await window.desk.snapshot();
+        if (!active || current !== request) return;
+        setData(next);
+        setWorkspaceReady(true);
+        setWorkspaceError("");
+      } catch (e) {
+        if (!active || current !== request) return;
+        setWorkspaceError(userError(e));
+      }
+    };
     void refresh();
     const timer = setInterval(() => {
       setTick(Date.now());
       void refresh();
     }, 2000);
-    return () => clearInterval(timer);
-  }, []);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [workspaceAttempt]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -339,6 +355,31 @@ function App() {
       )}
     </section>
   );
+  if (!workspaceReady)
+    return (
+      <main className="startup-state">
+        <div className="eyebrow">The Desk</div>
+        <h1>{workspaceError ? "Your workspace could not open." : "Opening your workspace…"}</h1>
+        {workspaceError ? (
+          <>
+            <p className="error" role="alert">
+              {workspaceError}
+            </p>
+            <button
+              className="primary"
+              onClick={() => {
+                setWorkspaceError("");
+                setWorkspaceAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Try again
+            </button>
+          </>
+        ) : (
+          <p role="status">Loading your saved classes, tasks, and study history.</p>
+        )}
+      </main>
+    );
   if (kind === "lens")
     return (
       <Lens
@@ -357,7 +398,9 @@ function App() {
   if (kind === "controller")
     return (
       <main className="controller">
-        {error && <p role="alert">{error}</p>}
+        {(workspaceError || error) && (
+          <p role="alert">{workspaceError || error}</p>
+        )}
         {sessionPanel}
       </main>
     );
@@ -443,9 +486,9 @@ function App() {
           </div>
           <button onClick={() => setCapture(true)}>Capture</button>
         </header>
-        {error && (
+        {(workspaceError || error) && (
           <p className="error" role="alert">
-            {error}
+            {workspaceError || error}
           </p>
         )}
         {captureNotice && <p role="status">{captureNotice}</p>}
