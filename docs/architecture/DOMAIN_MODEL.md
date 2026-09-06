@@ -18,6 +18,7 @@ The product contract §4 defines the required academic graph. This document desc
 | Capture provenance | Optional task payload retaining original/source text, captured time, candidate dates, uncertainties and field confidence | Original user-provided text is retained through task corrections |
 | Rebalance change | `plan_changes`, immutable before/after block records | Explicit approved preview; latest 50 records shown; all records retained |
 | Plan | `plans`, immutable computed versions | Auto-plan or approved rebalance trigger, horizon, saved block IDs, unscheduled work, overload, planner basis hash and computed authority |
+| Connection capability | static integration catalog; no external account data | Declared surface, current state and manual fallback; a catalog entry is not a connected integration |
 | Grade category / entry | `grade_categories` class FK; `grade_entries` category FK; revision-checked correction | User-entered scores, distinct from teacher evidence and official grades |
 | Mistake | `mistakes` JSON records; class FK in payload; optional same-class task and generated practice-task IDs | Student-entered error, correction and review evidence; not completion or mastery |
 | Concept / preparedness | `concepts` JSON records; class FK in payload; many-to-many task IDs | Explicit status, preparedness, retention mode and bounded unaided-attempt evidence |
@@ -47,7 +48,7 @@ The product contract §4 defines the required academic graph. This document desc
 
 ## Required graph still missing
 
-Account/login identity, integrations and connection capabilities remain unimplemented. The local User profile is not an account or security boundary. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
+Account/login identity and connected integration records remain unimplemented. The static connection catalog reports declared surfaces and current fallback states; it is not a connected account or sync engine. The local User profile is not an account or security boundary. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
 
 The current local profile is not a multi-user security boundary. JSON payload persistence is not evidence that absent objects, synchronization, provenance corrections or confidence history are supported.
 
