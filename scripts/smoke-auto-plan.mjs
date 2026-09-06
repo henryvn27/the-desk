@@ -77,9 +77,72 @@ try {
     await page.getByLabel("Planning mode", { exact: true }).inputValue(),
     "suggest",
   );
+  await page
+    .getByLabel("Planning mode", { exact: true })
+    .selectOption("auto-plan");
+  await page
+    .getByRole("button", { name: "Save planning behavior", exact: true })
+    .click();
+  await page.getByText("Planning behavior saved.", { exact: true }).waitFor();
+  // Seed an active session through the trusted API; capture/end are exercised in UI.
+  await page.evaluate(
+    (taskId) => window.desk.command({ type: "session.start", taskId }),
+    auto.tasks[0].id,
+  );
+  await capture("Captured during session");
+  const pending = (
+    await page.evaluate(() => window.desk.snapshot())
+  ).tasks.find((t) => t.title === "Captured during session");
+  assert.equal(pending.autoPlanPending, true);
+  assert.equal(
+    (await page.evaluate(() => window.desk.snapshot())).studyBlocks.filter(
+      (b) => b.taskId === pending.id,
+    ).length,
+    0,
+  );
+  await page.getByRole("button", { name: "Physics", exact: true }).click();
+  await page
+    .getByText(
+      "Auto-plan will reserve time after the active study session ends.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.screenshot({ path: join(output, "auto-plan-deferred.png") });
+  await app.close();
+  app = undefined;
+  await launch();
+  assert.equal(
+    (await page.evaluate(() => window.desk.snapshot())).tasks.find(
+      (t) => t.id === pending.id,
+    ).autoPlanPending,
+    true,
+  );
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page
+    .getByRole("button", { name: "End · keep unfinished", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "End · keep unfinished", exact: true })
+    .waitFor({ state: "hidden" });
+  const ended = await page.evaluate(() => window.desk.snapshot());
+  assert.equal(
+    ended.tasks.find((t) => t.id === pending.id).autoPlanPending,
+    undefined,
+  );
+  assert.equal(
+    ended.studyBlocks.filter((b) => b.taskId === pending.id).length,
+    1,
+  );
+  assert.deepEqual(
+    ended.studyBlocks.find((b) => b.id === auto.studyBlocks[0].id),
+    auto.studyBlocks[0],
+  );
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: join(output, "auto-plan-resumed.png") });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: default Auto-plan capture, visible change record, Suggest switch, preserved commitments and restart mode",
+    "PASS: default Auto-plan capture, visible change record, Suggest switch, preserved commitments, restart mode and deferred capture after session end",
   );
 } finally {
   if (app) await app.close();

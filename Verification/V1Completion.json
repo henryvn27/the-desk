@@ -409,11 +409,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/planner; packages/grades; packages/domain; apps/desktop",
-      "automated": "64 tests + typecheck/lint/build pass. Default new-capture Auto-plan, preserved commitments, Suggest persistence, active/uncertain deferral and capture-undo protection tested alongside grade-context ordering.",
-      "live": "Installed macOS Auto-plan capture/change record and Suggest switch/restart pass. Development manual drag/edit/rebalance regression passes. Screenshot inspected; operated video captured.",
+      "automated": "66 tests + typecheck/lint/build pass. Default and deferred Auto-plan, restart, one-time scheduling, Suggest cancellation, manual override and existing commitment preservation tested.",
+      "live": "Installed macOS Auto-plan capture/change history, mode switch and deferred capture after restart/session-end pass. Active-session fixture seeded via trusted test API; subsequent flow uses UI. Screenshot inspected; operated video captured.",
       "mac": "Unsigned installed arm64 grade/planner integration passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Broader automatic updates, deferred-session scheduling, Autopilot, learned behavior, mastery/dependencies/teacher/retention inputs and full planning layers remain unfinished; Windows interaction unverified."
+      "blocker": "Broader automatic updates/missed-block handling, Autopilot, learned behavior, mastery/dependencies/teacher/retention inputs and full planning layers remain unfinished; Windows interaction unverified."
     },
     {
       "id": "PLAN-002",

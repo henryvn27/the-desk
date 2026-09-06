@@ -29,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 13) {
+    if (version > 14) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -79,6 +79,7 @@ export class DeskStore {
       PRAGMA user_version=11; COMMIT;`);
     if (version <= 11) this.db.exec("BEGIN; PRAGMA user_version=12; COMMIT;");
     if (version <= 12) this.db.exec("BEGIN; PRAGMA user_version=13; COMMIT;");
+    if (version <= 13) this.db.exec("BEGIN; PRAGMA user_version=14; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -212,6 +213,15 @@ export class DeskStore {
             "INSERT INTO settings VALUES('planning-mode',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
           )
           .run(JSON.stringify(c.mode));
+        if (c.mode === "suggest")
+          for (const task of state.tasks.filter((t) => t.autoPlanPending)) {
+            const updated = { ...task };
+            delete updated.autoPlanPending;
+            this.db
+              .prepare("UPDATE tasks SET data=? WHERE id=?")
+              .run(JSON.stringify(updated), task.id);
+            this.queue(task.id, "task.auto-plan-cancelled", timestamp);
+          }
       }
       if (c.type === "grade.category") {
         if (!state.classes.some((course) => course.id === c.input.classId))
@@ -526,54 +536,16 @@ export class DeskStore {
           id: entityId,
           completed: false,
           createdAt: timestamp,
+          ...(active &&
+          state.planningMode === "auto-plan" &&
+          c.input.deadlineConfirmed
+            ? { autoPlanPending: true }
+            : {}),
         };
         this.db
           .prepare("INSERT INTO tasks VALUES(?,?,?)")
           .run(entityId, task.classId, JSON.stringify(task));
-        if (
-          state.planningMode === "auto-plan" &&
-          !active &&
-          task.deadlineConfirmed
-        ) {
-          const result = planWeek(
-            [task],
-            new Date(+now + 180000),
-            state.planning,
-            state.studyBlocks,
-            state,
-          );
-          const added: StudyBlock[] = result.blocks.map((block) => ({
-            ...block,
-            id: randomUUID(),
-            origin: "auto-plan",
-            locked: false,
-            revision: 0,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          }));
-          for (const block of added) {
-            this.db
-              .prepare("INSERT INTO study_blocks VALUES(?,?,?)")
-              .run(block.id, block.taskId, JSON.stringify(block));
-            this.queue(block.id, "block.auto-plan", timestamp);
-          }
-          if (added.length) {
-            const change: PlanChange = {
-              id: randomUUID(),
-              createdAt: timestamp,
-              expiresAt: timestamp,
-              appliedAt: timestamp,
-              reason: `Auto-plan: ${task.title}`,
-              added,
-              replaced: [],
-              kept: [],
-              unscheduled: result.unscheduled,
-            };
-            this.db
-              .prepare("INSERT INTO plan_changes VALUES(?,?,?)")
-              .run(change.id, timestamp, JSON.stringify(change));
-          }
-        }
+        if (!active) this.reserveCapturedTask(task, now);
       }
       if (c.type === "task.update") {
         const existing = state.tasks.find((t) => t.id === c.id);
@@ -666,6 +638,11 @@ export class DeskStore {
         this.db
           .prepare("UPDATE sessions SET data=?,active=? WHERE id=?")
           .run(JSON.stringify(active), active.endedAt ? 0 : 1, active.id);
+        if (c.type === "session.end")
+          for (const task of this.snapshot().tasks.filter(
+            (t) => t.autoPlanPending,
+          ))
+            this.reserveCapturedTask(task, now);
       }
       if (c.type === "session.review") {
         const session = state.sessions.find((s) => s.id === c.id);
@@ -709,6 +686,65 @@ export class DeskStore {
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
+    }
+  }
+  /** Called only inside a command transaction; consumes deferred intent once. */
+  private reserveCapturedTask(task: Task, now: Date) {
+    const timestamp = now.toISOString();
+    const ready = { ...task };
+    delete ready.autoPlanPending;
+    if (task.autoPlanPending) {
+      this.db
+        .prepare("UPDATE tasks SET data=? WHERE id=?")
+        .run(JSON.stringify(ready), task.id);
+      this.queue(task.id, "task.auto-plan-resumed", timestamp);
+    }
+    const state = this.snapshot();
+    if (
+      state.planningMode !== "auto-plan" ||
+      state.sessions.some((s) => !s.endedAt) ||
+      !ready.deadlineConfirmed ||
+      ready.completed ||
+      state.studyBlocks.some((b) => b.taskId === task.id)
+    )
+      return;
+    const result = planWeek(
+      [ready],
+      new Date(+now + 180000),
+      state.planning,
+      state.studyBlocks,
+      state,
+    );
+    const added: StudyBlock[] = result.blocks.map((block) => ({
+      ...block,
+      id: randomUUID(),
+      origin: "auto-plan",
+      locked: false,
+      revision: 0,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+    for (const block of added) {
+      this.db
+        .prepare("INSERT INTO study_blocks VALUES(?,?,?)")
+        .run(block.id, block.taskId, JSON.stringify(block));
+      this.queue(block.id, "block.auto-plan", timestamp);
+    }
+    if (added.length) {
+      const change: PlanChange = {
+        id: randomUUID(),
+        createdAt: timestamp,
+        expiresAt: timestamp,
+        appliedAt: timestamp,
+        reason: `Auto-plan: ${task.title}`,
+        added,
+        replaced: [],
+        kept: [],
+        unscheduled: result.unscheduled,
+      };
+      this.db
+        .prepare("INSERT INTO plan_changes VALUES(?,?,?)")
+        .run(change.id, timestamp, JSON.stringify(change));
     }
   }
   private queue(id: string, operation: string, at: string) {

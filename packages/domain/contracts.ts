@@ -88,6 +88,7 @@ export const taskInput = z.object({
 export type TaskInput = z.infer<typeof taskInput>;
 export type Class = { id: string; name: string; color: string };
 export type Task = TaskInput & {
+  autoPlanPending?: boolean;
   id: string;
   completed: boolean;
   createdAt: string;

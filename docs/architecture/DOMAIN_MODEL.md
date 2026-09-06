@@ -56,3 +56,6 @@ Schema 12 adds optional assignment links to same-class grade categories and upco
 
 
 Schema 13 introduces persisted Suggest/Auto-plan selection and automatic-block origin. Auto-plan is the default and reserves new confirmed captures three minutes ahead within available gaps, without moving existing blocks. Active-session captures and uncertain work remain proposals. Capture and its reservations/change record are transactional. Capture undo removes only untouched automatic blocks; edits/locks/cancellations prevent it. Switching modes does not rearrange commitments. Invalid persisted mode values fail closed. Plan change history includes automatic additions; broader automatic updates, deferred-session capture scheduling and Autopilot remain unimplemented.
+
+
+Schema 14 persists deferred Auto-plan intent for confirmed captures made during an active session. Session end consumes that intent transactionally and reserves available gaps once. Switching to Suggest clears pending intent, including if the user later switches back. Any existing reservation/cancellation for the task is a manual override and prevents duplicate automatic work. Pending status is shown in the class task list. This resumes new captures only; general task-update/deadline/missed-block automation remains open.

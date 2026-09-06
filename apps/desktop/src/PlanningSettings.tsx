@@ -47,9 +47,10 @@ export function PlanningSettings({
         </label>
         <p>
           Auto-plan reserves available time when you capture confirmed work. It
-          keeps existing blocks in place. During an active study session, new
-          work stays as proposals. Suggest leaves all new work as proposals.
-          Switching modes does not change saved blocks.
+          keeps existing blocks in place. During an active study session,
+          Auto-plan waits and reserves new captures when the session ends.
+          Suggest leaves all new work as proposals. Switching modes does not
+          change saved blocks.
         </p>
         <button disabled={busy}>Save planning behavior</button>
       </form>

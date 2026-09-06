@@ -598,6 +598,12 @@ function Library({
                     ? "Deadline confirmed"
                     : "Deadline needs confirmation"}
               </p>
+              {t.autoPlanPending && (
+                <p>
+                  Auto-plan will reserve time after the active study session
+                  ends.
+                </p>
+              )}
               {t.notes && <p>{t.notes}</p>}
               <button onClick={() => edit(t)}>Edit assignment</button>
               <button onClick={() => void openCanvas(t.id)}>Open canvas</button>

@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 13);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 14);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -975,5 +975,139 @@ test("Suggest mode persists without moving existing blocks, and active/uncertain
   } finally {
     store.close();
     rmSync(dir, { recursive: true });
+  }
+});
+
+test("Auto-plan deferred captures survive restart and reserve once after session end", () => {
+  const dir = mkdtempSync(join(tmpdir(), "desk-deferred-"));
+  const path = join(dir, "test.sqlite");
+  let store = new DeskStore(path);
+  const now = new Date(2026, 8, 7, 8);
+  try {
+    const classId = store.execute(
+      { type: "class.create", name: "Physics" },
+      now,
+    ).classes[0]!.id;
+    const input = {
+      classId,
+      title: "Current work",
+      minutes: 30,
+      dueAt: null,
+      deadlineConfirmed: true,
+      resource: null,
+      notes: "",
+    };
+    const initial = store.execute({ type: "task.create", input }, now);
+    store.execute({ type: "session.start", taskId: initial.tasks[0]!.id }, now);
+    const captured = store.execute(
+      { type: "task.create", input: { ...input, title: "Next work" } },
+      now,
+    );
+    const pending = captured.tasks.find((t) => t.title === "Next work")!;
+    assert.equal(pending.autoPlanPending, true);
+    assert.deepEqual(captured.studyBlocks, initial.studyBlocks);
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(
+      store.snapshot().tasks.find((t) => t.id === pending.id)!.autoPlanPending,
+      true,
+    );
+    const ended = store.execute(
+      { type: "session.end", completed: false },
+      new Date(+now + 600000),
+    );
+    assert.equal(
+      ended.tasks.find((t) => t.id === pending.id)!.autoPlanPending,
+      undefined,
+    );
+    assert.equal(
+      ended.studyBlocks.filter((b) => b.taskId === pending.id).length,
+      1,
+    );
+    assert.deepEqual(
+      ended.studyBlocks.find((b) => b.id === initial.studyBlocks[0]!.id),
+      initial.studyBlocks[0],
+    );
+    assert.equal(
+      ended.tasks.find((t) => t.id === pending.id)!.completed,
+      false,
+    );
+    assert.throws(
+      () => store.execute({ type: "session.end", completed: false }),
+      /No active/,
+    );
+    assert.deepEqual(store.snapshot(), ended);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true });
+  }
+});
+test("Suggest cancels pending automation and manual reservations are never duplicated on session end", () => {
+  const store = new DeskStore(":memory:");
+  const now = new Date(2026, 8, 7, 8);
+  try {
+    const classId = store.execute(
+      { type: "class.create", name: "Physics" },
+      now,
+    ).classes[0]!.id;
+    const input = {
+      classId,
+      title: "Current",
+      minutes: 30,
+      dueAt: null,
+      deadlineConfirmed: true,
+      resource: null,
+      notes: "",
+    };
+    const current = store.execute({ type: "task.create", input }, now)
+      .tasks[0]!;
+    store.execute({ type: "session.start", taskId: current.id }, now);
+    const pending = store
+      .execute(
+        { type: "task.create", input: { ...input, title: "Suggest later" } },
+        now,
+      )
+      .tasks.at(-1)!;
+    store.execute({ type: "planning.mode", mode: "suggest" }, now);
+    assert.equal(
+      store.snapshot().tasks.find((t) => t.id === pending.id)!.autoPlanPending,
+      undefined,
+    );
+    store.execute({ type: "planning.mode", mode: "auto-plan" }, now);
+    const manual = store
+      .execute(
+        { type: "task.create", input: { ...input, title: "Manual override" } },
+        now,
+      )
+      .tasks.at(-1)!;
+    const block = store
+      .execute(
+        {
+          type: "block.create",
+          taskId: manual.id,
+          input: { start: new Date(2026, 8, 7, 12).toISOString(), minutes: 30 },
+          beyondDeadlineApproved: false,
+        },
+        now,
+      )
+      .studyBlocks.find((b) => b.taskId === manual.id)!;
+    const ended = store.execute(
+      { type: "session.end", completed: false },
+      new Date(+now + 600000),
+    );
+    assert.equal(
+      ended.studyBlocks.filter((b) => b.taskId === pending.id).length,
+      0,
+    );
+    assert.deepEqual(
+      ended.studyBlocks.filter((b) => b.taskId === manual.id),
+      [block],
+    );
+    assert.equal(
+      ended.tasks.find((t) => t.id === manual.id)!.autoPlanPending,
+      undefined,
+    );
+  } finally {
+    store.close();
   }
 });
