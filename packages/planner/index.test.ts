@@ -215,3 +215,35 @@ test("saved commitments reserve capacity once, preserve locks, and elapsed block
     90,
   );
 });
+
+test("cancelled reservations restore the full remaining workload", async () => {
+  const { planWeek } = await import("./index");
+  const { defaultPlanningPreferences } = await import("../domain/contracts");
+  const start = new Date(2026, 8, 7, 9).toISOString();
+  const end = new Date(2026, 8, 7, 10).toISOString();
+  const result = planWeek(
+    [task("a", 90, null)],
+    new Date(2026, 8, 7, 8),
+    defaultPlanningPreferences,
+    [
+      {
+        id: "cancelled",
+        taskId: "a",
+        start,
+        end,
+        minutes: 60,
+        why: "Reserved",
+        locked: true,
+        revision: 3,
+        createdAt: start,
+        updatedAt: start,
+        cancelledAt: start,
+      },
+    ],
+  );
+  assert.equal(
+    result.blocks.reduce((sum, b) => sum + b.minutes, 0),
+    90,
+  );
+  assert.equal(result.blocks[0]!.start, new Date(2026, 8, 7, 8).toISOString());
+});

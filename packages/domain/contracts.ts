@@ -83,6 +83,7 @@ export const studyBlockTime = z.object({
   minutes: z.number().int().min(5).max(2400),
 });
 export type StudyBlock = Block & {
+  cancelledAt?: string;
   id: string;
   locked: boolean;
   revision: number;
@@ -118,6 +119,12 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("block.cancel"),
+    id,
+    revision: z.number().int().nonnegative(),
+    cancellationApproved: z.boolean(),
+  }),
   z.object({
     type: z.literal("block.create"),
     taskId: id,

@@ -30,7 +30,9 @@ export function planWeek(
 ) {
   const residual = tasks.filter((t) => !t.completed).map((t) => ({ ...t }));
   // Elapsed blocks remain visible history; they are not evidence of completed work.
-  const reserved = commitments.filter((b) => Date.parse(b.end) > +now);
+  const reserved = commitments.filter(
+    (b) => !b.cancelledAt && Date.parse(b.end) > +now,
+  );
   for (const task of residual) {
     task.minutes = Math.max(
       0,

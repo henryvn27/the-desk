@@ -466,11 +466,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "47 tests plus typecheck/lint/build pass. Saved blocks reject stale/overlapping/unapproved locked or late edits; restart and capacity-reservation tests pass.",
-      "live": "Installed macOS Plan smoke passes reserve, lock, denied edit, approved resize, and exact restart persistence. Screenshot and operated video captured.",
+      "automated": "48 tests plus typecheck/lint/build pass. Saved blocks reject stale/overlapping/unapproved locked or late edits. Cancellation retains history and restores planning capacity without completing work.",
+      "live": "Installed macOS Plan smoke passes reserve, lock, denied edit/cancellation, approved resize/release, and exact restart persistence. Screenshot and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Drag editing, cancellation, automatic rebalancing, plan history and complete explanation evidence remain unfinished; Windows interaction unverified."
+      "blocker": "Drag editing, automatic rebalancing, full plan history and complete explanation evidence remain unfinished; Windows interaction unverified."
     },
     {
       "id": "PLAN-005",

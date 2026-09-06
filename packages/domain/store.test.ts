@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 7);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 8);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -537,6 +537,58 @@ test("saved blocks survive restart and reject conflicting, stale, locked, and la
     store.close();
     store = new DeskStore(path);
     assert.deepEqual(store.snapshot().studyBlocks, [moved]);
+    assert.throws(
+      () =>
+        store.execute(
+          {
+            type: "block.cancel",
+            id: moved.id,
+            revision: moved.revision,
+            cancellationApproved: false,
+          },
+          now,
+        ),
+      /locked/,
+    );
+    assert.deepEqual(store.snapshot().studyBlocks, [moved]);
+    const cancelled = store.execute(
+      {
+        type: "block.cancel",
+        id: moved.id,
+        revision: moved.revision,
+        cancellationApproved: true,
+      },
+      now,
+    ).studyBlocks[0]!;
+    assert.ok(cancelled.cancelledAt);
+    assert.equal(store.snapshot().tasks[0]!.completed, false);
+    assert.equal(store.snapshot().tasks[0]!.minutes, 90);
+    assert.throws(
+      () =>
+        store.execute(
+          {
+            ...move,
+            revision: cancelled.revision,
+            lockedChangeApproved: true,
+            beyondDeadlineApproved: true,
+          },
+          now,
+        ),
+      /changed/,
+    );
+    store.close();
+    store = new DeskStore(path);
+    assert.deepEqual(store.snapshot().studyBlocks, [cancelled]);
+    store.execute(
+      {
+        type: "block.create",
+        taskId,
+        input: { start: cancelled.start, minutes: 30 },
+        beyondDeadlineApproved: true,
+      },
+      now,
+    );
+
     assert.equal(store.snapshot().tasks[0]!.completed, false);
   } finally {
     store.close();

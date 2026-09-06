@@ -97,27 +97,42 @@ export function StudyPlan({
                 minutes: Number(form.get("minutes")),
               };
               const beyondDeadlineApproved = form.has("deadline");
+              const cancelling =
+                (e.nativeEvent as SubmitEvent).submitter?.getAttribute(
+                  "value",
+                ) === "release";
               const c: Command =
-                "id" in editing
+                cancelling && "id" in editing
                   ? {
-                      type: "block.update",
+                      type: "block.cancel",
                       id: editing.id,
                       revision: editing.revision,
-                      input,
-                      locked: form.has("locked"),
-                      lockedChangeApproved: form.has("approveLock"),
-                      beyondDeadlineApproved,
+                      cancellationApproved: form.has("approveCancel"),
                     }
-                  : {
-                      type: "block.create",
-                      taskId: editing.taskId,
-                      input,
-                      beyondDeadlineApproved,
-                    };
+                  : "id" in editing
+                    ? {
+                        type: "block.update",
+                        id: editing.id,
+                        revision: editing.revision,
+                        input,
+                        locked: form.has("locked"),
+                        lockedChangeApproved: form.has("approveLock"),
+                        beyondDeadlineApproved,
+                      }
+                    : {
+                        type: "block.create",
+                        taskId: editing.taskId,
+                        input,
+                        beyondDeadlineApproved,
+                      };
               void save(c)
                 .then(() => {
                   setEditing(undefined);
-                  setStatus("Study block saved.");
+                  setStatus(
+                    cancelling
+                      ? "Reserved time released. The assignment still needs its remaining work."
+                      : "Study block saved.",
+                  );
                 })
                 .catch((e) => setStatus(userError(e)))
                 .finally(() => setBusy(false));
@@ -174,8 +189,21 @@ export function StudyPlan({
               <input name="deadline" type="checkbox" /> Allow this block to end
               after the assignment deadline
             </label>
+            {"id" in editing && (
+              <label>
+                <input type="checkbox" name="approveCancel" />{" "}
+                {editing.locked
+                  ? "I approve cancelling this locked block; keep the assignment"
+                  : "I approve releasing this reserved time; keep the assignment"}
+              </label>
+            )}
             <div className="actions">
               <button disabled={busy}>Save block</button>
+              {"id" in editing && (
+                <button type="submit" value="release" disabled={busy}>
+                  Release reserved time
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busy}
@@ -189,10 +217,23 @@ export function StudyPlan({
       )}
       <p role="status">{status}</p>
       <h2>Saved blocks</h2>
-      {data.studyBlocks.length ? (
-        data.studyBlocks.map((b) => row(b, true))
+      {data.studyBlocks.some((b) => !b.cancelledAt) ? (
+        data.studyBlocks.filter((b) => !b.cancelledAt).map((b) => row(b, true))
       ) : (
         <p>No saved blocks yet. Reserve a suggestion to keep its place.</p>
+      )}
+      {data.studyBlocks.some((b) => b.cancelledAt) && (
+        <details>
+          <summary>Released blocks</summary>
+          {data.studyBlocks
+            .filter((b) => b.cancelledAt)
+            .map((b) => (
+              <p key={b.id}>
+                {label(b)} · {b.minutes} minutes · released{" "}
+                {new Date(b.cancelledAt!).toLocaleString()}
+              </p>
+            ))}
+        </details>
       )}
       <h2>Suggested time</h2>
       {week.blocks.length ? (

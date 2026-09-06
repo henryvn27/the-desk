@@ -23,7 +23,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 7) {
+    if (version > 8) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -60,6 +60,7 @@ export class DeskStore {
       this.db.exec(`BEGIN;
       CREATE TABLE study_blocks(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),data TEXT NOT NULL);
       PRAGMA user_version=7; COMMIT;`);
+    if (version <= 7) this.db.exec("BEGIN; PRAGMA user_version=8; COMMIT;");
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -119,6 +120,35 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "block.cancel") {
+        const existing = state.studyBlocks.find((b) => b.id === c.id);
+        if (
+          !existing ||
+          existing.cancelledAt ||
+          existing.revision !== c.revision
+        )
+          throw Error(
+            "This block changed. Refresh your plan before cancelling it.",
+          );
+        if (!c.cancellationApproved)
+          throw Error(
+            existing.locked
+              ? "Confirm cancelling this locked block."
+              : "Confirm releasing this reserved time.",
+          );
+        entityId = existing.id;
+        this.db
+          .prepare("UPDATE study_blocks SET data=? WHERE id=?")
+          .run(
+            JSON.stringify({
+              ...existing,
+              cancelledAt: timestamp,
+              updatedAt: timestamp,
+              revision: existing.revision + 1,
+            }),
+            existing.id,
+          );
+      }
       if (c.type === "block.create" || c.type === "block.update") {
         const existing =
           c.type === "block.update"
@@ -126,7 +156,9 @@ export class DeskStore {
             : undefined;
         if (
           c.type === "block.update" &&
-          (!existing || existing.revision !== c.revision)
+          (!existing ||
+            existing.cancelledAt ||
+            existing.revision !== c.revision)
         )
           throw Error(
             "This block changed. Refresh your plan before editing it.",
@@ -161,6 +193,7 @@ export class DeskStore {
           changesTime &&
           state.studyBlocks.some(
             (b) =>
+              !b.cancelledAt &&
               b.id !== existing?.id &&
               Date.parse(b.start) < end &&
               Date.parse(b.end) > start,

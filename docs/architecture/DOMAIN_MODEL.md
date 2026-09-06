@@ -28,7 +28,7 @@ The product contract §4 defines the required academic graph. This document desc
 - Changing a confirmed deadline or revoking its confirmation requires explicit approval. Capture provenance survives the edit.
 - Uncertain deadlines are excluded from automatic planning. Capacity respects the configured local same-day window and buffer.
 - Remaining-time review cannot modify completed work or overwrite an estimate after a newer session of the same task.
-- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Schema 7 adds saved study blocks. Opening a future schema fails closed.
+- SQLite migrations are sequential and transactional. Schema 3 adds settings; schema 4 adds text sources and join tables; schema 5 adds Canvas records; schema 6 fences the notebook document format so older renderers cannot overwrite page content. Schema 7 adds saved study blocks; schema 8 fences cancellation-aware clients. Opening a future schema fails closed.
 
 ## Required graph still missing
 
@@ -38,4 +38,4 @@ The current local profile is not a multi-user security boundary. JSON payload pe
 
 Verification: `packages/domain/store.test.ts`, `packages/planner/index.test.ts`, and installed smoke evidence described in `Verification/BASELINE.md`.
 
-Saved blocks are retained across suggestion recalculation. Future reservations reduce remaining estimates and occupy capacity; elapsed blocks do not count as completed work. Automatic cancellation, rebalancing, drag editing and plan revision history remain open.
+Saved blocks are retained across suggestion recalculation. Future reservations reduce remaining estimates and occupy capacity; elapsed blocks do not count as completed work. Explicit cancellation retains the block with a cancellation timestamp and revision; it requires approval, preserves assignment work, and releases scheduling capacity. Automatic rebalancing, drag editing and full plan revision history remain open.

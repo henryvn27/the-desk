@@ -96,9 +96,48 @@ try {
     (await page.evaluate(() => window.desk.snapshot())).studyBlocks[0],
     saved,
   );
+  await page.getByRole("button", { name: "Edit block", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Release reserved time", exact: true })
+    .click();
+  await page
+    .getByText("Confirm cancelling this locked block.", { exact: false })
+    .waitFor();
+  assert.deepEqual(
+    (await page.evaluate(() => window.desk.snapshot())).studyBlocks[0],
+    saved,
+  );
+  await page
+    .getByLabel("I approve cancelling this locked block; keep the assignment", {
+      exact: true,
+    })
+    .check();
+  await page
+    .getByRole("button", { name: "Release reserved time", exact: true })
+    .click();
+  await page
+    .getByText(
+      "Reserved time released. The assignment still needs its remaining work.",
+      { exact: true },
+    )
+    .waitFor();
+  const cancelled = (await page.evaluate(() => window.desk.snapshot()))
+    .studyBlocks[0];
+  assert.ok(cancelled.cancelledAt);
+  await page.getByText("Released blocks", { exact: true }).click();
+  await page.screenshot({ path: join(output, "released-plan.png") });
+  await app.close();
+  app = undefined;
+  await launch();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await page.getByText("Released blocks", { exact: true }).waitFor();
+  const final = await page.evaluate(() => window.desk.snapshot());
+  assert.deepEqual(final.studyBlocks[0], cancelled);
+  assert.equal(final.tasks[0].completed, false);
+  assert.equal(final.tasks[0].minutes, 90);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence",
+    "PASS: reserve, lock, reject unapproved edit, approve edit, restart persistence, locked cancellation approval and retained history",
   );
 } finally {
   if (app) await app.close();

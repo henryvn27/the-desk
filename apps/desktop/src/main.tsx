@@ -159,8 +159,10 @@ function App() {
   const schedule = {
     blocks: [
       ...week.blocks,
-      ...data.studyBlocks.filter((b) =>
-        data.tasks.some((t) => t.id === b.taskId && !t.completed),
+      ...data.studyBlocks.filter(
+        (b) =>
+          !b.cancelledAt &&
+          data.tasks.some((t) => t.id === b.taskId && !t.completed),
       ),
     ]
       .filter(
