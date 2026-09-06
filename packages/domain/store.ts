@@ -36,7 +36,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 24) {
+    if (version > 25) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -106,6 +106,7 @@ export class DeskStore {
         "BEGIN; CREATE TABLE memories(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=23; COMMIT;",
       );
     if (version <= 23) this.db.exec("BEGIN; PRAGMA user_version=24; COMMIT;");
+    if (version <= 24) this.db.exec("BEGIN; PRAGMA user_version=25; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();

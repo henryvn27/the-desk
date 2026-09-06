@@ -54,3 +54,6 @@ Active-session Lens context now includes explicit global and current-class memor
 
 
 Learning controls apply to both Capture duration suggestions and inferred notes in active-session Lens context. Disabled learning retains notes for inspection/edit/forget but stops using inferred notes for tutoring. Explicit notes remain available. Confirmed duration patterns are tentative estimates based on recorded sessions, not proof of mastery or future outcomes. Clearing retains source session history but excludes it from new learning; re-enabling does not undo that exclusion.
+
+
+Inferred memories enter Lens context only while learning is enabled and their saved observations still match eligible current study evidence. Revised reviews/tasks and older notes without observations are withheld. Explicit notes remain eligible under normal class scope. This freshness check does not certify prediction accuracy.

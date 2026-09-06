@@ -1,4 +1,4 @@
-import type { Snapshot } from "../domain/contracts";
+import type { AcademicMemory, Snapshot } from "../domain/contracts";
 import { durationEvidence, durationSuggestion } from "./duration";
 export function learningSessions(
   state: Pick<Snapshot, "sessions" | "inference">,
@@ -32,6 +32,7 @@ export function durationMemories(state: Snapshot) {
             basis: JSON.stringify(evidence),
             text: `Reviewed ${workKind} work in ${course.name} took a median ${result.ratio.toFixed(2)} times the initial estimate across ${result.samples} tasks.`,
             evidence: {
+              observations: evidence,
               sessionIds: evidence.map((item) => item.sessionId),
               ratio: result.ratio,
               samples: result.samples,
@@ -40,5 +41,27 @@ export function durationMemories(state: Snapshot) {
         ];
       },
     ),
+  );
+}
+
+export function inferenceEvidenceCurrent(
+  memory: AcademicMemory,
+  state: Pick<Snapshot, "tasks" | "sessions">,
+): boolean {
+  if (memory.origin !== "inferred") return true;
+  const observations = memory.evidence?.observations;
+  if (!observations?.length) return false;
+  const first = observations[0]!;
+  const current = new Map(
+    durationEvidence(state.tasks, state.sessions, {
+      classId: first.classId,
+      workKind: first.workKind,
+      minutes: 30,
+    }).map((item) => [item.sessionId, item]),
+  );
+  return observations.every(
+    (observation) =>
+      JSON.stringify(current.get(observation.sessionId)) ===
+      JSON.stringify(observation),
   );
 }

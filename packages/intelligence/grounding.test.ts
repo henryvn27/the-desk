@@ -125,3 +125,29 @@ test("explicit memory context includes global/current-class statements and discl
   );
   assert.ok(JSON.stringify(result).length <= 20000);
 });
+
+test("unverifiable inferred memories are withheld while explicit notes remain available", () => {
+  const base = {
+    id: "memory",
+    text: "Remember this",
+    category: "preference" as const,
+    classId: null,
+    revision: 0,
+    createdAt: "",
+    updatedAt: "",
+  };
+  const result = JSON.parse(
+    lensContext({
+      ...state,
+      inference: { enabled: true, excludedSessionIds: [] },
+      memories: [
+        { ...base, origin: "inferred" },
+        { ...base, id: "explicit", origin: "explicit" },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    result.memories.map((memory: { id: string }) => memory.id),
+    ["explicit"],
+  );
+});

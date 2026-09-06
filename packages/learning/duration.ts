@@ -1,12 +1,24 @@
 import type { StudySession, Task, TaskInput } from "../domain/contracts";
 
+export type DurationObservation = {
+  sessionId: string;
+  ratio: number;
+  revision: number;
+  taskId: string;
+  taskRevision: number;
+  title: string;
+  actualMinutes: number;
+  estimatedMinutes: number;
+  classId: string;
+  workKind: NonNullable<TaskInput["workKind"]>;
+};
 /** Conservative local evidence: a reviewed, unchanged task finished in one session. */
 export function durationEvidence(
   tasks: Task[],
   sessions: StudySession[],
   input: Pick<TaskInput, "classId" | "workKind" | "minutes">,
 ) {
-  const evidence: { sessionId: string; ratio: number; revision: number }[] = [];
+  const evidence: DurationObservation[] = [];
   for (const task of tasks) {
     if (
       !task.completed ||
@@ -36,6 +48,13 @@ export function durationEvidence(
       continue;
     evidence.push({
       sessionId: session.id,
+      taskId: task.id,
+      taskRevision: task.revision ?? 0,
+      title: task.title,
+      actualMinutes: session.actualMinutes,
+      estimatedMinutes: estimate.minutes,
+      classId: task.classId,
+      workKind: task.workKind ?? "assignment",
       ratio: session.actualMinutes / estimate.minutes,
       revision: session.revision ?? 0,
     });

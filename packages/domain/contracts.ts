@@ -1,3 +1,4 @@
+import type { DurationObservation } from "../learning/duration";
 import { sourceKind } from "../intelligence/source-kind";
 import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
@@ -227,7 +228,12 @@ export type AcademicMemory = z.infer<typeof memoryInput> & {
   revision: number;
   origin: "explicit" | "inferred";
   inferenceKey?: string;
-  evidence?: { sessionIds: string[]; ratio: number; samples: number };
+  evidence?: {
+    sessionIds: string[];
+    ratio: number;
+    samples: number;
+    observations?: DurationObservation[];
+  };
   createdAt: string;
   updatedAt: string;
 };

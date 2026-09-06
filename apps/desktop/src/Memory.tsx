@@ -1,4 +1,7 @@
-import { durationMemories } from "../../../packages/learning/memory";
+import {
+  durationMemories,
+  inferenceEvidenceCurrent,
+} from "../../../packages/learning/memory";
 import { useEffect, useState } from "react";
 import {
   memoryCategory,
@@ -213,16 +216,24 @@ export function Memory({
               <summary>
                 Evidence · {memory.evidence.samples} reviewed tasks
               </summary>
-              {memory.evidence.sessionIds.map((id) => {
-                const session = data.sessions.find((s) => s.id === id);
-                const task = data.tasks.find((t) => t.id === session?.taskId);
-                return (
-                  <p key={id}>
-                    {task?.title ?? "Original task unavailable"} ·{" "}
-                    {session?.actualMinutes ?? "Unknown"} minutes recorded
-                  </p>
-                );
-              })}
+              {!inferenceEvidenceCurrent(memory, data) && (
+                <p>
+                  Study history changed or original evidence is unavailable.
+                  This pattern is paused in tutoring; review or forget it.
+                </p>
+              )}
+              {memory.evidence.observations?.map((observation) => (
+                <p key={observation.sessionId}>
+                  {observation.title} · {observation.actualMinutes} minutes
+                  recorded / {observation.estimatedMinutes} minutes estimated at
+                  confirmation
+                </p>
+              ))}
+              {!memory.evidence.observations && (
+                <p>
+                  Original numeric evidence was not saved by this older version.
+                </p>
+              )}
             </details>
           )}
           <div className="actions">

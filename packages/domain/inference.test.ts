@@ -4,7 +4,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DeskStore } from "./store";
-import { durationMemories, learningSessions } from "../learning/memory";
+import {
+  durationMemories,
+  learningSessions,
+  inferenceEvidenceCurrent,
+} from "../learning/memory";
 test("duration memory requires repeated evidence and confirmation; disable, forget and clear preserve explicit history", () => {
   const dir = mkdtempSync(join(tmpdir(), "desk-inference-"));
   let store = new DeskStore(join(dir, "desk.sqlite"));
@@ -69,6 +73,19 @@ test("duration memory requires repeated evidence and confirmation; disable, forg
     const memory = store.execute(confirm).memories[0]!;
     assert.equal(memory.origin, "inferred");
     assert.equal(memory.evidence?.samples, 3);
+    assert.equal(memory.evidence?.observations?.[0]?.estimatedMinutes, 30);
+    assert.equal(inferenceEvidenceCurrent(memory, store.snapshot()), true);
+    const originalEvidence = structuredClone(memory.evidence);
+    const session = store.snapshot().sessions[0]!;
+    store.execute({
+      type: "session.review",
+      id: session.id,
+      notes: "Corrected review",
+      remainingMinutes: null,
+    });
+    assert.equal(inferenceEvidenceCurrent(memory, store.snapshot()), false);
+    assert.deepEqual(store.snapshot().memories[0]!.evidence, originalEvidence);
+
     assert.throws(() => store.execute(confirm));
     store.execute({
       type: "memory.update",

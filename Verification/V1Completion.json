@@ -832,10 +832,10 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "Explicit editable/forgettable notes plus duration-pattern candidates from repeated session evidence. Store-validated confirmation persists provenance; disable and clear-inferred controls affect Capture learning and tutoring context without deleting explicit notes or study history.",
-      "automated": "99 tests pass including repeated-evidence threshold, confirmation/disabled/stale rejection, clear preservation, restart exclusions, full-task exclusion, explicit CRUD and scoped context.",
+      "implementation": "Explicit editable/forgettable notes plus duration-pattern candidates from repeated session evidence. Store-validated confirmation persists provenance; disable and clear-inferred controls affect Capture learning and tutoring context without deleting explicit notes or study history. Confirmed duration evidence is immutable; changed/unavailable evidence is shown and excluded from tutoring.",
+      "automated": "100 tests pass including immutable observation preservation after review correction, evidence freshness and withholding unverifiable inferred notes, plus prior inference/explicit-memory checks.",
       "live": "No provider request; actual tutoring use of notes unverified.",
-      "mac": "Unsigned installed UI smoke passes duration confirmation/evidence inspection, learning toggle, explicit edits, inferred clearing with explicit/history preservation, and cleared/disabled state after restart. Timing synthetic; screenshot/video retained.",
+      "mac": "Unsigned installed synthetic UI smoke verifies saved original evidence after review correction and visible stale warning, plus confirmation/learning controls/clear/restart. Screenshot/video retained; no real study-duration claim.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
       "blocker": "Broader preference inference and integration of existing settings/learned preferences remain incomplete. Live tutoring use and Windows UI unverified."
     },

@@ -1,3 +1,4 @@
+import { inferenceEvidenceCurrent } from "../learning/memory";
 import { sourcePassage } from "./passages";
 import { sourcePriority } from "./source-kind";
 import type { Snapshot } from "../domain/contracts";
@@ -62,7 +63,8 @@ export function lensContext(state: Snapshot, question = ""): string {
   const memories = (state.memories ?? []).filter(
     (memory) =>
       (!memory.classId || memory.classId === task.classId) &&
-      (memory.origin === "explicit" || state.inference?.enabled),
+      (memory.origin === "explicit" ||
+        (state.inference?.enabled && inferenceEvidenceCurrent(memory, state))),
   );
   context.omittedMemories = memories.length;
   for (const memory of memories) {
