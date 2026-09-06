@@ -52,7 +52,7 @@ function makeWindow(kind: "main" | "lens" | "controller") {
   const win = new BrowserWindow({
     ...(bounds ?? {
       width: kind === "controller" ? 400 : 1180,
-      height: kind === "controller" ? 220 : 800,
+      height: kind === "controller" ? 380 : 800,
     }),
     minWidth: kind === "main" ? 760 : undefined,
     minHeight: kind === "main" ? 580 : undefined,

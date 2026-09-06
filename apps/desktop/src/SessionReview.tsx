@@ -47,6 +47,13 @@ export function SessionReview({
           ? "You marked this task finished."
           : "Work remains unfinished."}
       </p>
+      {!!session.checklistAtEnd?.length && (
+        <p>
+          {session.checklistAtEnd.filter((item) => item.completed).length} of{" "}
+          {session.checklistAtEnd.length} steps were checked when this session
+          ended.
+        </p>
+      )}
       {session.estimateAtStart && (
         <p>
           {session.estimateAtStart.minutes} min estimated remaining when you

@@ -480,3 +480,23 @@ button[aria-pressed="true"] {
   margin-top: 6px;
   color: #686e68;
 }
+
+.task-checklist ul {
+  list-style: none;
+  padding: 0;
+}
+.task-checklist li {
+  margin-bottom: 1rem;
+}
+
+.controller p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.controller h2,
+.controller .session-progress {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

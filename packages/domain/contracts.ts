@@ -87,7 +87,17 @@ export const taskInput = z.object({
 });
 export type TaskInput = z.infer<typeof taskInput>;
 export type Class = { id: string; name: string; color: string };
+export type ChecklistItem = {
+  id: string;
+  title: string;
+  completed: boolean;
+  archived: boolean;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
 export type Task = TaskInput & {
+  checklist?: ChecklistItem[];
   autoPlanPending?: boolean;
   revision?: number;
   id: string;
@@ -95,6 +105,7 @@ export type Task = TaskInput & {
   createdAt: string;
 };
 export type StudySession = {
+  checklistAtEnd?: Pick<ChecklistItem, "id" | "title" | "completed">[];
   revision?: number;
   corrections?: Array<{
     correctedAt: string;
@@ -190,6 +201,22 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("checklist.add"),
+    taskId: id,
+    title: z.string().trim().min(1).max(500),
+  }),
+  z.object({
+    type: z.literal("checklist.update"),
+    taskId: id,
+    id,
+    revision: z.number().int().nonnegative(),
+    input: z.object({
+      title: z.string().trim().min(1).max(500),
+      completed: z.boolean(),
+      archived: z.boolean(),
+    }),
+  }),
   z.object({
     type: z.literal("planning.mode"),
     mode: z.enum(["suggest", "auto-plan"]),

@@ -1,11 +1,18 @@
-import type { Snapshot, Task } from "../../../packages/domain/contracts";
+import { TaskChecklist } from "./TaskChecklist";
+import type {
+  Command,
+  Snapshot,
+  Task,
+} from "../../../packages/domain/contracts";
 import { sessionKit } from "../../../packages/study/kit";
 
 export function SessionKit({
   task,
   data,
   openResource,
+  save,
 }: {
+  save: (command: Command) => Promise<unknown>;
   task: Task;
   data: Snapshot;
   openResource: (id: string) => Promise<void>;
@@ -14,6 +21,7 @@ export function SessionKit({
   return (
     <section aria-label="Session kit">
       <h3>Session kit</h3>
+      <TaskChecklist task={task} save={save} />
       {task.resource && (
         <button onClick={() => void openResource(task.id)}>
           Open assignment resource

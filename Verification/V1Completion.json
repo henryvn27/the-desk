@@ -537,12 +537,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain",
-      "automated": "72 tests plus typecheck/lint/build. Kit selection separates explicit assignment links, general class references and other-task sources; latest three nonblank ended reviews only. Prior single-active-session, timer and persistence coverage retained.",
-      "live": "Installed unsigned macOS kit smoke: UI capture/review/start, preview and active kit, assignment/class references, prior notes, pause/restart. Explicit source associations are seeded through IPC; external HTTPS dispatch is stubbed and verified, not a live browser navigation. Screenshot inspected and operated video captured.",
+      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain; apps/desktop/src/TaskChecklist.tsx",
+      "automated": "74 tests plus typecheck/lint/build: checklist item revision/ownership validation, archive/restore, unchanged task completion on check, scope revisions and immutable session-end checklist snapshots. Prior session/kit/correction/duration tests retained.",
+      "live": "Installed unsigned macOS checklist and Session Kit regression pass. UI adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot. Controller fit check confirms no scroll in the exercised layout; screenshots inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Previous 9a5da03 hosted macOS/Windows checks/build/package pass (34007362534); no kit-specific Windows interaction proof.",
-      "blocker": "Partial only: structured checklist/progress, objective refinement, mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
+      "windows": "Prior f881ffd hosted macOS/Windows checks/build/package pass (34007577938); checklist/controller Windows interaction unverified.",
+      "blocker": "Partial only: richer objectives, verified mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
     },
     {
       "id": "SESSION-002",
@@ -555,12 +555,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain",
-      "automated": "72 tests plus typecheck/lint/build. Kit selection separates explicit assignment links, general class references and other-task sources; latest three nonblank ended reviews only. Prior single-active-session, timer and persistence coverage retained.",
-      "live": "Installed unsigned macOS kit smoke: UI capture/review/start, preview and active kit, assignment/class references, prior notes, pause/restart. Explicit source associations are seeded through IPC; external HTTPS dispatch is stubbed and verified, not a live browser navigation. Screenshot inspected and operated video captured.",
+      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain; apps/desktop/src/TaskChecklist.tsx",
+      "automated": "74 tests plus typecheck/lint/build: checklist item revision/ownership validation, archive/restore, unchanged task completion on check, scope revisions and immutable session-end checklist snapshots. Prior session/kit/correction/duration tests retained.",
+      "live": "Installed unsigned macOS checklist and Session Kit regression pass. UI adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot. Controller fit check confirms no scroll in the exercised layout; screenshots inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Previous 9a5da03 hosted macOS/Windows checks/build/package pass (34007362534); no kit-specific Windows interaction proof.",
-      "blocker": "Partial only: structured checklist/progress, objective refinement, mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
+      "windows": "Prior f881ffd hosted macOS/Windows checks/build/package pass (34007577938); checklist/controller Windows interaction unverified.",
+      "blocker": "Partial only: richer objectives, verified mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
     },
     {
       "id": "SESSION-003",
@@ -573,12 +573,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop/src/SessionReview.tsx; apps/desktop/src/SessionCorrection.tsx; packages/domain; packages/learning/duration.ts",
-      "automated": "70 tests plus typecheck/lint/build: completion correction is atomic, requires current task/session revisions, rejects active or superseded sessions, retains timing/start estimates and previous review across restart. Duration-learning exclusions remain covered.",
-      "live": "Installed unsigned macOS correction smoke operates capture/start/finish, reopens work, inspects history, rejects a stale correction after an injected concurrent review, corrects completion and verifies restart. Installed duration regression also passes. Screenshot inspected and operated video captured.",
+      "implementation": "apps/desktop/src/SessionReview.tsx; apps/desktop/src/SessionCorrection.tsx; packages/domain; packages/learning/duration.ts; apps/desktop/src/TaskChecklist.tsx",
+      "automated": "74 tests plus typecheck/lint/build: checklist item revision/ownership validation, archive/restore, unchanged task completion on check, scope revisions and immutable session-end checklist snapshots. Prior session/kit/correction/duration tests retained.",
+      "live": "Installed unsigned macOS checklist and Session Kit regression pass. UI adds/checks/archives/restores steps, pauses through the controller, restarts, ends/reviews and renames a step while preserving the ended snapshot. Controller fit check confirms no scroll in the exercised layout; screenshots inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Prior 086eac5 hosted macOS/Windows checks/build/package pass (34006977441); no correction-specific Windows interaction proof.",
-      "blocker": "Partial only: automatic work detection and attempts/mistake/mastery/preparedness updates remain unfinished; duration learning is conservative and opt-in."
+      "windows": "Prior f881ffd hosted macOS/Windows checks/build/package pass (34007577938); checklist/controller Windows interaction unverified.",
+      "blocker": "Partial only: automatic work detection and attempts/mistake/mastery/preparedness updates remain unfinished."
     },
     {
       "id": "LENS-001",

@@ -19,6 +19,7 @@ import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
 import { Lens } from "./Lens";
 import { SessionCorrection } from "./SessionCorrection";
+import { TaskChecklist } from "./TaskChecklist";
 import { SessionKit } from "./SessionKit";
 import { SessionReview } from "./SessionReview";
 declare global {
@@ -201,8 +202,37 @@ function App() {
           <p>
             {Math.floor(elapsed)} min · {active.pausedAt ? "Paused" : "Working"}
           </p>
+          {activeTask?.checklist?.some((item) => !item.archived) && (
+            <p className="session-progress">
+              {
+                activeTask.checklist.filter(
+                  (item) => !item.archived && item.completed,
+                ).length
+              }{" "}
+              of {activeTask.checklist.filter((item) => !item.archived).length}{" "}
+              steps checked
+              {activeTask.checklist.find(
+                (item) => !item.archived && !item.completed,
+              ) && (
+                <>
+                  {" "}
+                  · Next step:{" "}
+                  {
+                    activeTask.checklist.find(
+                      (item) => !item.archived && !item.completed,
+                    )!.title
+                  }
+                </>
+              )}
+            </p>
+          )}
           {kind === "main" && activeTask && (
-            <SessionKit task={activeTask} data={data} openResource={open} />
+            <SessionKit
+              task={activeTask}
+              data={data}
+              openResource={open}
+              save={(c) => act(c, true)}
+            />
           )}
           <div className="actions">
             <button
@@ -376,7 +406,12 @@ function App() {
                 </details>
                 <details>
                   <summary>Preview study materials</summary>
-                  <SessionKit task={next} data={data} openResource={open} />
+                  <SessionKit
+                    task={next}
+                    data={data}
+                    openResource={open}
+                    save={(c) => act(c, true)}
+                  />
                 </details>
                 <button
                   className="primary"
@@ -482,7 +517,7 @@ function App() {
             open={open}
             edit={setEditing}
             saveGrade={(c) => act(c, true)}
-            saveSession={(c) => act(c, true)}
+            saveProgress={(c) => act(c, true)}
             saveSource={(input) => act({ type: "source.create", input }, true)}
             openCanvas={openCanvas}
             newNotebook={newNotebook}
@@ -550,7 +585,7 @@ function Library({
   edit,
   saveSource,
   saveGrade,
-  saveSession,
+  saveProgress,
   openCanvas,
   newNotebook,
 }: {
@@ -559,7 +594,7 @@ function Library({
   open: (id: string) => Promise<void>;
   edit: (task: Task) => void;
   saveGrade: (c: Command) => Promise<unknown>;
-  saveSession: (c: Command) => Promise<unknown>;
+  saveProgress: (c: Command) => Promise<unknown>;
   saveSource: (
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
@@ -616,6 +651,10 @@ function Library({
                 </p>
               )}
               {t.notes && <p>{t.notes}</p>}
+              <details>
+                <summary>Assignment checklist</summary>
+                <TaskChecklist task={t} save={saveProgress} />
+              </details>
               <button onClick={() => edit(t)}>Edit assignment</button>
               <button onClick={() => void openCanvas(t.id)}>Open canvas</button>
               <button onClick={() => void newNotebook(t.id)}>
@@ -650,6 +689,19 @@ function Library({
                               ? "Reported finished"
                               : "Reported unfinished"}
                         </p>
+                        {!!s.checklistAtEnd?.length && (
+                          <details>
+                            <summary>Checklist at session end</summary>
+                            <ul>
+                              {s.checklistAtEnd.map((item) => (
+                                <li key={item.id}>
+                                  {item.completed ? "Checked" : "Unchecked"} ·{" "}
+                                  {item.title}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
                         {s.estimateAtStart && (
                           <p>
                             {s.estimateAtStart.minutes} min estimated remaining
@@ -699,7 +751,7 @@ function Library({
                           <SessionCorrection
                             session={s}
                             task={t}
-                            save={saveSession}
+                            save={saveProgress}
                           />
                         )}
                         {s.review?.remainingMinutes != null && (

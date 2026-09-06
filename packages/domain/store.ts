@@ -29,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 16) {
+    if (version > 17) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -82,6 +82,7 @@ export class DeskStore {
     if (version <= 13) this.db.exec("BEGIN; PRAGMA user_version=14; COMMIT;");
     if (version <= 14) this.db.exec("BEGIN; PRAGMA user_version=15; COMMIT;");
     if (version <= 15) this.db.exec("BEGIN; PRAGMA user_version=16; COMMIT;");
+    if (version <= 16) this.db.exec("BEGIN; PRAGMA user_version=17; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -531,6 +532,49 @@ export class DeskStore {
             "Choose a grade category belonging to this assignment's class.",
           );
       }
+      if (c.type === "checklist.add" || c.type === "checklist.update") {
+        const task = state.tasks.find((t) => t.id === c.taskId);
+        if (!task) throw Error("Task no longer exists.");
+        if (task.completed)
+          throw Error("Reopen the task before changing its checklist.");
+        const items = task.checklist ?? [];
+        if (c.type === "checklist.add") {
+          if (items.length >= 100)
+            throw Error(
+              "This task already has 100 checklist items, including archived items.",
+            );
+          const item = {
+            id: randomUUID(),
+            title: c.title,
+            completed: false,
+            archived: false,
+            revision: 0,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+          task.checklist = [...items, item];
+          task.revision = (task.revision ?? 0) + 1;
+        } else {
+          const item = items.find((item) => item.id === c.id);
+          if (!item || item.revision !== c.revision)
+            throw Error(
+              "This checklist item changed. Close the editor and try again.",
+            );
+          if (
+            item.title !== c.input.title ||
+            item.archived !== c.input.archived
+          )
+            task.revision = (task.revision ?? 0) + 1;
+          Object.assign(item, c.input, {
+            revision: item.revision + 1,
+            updatedAt: timestamp,
+          });
+        }
+        entityId = task.id;
+        this.db
+          .prepare("UPDATE tasks SET data=? WHERE id=?")
+          .run(JSON.stringify(task), task.id);
+      }
       if (c.type === "task.create") {
         entityId = randomUUID();
         const task: Task = {
@@ -583,6 +627,8 @@ export class DeskStore {
           )
         )
           throw Error("This task has saved study blocks and cannot be undone.");
+        if (state.tasks.find((t) => t.id === c.id)?.checklist?.length)
+          throw Error("This task has checklist work and cannot be undone.");
         if (state.sessions.some((s) => s.taskId === c.id))
           throw Error("This task has study history and cannot be undone.");
         if (!state.tasks.some((t) => t.id === c.id))
@@ -636,6 +682,9 @@ export class DeskStore {
           active.endedAt = timestamp;
           active.completionReported = c.completed;
           const task = state.tasks.find((t) => t.id === active.taskId)!;
+          active.checklistAtEnd = (task.checklist ?? [])
+            .filter((item) => !item.archived)
+            .map(({ id, title, completed }) => ({ id, title, completed }));
           // Completion is the student's explicit report, never a claim of submission or mastery.
           if (c.completed) {
             task.completed = true;
