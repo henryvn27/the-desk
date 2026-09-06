@@ -537,12 +537,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
+      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain",
+      "automated": "72 tests plus typecheck/lint/build. Kit selection separates explicit assignment links, general class references and other-task sources; latest three nonblank ended reviews only. Prior single-active-session, timer and persistence coverage retained.",
+      "live": "Installed unsigned macOS kit smoke: UI capture/review/start, preview and active kit, assignment/class references, prior notes, pause/restart. Explicit source associations are seeded through IPC; external HTTPS dispatch is stubbed and verified, not a live browser navigation. Screenshot inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+      "windows": "Previous 9a5da03 hosted macOS/Windows checks/build/package pass (34007362534); no kit-specific Windows interaction proof.",
+      "blocker": "Partial only: structured checklist/progress, objective refinement, mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
     },
     {
       "id": "SESSION-002",
@@ -555,12 +555,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
+      "implementation": "apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; packages/study/kit.ts; packages/domain",
+      "automated": "72 tests plus typecheck/lint/build. Kit selection separates explicit assignment links, general class references and other-task sources; latest three nonblank ended reviews only. Prior single-active-session, timer and persistence coverage retained.",
+      "live": "Installed unsigned macOS kit smoke: UI capture/review/start, preview and active kit, assignment/class references, prior notes, pause/restart. Explicit source associations are seeded through IPC; external HTTPS dispatch is stubbed and verified, not a live browser navigation. Screenshot inspected and operated video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
+      "windows": "Previous 9a5da03 hosted macOS/Windows checks/build/package pass (34007362534); no kit-specific Windows interaction proof.",
+      "blocker": "Partial only: structured checklist/progress, objective refinement, mistakes, calculator, generated artifacts, external app/session integration and Windows interaction remain unfinished."
     },
     {
       "id": "SESSION-003",

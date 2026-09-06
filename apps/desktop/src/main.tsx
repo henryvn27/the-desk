@@ -19,6 +19,7 @@ import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
 import { Lens } from "./Lens";
 import { SessionCorrection } from "./SessionCorrection";
+import { SessionKit } from "./SessionKit";
 import { SessionReview } from "./SessionReview";
 declare global {
   interface Window {
@@ -200,15 +201,9 @@ function App() {
           <p>
             {Math.floor(elapsed)} min · {active.pausedAt ? "Paused" : "Working"}
           </p>
-          {kind === "main" &&
-            data.sources
-              .filter((s) => s.taskIds.includes(active.taskId))
-              .map((s) => (
-                <details key={s.id}>
-                  <summary>{s.title}</summary>
-                  <p className="source-text">{s.text}</p>
-                </details>
-              ))}
+          {kind === "main" && activeTask && (
+            <SessionKit task={activeTask} data={data} openResource={open} />
+          )}
           <div className="actions">
             <button
               onClick={() =>
@@ -220,7 +215,7 @@ function App() {
               {active.pausedAt ? "Resume" : "Pause"}
             </button>
             <button onClick={() => void window.desk.lens()}>Lens</button>
-            {activeTask?.resource && (
+            {kind !== "main" && activeTask?.resource && (
               <button onClick={() => void open(activeTask.id)}>Resource</button>
             )}
           </div>
@@ -378,6 +373,10 @@ function App() {
                 <details>
                   <summary>Why this?</summary>
                   <p>{schedule.blocks[0]?.why}</p>
+                </details>
+                <details>
+                  <summary>Preview study materials</summary>
+                  <SessionKit task={next} data={data} openResource={open} />
                 </details>
                 <button
                   className="primary"
