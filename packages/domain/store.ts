@@ -39,6 +39,7 @@ import {
   type Mistake,
   type Concept,
   type Attempt,
+  type SessionAttemptInput,
   type Plan,
   type OutboxOperation,
   type SyncEnvelope,
@@ -2926,6 +2927,18 @@ export class DeskStore {
             .run(JSON.stringify(task), task.id);
           this.queue(task.id, "task.remaining-time", timestamp);
         }
+        const evidence = c.attempts ?? [];
+        if (evidence.length && (session.evidenceAttemptIds?.length ?? 0) > 0)
+          throw Error(
+            "Learning evidence is already recorded for this session. Edit the saved attempt instead.",
+          );
+        const evidenceAttemptIds = [...(session.evidenceAttemptIds ?? [])];
+        for (const attempt of evidence)
+          evidenceAttemptIds.push(
+            this.recordSessionAttempt(session, task, attempt, timestamp),
+          );
+        if (evidenceAttemptIds.length)
+          session.evidenceAttemptIds = evidenceAttemptIds;
         session.revision = (session.revision ?? 0) + 1;
         session.review = {
           reviewedAt: timestamp,
@@ -2945,6 +2958,59 @@ export class DeskStore {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+  private recordSessionAttempt(
+    session: StudySession,
+    task: Task,
+    input: SessionAttemptInput,
+    timestamp: string,
+  ) {
+    const state = this.snapshot();
+    const conceptIds = [...new Set(input.conceptIds)];
+    if (
+      conceptIds.some(
+        (conceptId) =>
+          !state.concepts.some(
+            (concept) =>
+              concept.id === conceptId && concept.classId === task.classId,
+          ),
+      )
+    )
+      throw Error("Every evidence concept must belong to the session class.");
+    const attempt: Attempt = {
+      ...input,
+      classId: task.classId,
+      taskId: session.taskId,
+      conceptIds,
+      attemptedAt: timestamp,
+      id: randomUUID(),
+      revision: 0,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const concepts = new Map(
+      state.concepts.map((concept) => [concept.id, { ...concept }]),
+    );
+    for (const conceptId of conceptIds) {
+      const concept = concepts.get(conceptId);
+      if (!concept) continue;
+      concept.attempts += 1;
+      if (attempt.unaided) {
+        concept.unaidedTotal += 1;
+        if (attempt.result === "correct") concept.unaidedCorrect += 1;
+      }
+      concept.hintCount += attempt.hintCount;
+      concept.lastReviewedAt = attempt.attemptedAt;
+      concept.revision += 1;
+      concept.updatedAt = timestamp;
+      this.db
+        .prepare("UPDATE concepts SET data=? WHERE id=?")
+        .run(JSON.stringify(concept), concept.id);
+    }
+    this.db
+      .prepare("INSERT INTO attempts VALUES(?,?)")
+      .run(attempt.id, JSON.stringify(attempt));
+    return attempt.id;
   }
   /** Called only inside a command transaction; consumes deferred intent once. */
   private reserveCapturedTask(task: Task, now: Date) {

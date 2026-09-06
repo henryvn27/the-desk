@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DeskAPI } from "../../../packages/domain/contracts";
+import { parseBrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
 const api: DeskAPI = {
   onEdit: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, action: unknown) => {
@@ -15,6 +16,22 @@ const api: DeskAPI = {
   deleteLocalData: () => ipcRenderer.invoke("desk:data-delete"),
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
+  browserContext: () => ipcRenderer.invoke("desk:browser-context"),
+  onBrowserContext: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, value: unknown) => {
+      const parsed = parseBrowserBridgeMessage(value);
+      listener(parsed);
+    };
+    ipcRenderer.on("desk:browser-context", receive);
+    return () => ipcRenderer.removeListener("desk:browser-context", receive);
+  },
+  onBrowserContextCleared: (listener) => {
+    const receive = () => listener();
+    ipcRenderer.on("desk:browser-context-clear", receive);
+    return () => ipcRenderer.removeListener("desk:browser-context-clear", receive);
+  },
+  browserBridgeStatus: () => ipcRenderer.invoke("desk:browser-bridge-status"),
+  clearBrowserContext: () => ipcRenderer.invoke("desk:browser-context-clear"),
   providerStatus: () => ipcRenderer.invoke("desk:provider-status"),
   accountStatus: () => ipcRenderer.invoke("desk:account-status"),
   accountSignIn: (email, password) =>

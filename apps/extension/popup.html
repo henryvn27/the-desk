@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Desk Browser Bridge</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <p class="eyebrow">THE DESK</p>
+        <h1>Browser capture</h1>
+        <p class="lede">Review the current page and send only the evidence you choose to your local Desk workspace.</p>
+      </header>
+
+      <section class="panel" aria-labelledby="connection-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LOCAL HOST</p>
+            <h2 id="connection-heading">Bridge connection</h2>
+          </div>
+          <span class="lock-mark" aria-hidden="true">●</span>
+        </div>
+        <label for="endpoint">Loopback endpoint</label>
+        <input id="endpoint" type="url" spellcheck="false" autocomplete="off" />
+        <p class="hint">Only 127.0.0.1 or localhost with the Desk bridge path is accepted.</p>
+        <label for="token">Per-install token <span class="optional">required to send</span></label>
+        <input id="token" type="password" spellcheck="false" autocomplete="off" placeholder="Set by the Desk host" />
+        <button id="save" class="secondary" type="button">Save connection</button>
+      </section>
+
+      <section class="panel capture-panel" aria-labelledby="capture-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">EXPLICIT CAPTURE</p>
+            <h2 id="capture-heading">Current page</h2>
+          </div>
+          <span class="capture-mark" aria-hidden="true">↗</span>
+        </div>
+        <p class="hint">The extension reads the active tab only after you press Capture. It does not run in the background.</p>
+        <button id="capture" class="primary" type="button">Capture active tab</button>
+        <div class="preview" aria-live="polite">
+          <h3 id="page-title">Nothing captured yet</h3>
+          <p id="page-url" class="url">Capture a page to preview its URL.</p>
+          <p id="visible-summary" class="summary">Visible page text will be bounded before it leaves the browser.</p>
+          <div class="selection-box">
+            <p class="eyebrow">SELECTION</p>
+            <p id="selection">Select a passage in the page, then capture it here.</p>
+          </div>
+        </div>
+        <button id="send" class="primary send" type="button" disabled>Send reviewed capture</button>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

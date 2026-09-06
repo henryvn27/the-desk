@@ -17,7 +17,7 @@
       "title": "Full V1 vertical not yet implemented or live verified",
       "severity": "high",
       "status": "in_progress",
-      "evidence": "2026-09-06: installed macOS arm64 build passes bounded account, sync, conflict, migration, Lens and acceptance smokes; full Capture-to-Replan, production integrations, voice, Windows and strict distribution evidence remain open.",
+      "evidence": "2026-09-06: exact installed macOS arm64 build passes bounded account, sync, conflict, migration, Lens, browser-bridge, session-evidence, Plan and acceptance smokes; full Capture-to-Replan, production integrations, voice, Windows and strict distribution evidence remain open.",
       "notes": "Continue bounded implementation and evidence; do not call the release complete while the completion map or release gates retain material gaps."
     },
     {
@@ -43,7 +43,7 @@
       "title": "Live OpenRouter authentication and Lens grounding unverified",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: sanitized live text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 173 automated tests, release-boundary provider-failure checks and installed synthetic import/routing/restart/disconnect smoke pass.",
+      "evidence": "2026-09-06: sanitized live text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 177 automated tests, release-boundary provider-failure checks and installed synthetic import/routing/restart/disconnect smoke pass.",
       "notes": "No further live retries until credential/account state changes. Do not expose or copy the developer key. Account logging settings and real grounding remain unverified; independent V1 work continues."
     },
     {
@@ -95,17 +95,17 @@
       "title": "macOS directory artifact is development-signed and not notarized",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: release and installed app.asar hashes match e7ec0f1b14b3d018ed533e5cec6c3f6efb39e9087986765118ea0f24370d4d6d. codesign reports the local Apple Development identity and strict deep verification passes; electron-builder skipped notarization, so no notarized release is claimed.",
+      "evidence": "2026-09-06: release and installed app.asar hashes match 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. codesign reports the local Apple Development identity and strict deep verification passes; electron-builder skipped notarization, so no notarized release is claimed.",
       "notes": "Requires the authorized signing/notarization environment and release credentials; local implementation work continues independently."
     },
     {
       "id": "GOOGLE-001",
       "area": "integrations",
-      "title": "Live Google OAuth and browser extension transport remain unverified",
+      "title": "Live Google OAuth and real browser integration remain unverified",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: runtime-validated multi-identity/progressive capability state model and installed connection/account UI pass; no live OAuth, Classroom/Calendar/Drive transport, extension or Windows interaction proof exists.",
-      "notes": "Provider-neutral fallbacks stay explicit; do not claim sync from a saved URL or OAuth-shaped state."
+      "evidence": "2026-09-06: runtime-validated multi-identity/progressive capability state model and installed connection/account UI pass. The local loopback browser bridge and packaged MV3 extension now pass bounded host/transport and installed browser-context smokes; live OAuth, real Chrome/Edge installation, Classroom/Calendar/Drive transport and Windows interaction remain unverified.",
+      "notes": "Provider-neutral fallbacks stay explicit. Do not claim sync or live site capture from a saved URL or OAuth-shaped state. The extension/host implementation is reviewable, but browser permission and live-site behavior still need external runtime proof."
     }
   ]
 }

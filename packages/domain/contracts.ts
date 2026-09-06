@@ -363,6 +363,7 @@ export type Task = TaskInput & {
   createdAt: string;
 };
 export type StudySession = {
+  evidenceAttemptIds?: string[];
   checklistAtEnd?: Pick<ChecklistItem, "id" | "title" | "completed">[];
   revision?: number;
   corrections?: Array<{
@@ -599,6 +600,23 @@ export type Attempt = AttemptInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const sessionAttemptInput = z
+  .object({
+    conceptIds: z.array(id).max(100),
+    result: attemptResult,
+    unaided: z.boolean(),
+    hintCount: z.number().int().min(0).max(10000),
+    notes: z.string().trim().max(5000),
+  })
+  .superRefine((input, ctx) => {
+    if (!input.unaided && input.hintCount === 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["hintCount"],
+        message: "Record at least one hint when an attempt was aided.",
+      });
+  });
+export type SessionAttemptInput = z.infer<typeof sessionAttemptInput>;
 export type Snapshot = {
   user: User | null;
   mistakes: Mistake[];
@@ -978,6 +996,7 @@ export const command = z.discriminatedUnion("type", [
     id,
     notes: z.string().trim().max(20000),
     remainingMinutes: z.number().int().min(5).max(2400).nullable(),
+    attempts: z.array(sessionAttemptInput).max(20).optional(),
   }),
 ]);
 export type Command = z.infer<typeof command>;
@@ -998,6 +1017,18 @@ export interface DeskAPI {
   deleteLocalData(): Promise<Snapshot>;
   canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
+  browserContext(): Promise<import("../integrations/browser-bridge").BrowserBridgeMessage | null>;
+  onBrowserContext(
+    listener: (message: import("../integrations/browser-bridge").BrowserBridgeMessage) => void,
+  ): () => void;
+  onBrowserContextCleared(listener: () => void): () => void;
+  browserBridgeStatus(): Promise<{
+    running: boolean;
+    endpoint: string | null;
+    port: number | null;
+    token: string | null;
+  }>;
+  clearBrowserContext(): Promise<void>;
   providerStatus(): Promise<{
     configured: boolean;
     secureStorage: boolean;

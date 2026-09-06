@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "The Desk Browser Bridge",
+  "version": "1.0.0",
+  "description": "Review and send bounded page context to a local The Desk host.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://127.0.0.1/*",
+    "https://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Capture to The Desk",
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "minimum_chrome_version": "120"
+}

@@ -7,6 +7,7 @@ import type {
 } from "../../../packages/intelligence/lens-provider";
 import type { Command } from "../../../packages/domain/contracts";
 import type { Snapshot } from "../../../packages/domain/contracts";
+import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
 import {
   lensAnswerCanvasScene,
   lensAnswerMemoryInput,
@@ -23,6 +24,8 @@ export function Lens({
   classId,
   taskId,
   taskResource,
+  browserContext,
+  clearBrowserContext,
   save,
 }: {
   tutoringMode: TutoringMode;
@@ -32,6 +35,8 @@ export function Lens({
   classId?: string;
   taskId?: string;
   taskResource?: string;
+  browserContext: BrowserBridgeMessage | null;
+  clearBrowserContext: () => Promise<void>;
   save: (command: Command) => Promise<Snapshot | undefined>;
 }) {
   const [savingMode, setSavingMode] = useState(false);
@@ -212,6 +217,22 @@ export function Lens({
         <div className="eyebrow">Lens · {className}</div>
         <h2>{title}</h2>
         <p>Circle one or more areas, or ask about your current task.</p>
+        {browserContext && (
+          <div className="source" role="status">
+            <strong>Browser context attached</strong>
+            <p>
+              {browserContext.context.title || "Untitled page"}
+              <br />
+              <span className="muted">{browserContext.context.url}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => void clearBrowserContext()}
+            >
+              Clear browser context
+            </button>
+          </div>
+        )}
         <div className="actions" aria-label="Selection mode">
           {(["freehand", "box", "click"] as const).map((m) => (
             <button

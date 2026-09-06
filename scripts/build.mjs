@@ -14,3 +14,4 @@ await build({
   external: ["electron"],
   target: "node24",
 });
+await import("./build-extension.mjs");

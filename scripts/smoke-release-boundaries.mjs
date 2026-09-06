@@ -44,6 +44,9 @@ async function ensureBuildOutput() {
     join(repository, "dist", "index.html"),
     join(repository, "dist-electron", "main.cjs"),
     join(repository, "dist-electron", "preload.cjs"),
+    join(repository, "dist-extension", "manifest.json"),
+    join(repository, "dist-extension", "background.js"),
+    join(repository, "dist-extension", "popup.js"),
   ];
   const built = await Promise.all(required.map((path) => exists(path)));
   if (built.every(Boolean)) return;
@@ -73,6 +76,9 @@ async function inspectPackagedArchive() {
     "/dist/index.html",
     "/dist-electron/main.cjs",
     "/dist-electron/preload.cjs",
+    "/dist-extension/manifest.json",
+    "/dist-extension/background.js",
+    "/dist-extension/popup.js",
     "/package.json",
   ];
   for (const entry of required)
@@ -174,13 +180,14 @@ assert.equal(packageJson.main, "dist-electron/main.cjs");
 assert.deepEqual(packageJson.build?.files, [
   "dist/**",
   "dist-electron/**",
+  "dist-extension/**",
   "package.json",
 ]);
 assert.deepEqual(packageJson.build?.extraResources, [
   { from: "licenses", to: "licenses" },
 ]);
 
-const outputRoots = ["dist", "dist-electron"];
+const outputRoots = ["dist", "dist-electron", "dist-extension"];
 const outputFiles = (
   await Promise.all(
     outputRoots.map(async (root) =>

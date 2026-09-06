@@ -339,6 +339,94 @@ test("session review survives restart, updates remaining work, and rejects stale
   }
 });
 
+test("session review can record explicit checked evidence without claiming mastery", () => {
+  const store = new DeskStore(":memory:");
+  try {
+    const classId = store.execute({ type: "class.create", name: "Physics" })
+      .classes[0]!.id;
+    const taskId = store.execute({
+      type: "task.create",
+      input: {
+        title: "Free body diagrams",
+        classId,
+        dueAt: null,
+        minutes: 30,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: true,
+      },
+    }).tasks[0]!.id;
+    const concept = store.execute({
+      type: "concept.create",
+      input: {
+        classId,
+        taskIds: [taskId],
+        name: "Forces",
+        status: "learning",
+        preparedness: "developing",
+        retentionMode: "course",
+        reviewDue: null,
+        attempts: 0,
+        unaidedCorrect: 0,
+        unaidedTotal: 0,
+        hintCount: 0,
+        lastReviewedAt: null,
+        evidenceNote: "",
+      },
+    }).concepts[0]!;
+    const sessionId = store.execute(
+      { type: "session.start", taskId },
+      new Date("2026-09-06T12:00:00.000Z"),
+    ).sessions[0]!.id;
+    store.execute(
+      { type: "session.end", completed: false },
+      new Date("2026-09-06T12:20:00.000Z"),
+    );
+    const reviewed = store.execute({
+      type: "session.review",
+      id: sessionId,
+      notes: "Checked one diagram",
+      remainingMinutes: null,
+      attempts: [
+        {
+          conceptIds: [concept.id],
+          result: "correct",
+          unaided: true,
+          hintCount: 0,
+          notes: "Direction was correct.",
+        },
+      ],
+    });
+    assert.equal(reviewed.attempts.length, 1);
+    assert.deepEqual(reviewed.sessions[0]!.evidenceAttemptIds, [reviewed.attempts[0]!.id]);
+    assert.equal(reviewed.concepts[0]!.attempts, 1);
+    assert.equal(reviewed.concepts[0]!.unaidedCorrect, 1);
+    assert.equal(reviewed.concepts[0]!.unaidedTotal, 1);
+    assert.equal(reviewed.concepts[0]!.status, "learning");
+    assert.throws(
+      () =>
+        store.execute({
+          type: "session.review",
+          id: sessionId,
+          notes: "retry",
+          remainingMinutes: null,
+          attempts: [
+            {
+              conceptIds: [concept.id],
+              result: "partial",
+              unaided: false,
+              hintCount: 1,
+              notes: "",
+            },
+          ],
+        }),
+      /already recorded/,
+    );
+  } finally {
+    store.close();
+  }
+});
+
 test("planning preferences persist and invalid window cannot overwrite them", () => {
   const directory = mkdtempSync(join(tmpdir(), "desk-prefs-"));
   const path = join(directory, "db.sqlite");

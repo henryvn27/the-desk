@@ -41,6 +41,8 @@ import { SessionCorrection } from "./SessionCorrection";
 import { TaskChecklist } from "./TaskChecklist";
 import { SessionKit } from "./SessionKit";
 import { SessionReview } from "./SessionReview";
+import { BrowserBridgeSettings } from "./BrowserBridgeSettings";
+import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
 declare global {
   interface Window {
     EXCALIDRAW_ASSET_PATH: string;
@@ -109,6 +111,8 @@ function App() {
   const [reviewingCapture, setReviewingCapture] = useState<CaptureInboxItem>();
   const [canvas, setCanvas] =
     useState<import("../../../packages/domain/contracts").CanvasRecord>();
+  const [browserContext, setBrowserContext] =
+    useState<BrowserBridgeMessage | null>(null);
   useEffect(() => {
     let active = true;
     const refresh = () =>
@@ -206,6 +210,26 @@ function App() {
       clearInterval(timer);
     };
   }, [workspaceAttempt]);
+  useEffect(() => {
+    let active = true;
+    void window.desk
+      .browserContext()
+      .then((context) => {
+        if (active) setBrowserContext(context);
+      })
+      .catch(() => undefined);
+    const unsubscribe = window.desk.onBrowserContext((context) => {
+      if (active) setBrowserContext(context);
+    });
+    const unsubscribeClear = window.desk.onBrowserContextCleared(() => {
+      if (active) setBrowserContext(null);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+      unsubscribeClear();
+    };
+  }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -392,6 +416,11 @@ function App() {
         classId={activeTask?.classId}
         taskId={activeTask?.id}
         taskResource={activeTask?.resource ?? undefined}
+        browserContext={browserContext}
+        clearBrowserContext={async () => {
+          await window.desk.clearBrowserContext();
+          setBrowserContext(null);
+        }}
         save={(command) => act(command, true)}
       />
     );
@@ -492,6 +521,29 @@ function App() {
           </p>
         )}
         {captureNotice && <p role="status">{captureNotice}</p>}
+        {browserContext && (
+          <section className="browser-context-notice" role="status">
+            <div>
+              <div className="eyebrow">Browser context ready</div>
+              <strong>{browserContext.context.title || "Untitled page"}</strong>
+              <p className="muted">
+                {browserContext.context.browser} · {browserContext.context.url}
+              </p>
+            </div>
+            <div className="actions">
+              <button onClick={() => void window.desk.lens()}>Ask Lens</button>
+              <button
+                onClick={() =>
+                  void window.desk.clearBrowserContext().then(() =>
+                    setBrowserContext(null),
+                  )
+                }
+              >
+                Clear
+              </button>
+            </div>
+          </section>
+        )}
         {lastId && (
           <p role="status">
             Task saved.{" "}
@@ -518,6 +570,9 @@ function App() {
                     ?.id === unreviewed.id
                 }
                 task={reviewTask}
+                concepts={data.concepts.filter(
+                  (concept) => concept.classId === reviewTask.classId,
+                )}
                 save={act}
                 busy={busy}
               />
@@ -668,6 +723,7 @@ function App() {
             <ProviderSettings />
             <AccountSettings />
             <ConnectionsSettings />
+            <BrowserBridgeSettings />
             <SyncSettings
               outbox={data.outbox}
               conflicts={data.syncConflicts}
