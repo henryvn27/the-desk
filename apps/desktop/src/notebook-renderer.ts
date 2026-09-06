@@ -30,13 +30,33 @@ export function makePageFrame(page: Page) {
     locked: true,
   };
 }
+export function makePageBackground(page: Page) {
+  if (!page.pdf) return undefined;
+  const image = convertToExcalidrawElements([
+    {
+      type: "image",
+      fileId: page.pdf.fileId,
+      x: 0,
+      y: 0,
+      width: page.width,
+      height: page.height,
+      locked: true,
+    },
+  ])[0];
+  if (!image || image.type !== "image") throw Error("Unable to show PDF page.");
+  return image;
+}
 export function fitElementsToPage(
   elements: readonly ExcalidrawElement[],
   frame: ReturnType<typeof makePageFrame>,
+  background?: ReturnType<typeof makePageBackground>,
 ) {
   return [
+    ...(background ? [{ ...background, frameId: frame.id }] : []),
     ...elements
-      .filter((element) => element.id !== frame.id)
+      .filter(
+        (element) => element.id !== frame.id && element.id !== background?.id,
+      )
       .map((element) => ({ ...element, frameId: frame.id })),
     frame,
   ];
@@ -44,8 +64,24 @@ export function fitElementsToPage(
 export function pageNeedsRepair(
   elements: readonly ExcalidrawElement[],
   frame: ReturnType<typeof makePageFrame>,
+  background?: ReturnType<typeof makePageBackground>,
 ) {
   const current = elements.find((element) => element.id === frame.id);
+  if (background) {
+    const image = elements.find((element) => element.id === background.id);
+    if (
+      !image ||
+      image.type !== "image" ||
+      image.isDeleted ||
+      !image.locked ||
+      image.x !== 0 ||
+      image.y !== 0 ||
+      image.width !== frame.width ||
+      image.height !== frame.height ||
+      image.fileId !== background.fileId
+    )
+      return true;
+  }
   return (
     !current ||
     current.isDeleted ||

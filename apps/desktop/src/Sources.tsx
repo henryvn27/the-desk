@@ -1,3 +1,4 @@
+import { OriginalPDF } from "./OriginalPDF";
 import { useEffect, useRef, useState } from "react";
 import type { Snapshot, SourceInput } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
@@ -33,7 +34,8 @@ export function Sources({
         <details key={s.id} className="source">
           <summary>{s.title}</summary>
           <p className="muted">
-            Pasted by you · {new Date(s.createdAt).toLocaleDateString()}
+            {s.pdf ? "Imported PDF" : "Pasted by you"} ·{" "}
+            {new Date(s.createdAt).toLocaleDateString()}
           </p>
           <p>
             {s.classIds
@@ -50,7 +52,11 @@ export function Sources({
                 .join("; ")}
             </p>
           )}
-          <p className="source-text">{s.text}</p>
+          {s.pdf ? (
+            <OriginalPDF source={s} />
+          ) : (
+            <p className="source-text">{s.text}</p>
+          )}
         </details>
       ))}
       {!sources.length && <p className="muted">No matching saved sources.</p>}

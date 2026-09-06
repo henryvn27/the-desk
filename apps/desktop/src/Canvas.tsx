@@ -1,3 +1,4 @@
+import { OriginalPDF } from "./OriginalPDF";
 import { useRef, useState, useEffect } from "react";
 import {
   Excalidraw,
@@ -21,6 +22,7 @@ import {
 } from "../../../packages/canvas/notebook";
 import {
   makePageFrame,
+  makePageBackground,
   fitElementsToPage,
   pageNeedsRepair,
 } from "./notebook-renderer";
@@ -54,6 +56,9 @@ export default function Canvas({
       ? makePageFrame(activeNotebookPage(record.scene))
       : undefined,
   );
+  const [pageBackground, setPageBackground] = useState(() =>
+    page ? makePageBackground(page) : undefined,
+  );
   const last = useRef(JSON.stringify(record.scene));
   const sourceIds = useRef(record.scene.sourceIds ?? []);
   const [showSources, setShowSources] = useState(false);
@@ -83,7 +88,10 @@ export default function Canvas({
       if (!documentScene.current.notebook) return queueDocument(visible);
       if (activePageId !== documentScene.current.notebook.activePageId) return;
       const elements = visible.elements
-        .filter((element) => element.id !== pageFrame?.id)
+        .filter(
+          (element) =>
+            element.id !== pageFrame?.id && element.id !== pageBackground?.id,
+        )
         .map((element) => ({ ...element, frameId: null }));
       queueDocument(
         replaceNotebookPage(
@@ -114,6 +122,7 @@ export default function Canvas({
       editor.current = null;
       setShowMath(false);
       setPageFrame(makePageFrame(activeNotebookPage(next)));
+      setPageBackground(makePageBackground(activeNotebookPage(next)));
       setActivePageId(next.notebook!.activePageId);
     } catch (e) {
       setError(userError(e));
@@ -368,8 +377,22 @@ export default function Canvas({
               return (
                 <section key={id}>
                   <h3>{source?.title ?? "Source unavailable"}</h3>
-                  <p className="source-text">{source?.text}</p>
+                  {source?.pdf ? (
+                    <OriginalPDF source={source} />
+                  ) : (
+                    <p className="source-text">{source?.text}</p>
+                  )}
                   <button
+                    disabled={documentScene.current.notebook?.pages.some(
+                      (page) => page.pdf?.sourceId === id,
+                    )}
+                    title={
+                      documentScene.current.notebook?.pages.some(
+                        (page) => page.pdf?.sourceId === id,
+                      )
+                        ? "PDF pages retain their original source"
+                        : undefined
+                    }
                     onClick={() =>
                       changeLinks(links.filter((link) => link !== id))
                     }
@@ -405,6 +428,7 @@ export default function Canvas({
                     ? fitElementsToPage(
                         page.elements as unknown as ExcalidrawElement[],
                         pageFrame,
+                        pageBackground,
                       )
                     : documentScene.current.elements,
                 files: documentScene.current.files,
@@ -420,12 +444,19 @@ export default function Canvas({
             onChange={(elements, state, files) => {
               if (activePageId !== documentScene.current.notebook?.activePageId)
                 return;
-              if (pageFrame && pageNeedsRepair(elements, pageFrame)) {
+              if (
+                pageFrame &&
+                pageNeedsRepair(elements, pageFrame, pageBackground)
+              ) {
                 const api = editor.current;
                 queueMicrotask(() => {
                   if (api && editor.current === api)
                     api.updateScene({
-                      elements: fitElementsToPage(elements, pageFrame),
+                      elements: fitElementsToPage(
+                        elements,
+                        pageFrame,
+                        pageBackground,
+                      ),
                       captureUpdate: CaptureUpdateAction.NEVER,
                     });
                 });

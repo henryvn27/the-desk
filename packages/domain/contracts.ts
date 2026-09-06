@@ -21,7 +21,8 @@ export type SourceInput = z.infer<typeof sourceInput>;
 export type Source = SourceInput & {
   id: string;
   createdAt: string;
-  authority: "user-provided-text";
+  authority: "user-provided-text" | "user-provided-pdf";
+  pdf?: { fileName: string; byteLength: number; sha256: string };
 };
 export const taskInput = z.object({
   captureEvidence: z
@@ -110,6 +111,7 @@ export const command = z.discriminatedUnion("type", [
     type: z.literal("canvas.create"),
     taskId: id,
     notebook: z.boolean().optional(),
+    scene: canvasScene.optional(),
   }),
   z.object({ type: z.literal("canvas.recover"), id, scene: canvasScene }),
   z.object({
@@ -158,6 +160,10 @@ export interface DeskAPI {
   onEdit(listener: (action: "undo" | "redo") => void): () => void;
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
+  importPDF(
+    taskId: string,
+  ): Promise<{ source: Source; bytes: Uint8Array } | null>;
+  exportPDF(sourceId: string): Promise<boolean>;
   canvas(id: string): Promise<CanvasRecord>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   providerStatus(): Promise<{ configured: boolean; secureStorage: boolean }>;

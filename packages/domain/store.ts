@@ -1,3 +1,4 @@
+import { pdfMetadata } from "../sources/pdf";
 import { startNotebook } from "../canvas/notebook";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
 import { DatabaseSync } from "node:sqlite";
@@ -22,7 +23,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 6) {
+    if (version > 7) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -55,6 +56,51 @@ export class DeskStore {
     // Notebook content lives inside page envelopes. Older renderers would save
     // only root elements, so prevent them from opening this document format.
     if (version <= 5) this.db.exec("BEGIN; PRAGMA user_version=6; COMMIT;");
+    if (version <= 6)
+      this.db.exec(
+        "BEGIN; CREATE TABLE source_pdfs(source_id TEXT PRIMARY KEY REFERENCES sources(id),fileName TEXT NOT NULL,byteLength INTEGER NOT NULL,sha256 TEXT NOT NULL,bytes BLOB NOT NULL); PRAGMA user_version=7; COMMIT;",
+      );
+  }
+  importPDF(fileName: string, bytes: Uint8Array, taskId: string): Source {
+    const metadata = pdfMetadata(fileName, bytes);
+    const task = this.snapshot().tasks.find((task) => task.id === taskId);
+    if (!task) throw Error("Assignment no longer exists.");
+    const id = randomUUID(),
+      now = new Date().toISOString();
+    this.db.exec("BEGIN");
+    try {
+      this.db
+        .prepare("INSERT INTO sources VALUES(?,?,?,?,?)")
+        .run(id, metadata.fileName, "", now, "user-provided-pdf");
+      this.db
+        .prepare("INSERT INTO source_classes VALUES(?,?)")
+        .run(id, task.classId);
+      this.db.prepare("INSERT INTO source_tasks VALUES(?,?)").run(id, task.id);
+      this.db
+        .prepare("INSERT INTO source_pdfs VALUES(?,?,?,?,?)")
+        .run(
+          id,
+          metadata.fileName,
+          metadata.byteLength,
+          metadata.sha256,
+          bytes,
+        );
+      this.db
+        .prepare("INSERT INTO outbox VALUES(?,?,?,?)")
+        .run(randomUUID(), id, "source.importPDF", now);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.snapshot().sources.find((source) => source.id === id)!;
+  }
+  pdf(sourceId: string): Uint8Array {
+    const row = this.db
+      .prepare("SELECT bytes FROM source_pdfs WHERE source_id=?")
+      .get(sourceId);
+    if (!row) throw Error("Original PDF is unavailable.");
+    return Uint8Array.from(row.bytes as Uint8Array);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
     this.db
@@ -62,6 +108,9 @@ export class DeskStore {
       .run(randomUUID(), "local", sessionId, "lens", JSON.stringify(event));
   }
   snapshot(): Snapshot {
+    const pdfs = this.db
+      .prepare("SELECT source_id,fileName,byteLength,sha256 FROM source_pdfs")
+      .all();
     const classLinks = this.db.prepare("SELECT * FROM source_classes").all();
     const taskLinks = this.db.prepare("SELECT * FROM source_tasks").all();
     const settings = this.db
@@ -78,6 +127,18 @@ export class DeskStore {
         .all()
         .map((r) => ({
           ...r,
+          ...(pdfs.some((pdf) => pdf.source_id === r.id)
+            ? {
+                pdf: (() => {
+                  const pdf = pdfs.find((pdf) => pdf.source_id === r.id)!;
+                  return {
+                    fileName: pdf.fileName,
+                    byteLength: pdf.byteLength,
+                    sha256: pdf.sha256,
+                  };
+                })(),
+              }
+            : {}),
           classIds: classLinks
             .filter((l) => l.source_id === r.id)
             .map((l) => l.class_id),
@@ -118,20 +179,35 @@ export class DeskStore {
           files: {},
           viewBackgroundColor: "#ffffff",
         };
-        const scene = c.notebook ? startNotebook(blank, randomUUID()) : blank;
+        const scene =
+          c.scene ?? (c.notebook ? startNotebook(blank, randomUUID()) : blank);
         this.db
           .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
           .run(
             entityId,
             task.id,
-            c.notebook ? `${task.title} notebook` : task.title,
+            scene.notebook ? `${task.title} notebook` : task.title,
             timestamp,
             timestamp,
             0,
             JSON.stringify(scene),
           );
       }
-      if (c.type === "canvas.save" || c.type === "canvas.recover") {
+      if (
+        (c.type === "canvas.save" ||
+          c.type === "canvas.recover" ||
+          c.type === "canvas.create") &&
+        c.scene
+      ) {
+        for (const page of c.scene.notebook?.pages ?? []) {
+          if (
+            page.pdf &&
+            !this.db
+              .prepare("SELECT source_id FROM source_pdfs WHERE source_id=?")
+              .get(page.pdf.sourceId)
+          )
+            throw Error("Original PDF is unavailable.");
+        }
         for (const sourceId of c.scene.sourceIds ?? []) {
           if (!state.sources.some((source) => source.id === sourceId))
             throw Error("A linked source no longer exists.");

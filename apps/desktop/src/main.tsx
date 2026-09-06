@@ -1,6 +1,8 @@
+import { OriginalPDF } from "./OriginalPDF";
 import { userError } from "./errors";
 import React, { useEffect, useState } from "react";
 const Canvas = React.lazy(() => import("./Canvas"));
+const PdfImport = React.lazy(() => import("./PdfImport"));
 import { createRoot } from "react-dom/client";
 import type {
   DeskAPI,
@@ -41,6 +43,7 @@ function App() {
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
   const [editing, setEditing] = useState<Task>();
+  const [pdfTask, setPdfTask] = useState<string>();
   const [canvas, setCanvas] =
     useState<import("../../../packages/domain/contracts").CanvasRecord>();
   async function openCanvas(taskId: string, canvasId?: string) {
@@ -184,7 +187,11 @@ function App() {
               .map((s) => (
                 <details key={s.id}>
                   <summary>{s.title}</summary>
-                  <p className="source-text">{s.text}</p>
+                  {s.pdf ? (
+                    <OriginalPDF source={s} />
+                  ) : (
+                    <p className="source-text">{s.text}</p>
+                  )}
                 </details>
               ))}
           <div className="actions">
@@ -501,9 +508,25 @@ function App() {
             saveSource={(input) => act({ type: "source.create", input }, true)}
             openCanvas={openCanvas}
             newNotebook={newNotebook}
+            annotatePDF={setPdfTask}
           />
         )}
       </main>
+      {pdfTask && (
+        <React.Suspense fallback={<p>Opening PDF importer…</p>}>
+          <PdfImport
+            taskId={pdfTask}
+            close={() => setPdfTask(undefined)}
+            changed={() => {
+              void window.desk.snapshot().then(setData);
+            }}
+            ready={(record) => {
+              setPdfTask(undefined);
+              setCanvas(record);
+            }}
+          />
+        </React.Suspense>
+      )}
       {canvas && (
         <React.Suspense fallback={<p>Opening canvas…</p>}>
           <Canvas
@@ -560,6 +583,7 @@ function Library({
   saveSource,
   openCanvas,
   newNotebook,
+  annotatePDF,
 }: {
   data: Snapshot;
   classId?: string;
@@ -570,6 +594,7 @@ function Library({
   ) => Promise<unknown>;
   openCanvas: (taskId: string, canvasId?: string) => Promise<void>;
   newNotebook: (taskId: string) => Promise<void>;
+  annotatePDF: (taskId: string) => void;
 }) {
   const [search, setSearch] = useState("");
   return (
@@ -612,6 +637,7 @@ function Library({
               <button onClick={() => void newNotebook(t.id)}>
                 New notebook
               </button>
+              <button onClick={() => annotatePDF(t.id)}>Annotate PDF</button>
               {data.canvases
                 .filter((c) => c.taskId === t.id)
                 .slice(1)

@@ -14,3 +14,7 @@ await build({
   external: ["electron"],
   target: "node24",
 });
+
+for (const folder of ["cmaps", "standard_fonts", "wasm", "iccs"]) {
+  await cp(`node_modules/pdfjs-dist/${folder}`, `dist/pdfjs/${folder}`, { recursive: true });
+}

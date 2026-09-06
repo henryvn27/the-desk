@@ -56,6 +56,13 @@ const binaryFile = z
   });
 
 const notebookPage = z.strictObject({
+  pdf: z
+    .strictObject({
+      sourceId: z.string().uuid(),
+      pageNumber: z.number().int().min(1).max(10000),
+      fileId: id,
+    })
+    .optional(),
   id: z.string().uuid(),
   title: z.string().trim().min(1).max(120),
   width: z.number().int().min(200).max(2400),
@@ -80,6 +87,20 @@ export const canvasScene = z
   })
   .superRefine((scene, context) => {
     if (scene.notebook) {
+      for (const page of scene.notebook.pages) {
+        if (
+          page.pdf &&
+          (!scene.files[page.pdf.fileId] ||
+            !scene.sourceIds?.includes(page.pdf.sourceId))
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["notebook", "pages"],
+            message:
+              "PDF pages require their background file and original source link",
+          });
+        }
+      }
       const ids = scene.notebook.pages.map((page) => page.id);
       if (
         new Set(ids).size !== ids.length ||

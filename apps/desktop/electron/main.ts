@@ -13,10 +13,11 @@ import {
   systemPreferences,
   dialog,
 } from "electron";
-import { join, resolve, sep } from "node:path";
+import { join, resolve, sep, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdirSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { writeFile, open } from "node:fs/promises";
+import { MAX_PDF_BYTES } from "../../../packages/sources/pdf";
 import { DeskStore } from "../../../packages/domain/store";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
@@ -226,6 +227,55 @@ app.whenReady().then(() => {
   ipcMain.handle("desk:canvas", (event, id) => {
     check(event);
     return store.canvas(z.string().uuid().parse(id));
+  });
+  ipcMain.handle("desk:pdf-import", async (event, rawTaskId) => {
+    check(event);
+    const taskId = z.string().uuid().parse(rawTaskId);
+    if (!store.snapshot().tasks.some((task) => task.id === taskId))
+      throw Error("Assignment no longer exists.");
+    const owner = BrowserWindow.fromWebContents(event.sender)!;
+    const picked = await dialog.showOpenDialog(owner, {
+      title: "Import PDF for annotation",
+      properties: ["openFile"],
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const handle = await open(picked.filePaths[0], "r");
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > MAX_PDF_BYTES)
+        throw Error("Choose a PDF file no larger than 20 MB.");
+      const bytes = Buffer.alloc(stat.size + 1);
+      const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+      if (bytesRead !== stat.size)
+        throw Error("The PDF changed while it was being imported. Try again.");
+      const original = bytes.subarray(0, bytesRead);
+      const source = store.importPDF(
+        basename(picked.filePaths[0]),
+        original,
+        taskId,
+      );
+      return { source, bytes: Uint8Array.from(original) };
+    } finally {
+      await handle.close();
+    }
+  });
+  ipcMain.handle("desk:pdf-export", async (event, rawId) => {
+    check(event);
+    const id = z.string().uuid().parse(rawId);
+    const source = store.snapshot().sources.find((source) => source.id === id);
+    if (!source?.pdf) throw Error("Original PDF is unavailable.");
+    const picked = await dialog.showSaveDialog(
+      BrowserWindow.fromWebContents(event.sender)!,
+      {
+        title: "Save original PDF",
+        defaultPath: source.pdf.fileName,
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      },
+    );
+    if (picked.canceled || !picked.filePath) return false;
+    await writeFile(picked.filePath, store.pdf(id));
+    return true;
   });
   ipcMain.handle("desk:canvas-export", async (event, id, raw) => {
     check(event);
