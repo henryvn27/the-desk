@@ -58,6 +58,12 @@ export function syncPayloadEqual(local: string, remote: unknown) {
   }
 }
 
+class SupabaseSyncRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`Cloud sync request failed (HTTP ${status}).`);
+  }
+}
+
 export class SupabaseSyncClient {
   constructor(private readonly context: SupabaseSyncContext) {}
 
@@ -81,14 +87,26 @@ export class SupabaseSyncClient {
     } catch {
       throw Error("Local sync payload is invalid.");
     }
-    await this.request("POST", "", {
-      operation_id: envelope.id,
-      account_id: this.context.userId,
-      entity_id: envelope.entityId,
-      operation: envelope.operation,
-      payload,
-      created_at: envelope.createdAt,
-    });
+    try {
+      await this.request("POST", "", {
+        operation_id: envelope.id,
+        account_id: this.context.userId,
+        entity_id: envelope.entityId,
+        operation: envelope.operation,
+        payload,
+        created_at: envelope.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof SupabaseSyncRequestError && error.status === 409) {
+        const remote = await this.latest(envelope.entityId);
+        if (
+          remote?.operation_id === envelope.id &&
+          syncPayloadEqual(envelope.payload, remote.payload)
+        )
+          return;
+      }
+      throw error;
+    }
   }
 
   private async request(
@@ -108,8 +126,7 @@ export class SupabaseSyncClient {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const raw = await response.text();
-    if (!response.ok)
-      throw Error(`Cloud sync request failed (HTTP ${response.status}).`);
+    if (!response.ok) throw new SupabaseSyncRequestError(response.status);
     let parsed: unknown;
     if (!raw) return [];
     try {
