@@ -64,7 +64,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -83,7 +83,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -102,7 +102,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -120,7 +120,7 @@
       "automated": "npm run check passes: electron-only guard, typecheck, lint, 177 tests and production build. Release-boundary smoke scans generated output for credential-shaped files. SQLite remains authoritative and the bounded authenticated sync boundary is main-process-only.",
       "live": "Installed-package smokes cover account, cloud sync, conflict review, interrupted migration recovery, Lens actions and restart persistence; production Supabase is not claimed.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. The packaged app is the current Electron/React/TypeScript V1 artifact and passes strict deep codesign verification.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. This is build/package evidence, not Windows interactive UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. This is build/package evidence, not Windows interactive UI proof.",
       "blocker": "Production Supabase migration/auth, full school integrations, notarized distribution, Windows interaction and the remaining contract slices remain open."
     },
     {
@@ -139,7 +139,7 @@
       "automated": "npm run check passes: electron-only guard, typecheck, lint, 177 tests and production build. scripts/check-electron-only.mjs fails on tracked Swift, Xcode project or Xcode workspace files.",
       "live": "Electron/React/TypeScript is the only tracked V1 implementation surface; legacy Swift is history/documentation only.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows UI proof.",
       "blocker": "The full Electron rebuild is guarded and no Swift/Xcode implementation remains. The installed directory artifact is signed with the local Apple Development identity and passes strict deep verification; notarization, Windows interactive evidence and final release review remain open."
     },
     {
@@ -157,7 +157,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -210,7 +210,7 @@
       "automated": "85 tests plus typecheck/lint/build; bounded UTF-8 import, invalid-file/credential-marker rejection, atomic batches and filename/source preservation.",
       "live": "Automated development/installed imports cover cancellation, invalid batches, review and restart. Separate direct native-picker interaction passes without a dialog stub (scripts/verify-native-picker.mjs).",
       "mac": "Unsigned installed schema-20 build at 0c464c8; direct unstubbed macOS native-picker import verified using CUA and an isolated synthetic Markdown file. SQLite assertions confirm one pending item, correct basename/source type and no task. Screenshots retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Typed/pasted assignments and native plain-text/Markdown import supported. PDF/image/OCR, rich documents, browser integrations, voice, email and drag/drop intake remain unimplemented or unverified; Windows interactive proof remains open."
     },
     {
@@ -228,7 +228,7 @@
       "automated": "85 tests plus typecheck/lint/build; bounded UTF-8 import, invalid-file/credential-marker rejection, atomic batches and filename/source preservation.",
       "live": "Automated development/installed imports cover cancellation, invalid batches, review and restart. Separate direct native-picker interaction passes without a dialog stub (scripts/verify-native-picker.mjs).",
       "mac": "Unsigned installed schema-20 build at 0c464c8; direct unstubbed macOS native-picker import verified using CUA and an isolated synthetic Markdown file. SQLite assertions confirm one pending item, correct basename/source type and no task. Screenshots retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Typed/pasted assignments and native plain-text/Markdown import supported. PDF/image/OCR, rich documents, browser integrations, voice, email and drag/drop intake remain unimplemented or unverified; Windows interactive proof remains open."
     },
     {
@@ -246,7 +246,7 @@
       "automated": "npm run check: 27 tests including provider failure and migration contracts",
       "live": "Manual and parsed capture, no-key Lens fallback; no live provider response yet",
       "mac": "Unsigned installed first-slice development smoke",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Live response/grounding/cost and remaining full requirement criteria are unverified."
     },
     {
@@ -264,7 +264,7 @@
       "automated": "82 tests plus typecheck/lint/build; policy thresholds, batch duplicate checks, no retroactive filing, durable modes, planning integration, uncertainty routing and edited-assignment undo protection.",
       "live": "Development and installed policy smoke exercise Balanced filing/reason/undo, Conservative review, Autopilot partial class match and restart. Installed Inbox regression passes.",
       "mac": "Unsigned packaged/installed schema-19 app; archive bytes match; screenshots inspected and operated video captured.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Policy modes and automatic filing are implemented for deterministic pasted text. Manual due-date authority claims now preserve and resolve source conflicts explicitly. Broader capture formats and requirement-specific Windows interaction proof remain open; full capture acceptance is not complete."
     },
     {
@@ -301,7 +301,7 @@
       "automated": "177 tests plus 10 extension tests, typecheck/lint/build cover the honest connection catalog, bounded browser-context protocol, loopback bearer/origin checks, runtime-validated Google state model, retry/conflict states and main-process boundaries.",
       "live": "Connection status stays explicit; installed Settings shows the loopback endpoint/token and privacy boundary, while the browser bridge accepts only the reviewed page-context envelope and never claims full sync from it.",
       "mac": "Installed account, cloud-sync, conflict, acceptance, connection-boundary and browser-bridge smokes have no renderer errors; app.asar is 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows UI proof.",
       "blocker": "OAuth/API adapters, live browser extension/page capture, email ingestion, real Classroom/Khan/Quizlet surfaces, production account sync and Windows interaction remain incomplete."
     },
     {
@@ -320,7 +320,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -338,7 +338,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -357,7 +357,7 @@
       "automated": "MV3 extension tests cover bounded active-tab capture, HTTP(S) filtering, generic/Classroom/Drive/Docs/Khan/Quizlet adapter hints, review-before-send and bounded transport errors; the installed host smoke covers authorization and malformed-data rejection.",
       "live": "Installed Desk loopback browser-context transport passes with a reviewed envelope, but no live Chrome/Edge installation or Classroom page import is claimed.",
       "mac": "Installed browser-bridge smoke passes against app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; packaged dist-extension contains the worker, popup, manifest and styles.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Live Classroom browsing, page permissions, large-import confirmation, obvious-update handling, disconnect/denial recovery and Windows interaction remain open."
     },
     {
@@ -375,7 +375,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -393,7 +393,7 @@
       "automated": "177 domain tests plus 10 MV3 extension tests, typecheck/lint/build and focused browser-bridge host tests. Versioned Chrome/Edge page-context envelopes are schema-bounded to HTTP(S) URL/title/selection/visible text, the loopback host requires a per-run bearer token and approved extension origin, and commands, credentials and page execution are rejected.",
       "live": "The installed app accepts a reviewed loopback browser-context envelope, renders it as Lens evidence, rejects wrong authorization and malformed extra commands, and clears it without renderer errors. The extension is bundled into the packaged app and exposes explicit review-before-send capture with generic and bounded site-adapter hints.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. The installed browser-bridge and session-evidence smokes pass; screenshots and operated videos are retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. The extension is included in the package build; no real Windows extension/browser UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. The extension is included in the package build; no real Windows extension/browser UI proof.",
       "blocker": "Real Chrome/Edge installation, page permission prompts, disconnect/permission-denial paths, adapter behavior on live sites and Windows interactive proof remain open."
     },
     {
@@ -431,7 +431,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -469,7 +469,7 @@
       "automated": "52 tests plus typecheck/lint/build pass. Required/optional, imminent-deadline and recorded-importance ordering tested; existing block/rebalance safety tests pass.",
       "live": "Installed macOS smoke persists assessment/importance choices through restart plus drag/edit/release/rebalance regression. Accessible select names fixed after observed timeout; screenshot inspected and video captured.",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Expected grade impact, mastery/dependency/spacing/learning, automatic mode and complete manual-edit history remain unfinished; Windows interaction unverified."
     },
     {
@@ -487,7 +487,7 @@
       "automated": "177 tests plus typecheck/lint/build pass. Calendar contract tests cover deterministic iCalendar output, escaping, stable Desk IDs, cancellation/orphan exclusion and invalid dates; the native export boundary stays in the trusted Electron main process.",
       "live": "Installed Plan smoke passes the saved-plan/restart flow and renders the explicit \u201cExport study plan (.ics)\u201d action. The native save-dialog click and an external calendar import remain unverified.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; Plan screenshot and operated video are retained in the user-facing outputs folder.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "V1 has a deliberate manual .ics export that requires a native save choice; approval-aware automatic publishing, Autopilot opt-in publishing and external-calendar import/sync remain unimplemented."
     },
     {
@@ -505,7 +505,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -523,7 +523,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -596,7 +596,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -614,7 +614,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -633,7 +633,7 @@
       "automated": "77 tests plus typecheck/lint/build; strict approved routing, canonical identities, structured output, privacy constraints and telemetry failure handling.",
       "live": "Bounded OpenRouter text/synthetic-image checks returned HTTP 401; no successful live answer, grounding or charged usage verified.",
       "mac": "Unsigned installed synthetic OpenRouter import/routing/restart/disconnect smoke; no renderer key entry, Lens import denied, package environment/credential file exclusion verified.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Live authentication rejected (HTTP 401); quality/grounding, workload escalation, billing reconciliation and remaining full criteria stay open."
     },
     {
@@ -651,7 +651,7 @@
       "automated": "177 tests plus typecheck/lint/build; Lens action tests cover source, note, low-confidence mistake, Canvas artifact provenance, follow-up resource-review, bounded HTTPS open payloads, invalid context and non-HTTPS rejection.",
       "live": "Installed Lens smoke exercises all bounded actions, persists links to the active class/task and captures the operated Lens and Canvas artifact surfaces; no arbitrary action or live provider response is claimed.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. Current screenshots and operated videos are retained under artifacts/ and copied to the user-facing outputs folder.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows Lens/overlay proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows Lens/overlay proof.",
       "blocker": "Live OpenRouter authentication remains HTTP 401; voice, external-screen interpretation, launch-app proof and Windows interactive evidence remain open."
     },
     {
@@ -669,7 +669,7 @@
       "automated": "177 tests plus typecheck/lint/build include strict provider action rejection, bounded Lens actions, safe auth-error redaction and build-output credential scanning.",
       "live": "Synthetic provider responses only; no successful live OpenRouter response or autonomous external action is claimed.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. Synthetic tutoring/Lens screenshots and videos retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows UI proof.",
       "blocker": "Class-source grounding and live teaching quality remain unverified; OpenRouter HTTP 401 requires an external credential/account change."
     },
     {
@@ -687,7 +687,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -817,7 +817,7 @@
       "automated": "95 tests pass: lexical later-passage selection, offsets, distinct-term scoring, fallback, within-type ranking plus existing source hierarchy/scope/budget, persistence and action-boundary checks.",
       "live": "Synthetic provider responses only; no successful live OpenRouter response.",
       "mac": "Unsigned installed synthetic smoke verifies matching later-passage inclusion with exact source offsets, unrelated exclusion, tutoring modes/action rejection and restart; prior source-type UI proof retained. Live answer fidelity unverified.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Semantic relevance, independent source verification, validated citations and live teaching quality remain open; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
     },
     {
@@ -876,7 +876,7 @@
       "automated": "177 tests plus typecheck/lint/build; migration/recovery smoke covers schema 36/37 to 38 preservation, fail-closed future/corrupt state and abrupt post-commit process interruption; sync tests cover 503 retry, account scope, newer-remote conflict preservation, 409 idempotent lost-response reconciliation and user-approved remote-copy application.",
       "live": "Bounded Electron fixtures show SQLite-authoritative local writes, queued retries, preserved local/remote conflict copies and explicit review without silent overwrite. Remote-copy application is covered at the trusted store/IPC contract boundary; the installed conflict smoke stops after preservation so it does not claim production merge.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. Installed account, cloud-sync, conflict, migration, acceptance and Plan smokes pass; screenshots and operated videos are retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows sync UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows sync UI proof.",
       "blocker": "Production Supabase migration/RLS deployment, production session refresh and cross-client remote merge remain unavailable; local user-approved remote-copy application is implemented and unit-tested, while broader failure modes and Windows interaction remain incomplete."
     },
     {
@@ -894,7 +894,7 @@
       "automated": "177 tests plus typecheck/lint/build; account boundary tests cover encrypted session summaries and renderer-safe errors, while runtime Google connection validation covers multiple identities, progressive capability outcomes, malformed inputs and credential isolation.",
       "live": "Loopback account smoke proves main-process sign-in/sign-out/sign-up and restart persistence; Google remains an explicit provider-neutral connection-state boundary without live OAuth transport.",
       "mac": "Installed account/cloud artifacts pass against app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; fresh packaged launch no longer probes macOS Keychain before an account exists.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows account UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows account UI proof.",
       "blocker": "Real Supabase auth/RLS deployment, Google OAuth/session refresh, school transports, multiple live identities and Windows interaction remain incomplete."
     },
     {
@@ -914,7 +914,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -935,7 +935,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -953,7 +953,7 @@
       "automated": "77 tests plus typecheck/lint/build; strict approved routing, canonical identities, structured output, privacy constraints and telemetry failure handling.",
       "live": "Bounded OpenRouter text/synthetic-image checks returned HTTP 401; no successful live answer, grounding or charged usage verified.",
       "mac": "Unsigned installed synthetic OpenRouter import/routing/restart/disconnect smoke; no renderer key entry, Lens import denied, package environment/credential file exclusion verified.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Live authentication rejected (HTTP 401); quality/grounding, workload escalation, billing reconciliation and remaining full criteria stay open."
     },
     {
@@ -971,7 +971,7 @@
       "automated": "177 tests plus typecheck/lint/build; approved routing, provider failure classification, single-request 401/429/malformed-response UX, privacy options, telemetry redaction and build-output secret scanning are covered.",
       "live": "Bounded OpenRouter checks still return HTTP 401; no successful live answer, grounding or charged usage is claimed.",
       "mac": "Installed provider import/routing/disconnect evidence contains no key in renderer or package; current app.asar hash is 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows Lens/provider proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows Lens/provider proof.",
       "blocker": "The supplied OpenRouter credential is rejected with sanitized HTTP 401 for Terra and Gemini checks. Smallest external action: provide a valid OpenRouter user key or correct the account credential. No live answer, grounding, escalation or charged usage is claimed until then."
     },
     {
@@ -989,7 +989,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -1006,7 +1006,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1024,7 +1024,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1042,7 +1042,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1061,7 +1061,7 @@
       "automated": "npm run check passes the Electron-only guard, typecheck, lint, 177 domain tests, 10 extension tests and production build; release-boundary, acceptance, migration/recovery, Lens-action, sync/conflict, planner, browser-bridge and session-evidence smokes are bounded and explicit.",
       "live": "Installed evidence covers capture, plan/session persistence, checked session evidence, local browser-context transport, account/sync/conflict/recovery and bounded Lens actions. It remains a local fixture-driven slice, not the full real-world vertical.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; account, cloud-sync, conflict, migration, Lens, acceptance, Plan, browser-bridge and session-evidence smokes pass.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. Build/package only; no Windows interactive vertical proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. Build/package only; no Windows interactive vertical proof.",
       "blocker": "Real applications/browser pages/PDFs, live provider, voice, external-screen Lens, full Canvas/PDF work, live browser extension permissions, tomorrow adaptation and Windows interactive proof remain incomplete."
     },
     {
@@ -1079,7 +1079,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1097,7 +1097,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1115,7 +1115,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1135,7 +1135,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -1152,7 +1152,7 @@
       "automated": "177 tests plus 10 MV3 extension tests, typecheck/lint/build, with focused browser bridge, runtime Google state, provider, migration/recovery, retry/conflict, remote-copy apply, calendar export, Lens-action and release-boundary suites.",
       "live": "Bounded account, sync, acceptance, Lens, browser-bridge and session-evidence smokes pass against loopback/synthetic fixtures; production services and live sites are not claimed.",
       "mac": "Installed account, sync, conflict, migration, acceptance, Lens, browser-bridge, session-evidence and Plan smokes pass; app.asar is 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9 and screenshots/videos are retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows UI proof.",
       "blocker": "Live provider/integration evidence and the remaining full contract criteria are still unverified."
     },
     {
@@ -1169,7 +1169,7 @@
       "automated": "npm run check passes with 177 tests; planner suites cover overloaded days, due-date conflicts, locks, sleep, estimate learning, missed blocks, deadline changes, impossible schedules, timezone/DST, no available time and uncertain dates.",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -1186,7 +1186,7 @@
       "automated": "Migration/recovery smoke plus the 173-test check cover offline edits, restart, queued retry, 503 reconnect, 409 lost-response reconciliation, conflict preservation, user-approved remote-copy application, schema migration, abrupt post-commit interruption and fail-closed corrupt/future state.",
       "live": "Bounded Electron acceptance and sync fixtures pass; no production upload or power-loss simulation is claimed.",
       "mac": "Installed migration, account, cloud-sync, conflict and broad acceptance smokes pass against app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No requirement-specific Windows failure-mode UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No requirement-specific Windows failure-mode UI proof.",
       "blocker": "Simultaneous real clients, production remote-copy merge, session refresh and Windows interactive failure paths remain open; the interruption check stops after committed writes and does not simulate power loss mid-transaction."
     },
     {
@@ -1203,7 +1203,7 @@
       "automated": "177 tests plus installed Lens smoke cover click/rectangle/freehand selection input, explicit provider-action rejection, bounded persistence actions, resource-open status and cleanup without renderer errors.",
       "live": "Installed Lens action smoke and operated artifacts pass; voice, multiple-monitor scaling, external-screen permission, live provider and full overlay matrix remain unverified.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Voice, multiple-monitor/scaled-display, external browser/native app, permission-denied/capture-failure and Windows interaction paths remain incomplete."
     },
     {
@@ -1221,7 +1221,7 @@
       "automated": "177 tests plus 10 MV3 extension tests, typecheck/lint/build cover bounded browser envelopes, runtime Google denied/admin-blocked/expired/reconnect states, Lens actions, Canvas regression contracts, sync conflicts and release-boundary provider failures.",
       "live": "Installed browser-bridge/session-evidence, synthetic Lens/Canvas and loopback sync/account smoke evidence passes; no live Google OAuth, real Chrome/Edge, PDF or Windows interaction is claimed.",
       "mac": "Installed Lens, browser-bridge, session-evidence, account, cloud-sync/conflict and acceptance smokes pass against app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; no live Google OAuth, real Chrome/Edge, PDF or Windows interaction is claimed.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. Build/package only.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. Build/package only.",
       "blocker": "Extension permission/disconnect flows on real browsers, live Google denial/admin paths, full Canvas/PDF matrix, browser adapters and Windows runtime remain incomplete."
     },
     {
@@ -1239,7 +1239,7 @@
       "automated": "npm run check plus installed browser-bridge/session-evidence and the existing account, sync, Lens, Plan, migration and acceptance smoke lanes; every lane uses isolated temporary data and records renderer errors.",
       "live": "The exact installed macOS app passes the bounded primary lanes, local browser-context transport, session evidence and restart/persistence checks; screenshot/video evidence is retained.",
       "mac": "Installed signed-development arm64 build at /Users/henry/Applications/The Desk V1.app matches app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9 and passes strict deep codesign verification.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Real Chrome/Edge installation, external app/permission behavior, notarization and Windows interactive proof remain open."
     },
     {
@@ -1257,7 +1257,7 @@
       "automated": "npm run check; see Verification/BASELINE.md",
       "live": "npm run test:desktop: first slice only",
       "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -1275,7 +1275,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Ongoing consistency and final release review required."
     },
     {
@@ -1293,7 +1293,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Ongoing consistency and final release review required."
     },
     {
@@ -1311,7 +1311,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1328,7 +1328,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1345,7 +1345,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1363,7 +1363,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1381,7 +1381,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1398,7 +1398,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1415,7 +1415,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1432,7 +1432,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1450,7 +1450,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1468,7 +1468,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1485,7 +1485,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     }
   ],
@@ -1504,7 +1504,7 @@
       "automated": "npm run check passes the Electron-only guard, typecheck, lint, 177 domain tests, 10 extension tests and production build. npm run package succeeds for the macOS arm64 directory artifact; release-boundary smoke scans build output, dist-extension and packaged files for credential material and exercises malformed/auth provider failures.",
       "live": null,
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches release/mac-arm64 app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9 and passes strict deep codesign verification.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8.",
       "blocker": "Production migration/RLS proof, live provider/integration acceptance, notarized distribution, Windows installed UI and complete V1 vertical remain open."
     },
     {
@@ -1521,7 +1521,7 @@
       "automated": "177 tests plus installed acceptance, Plan, session-evidence, browser-bridge and Lens-action smokes cover bounded local flows.",
       "live": "Installed local fixtures prove capture, planning, session persistence, checked evidence, browser context and bounded Lens actions; they do not prove real external applications or live AI.",
       "mac": "Installed app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9 passes the bounded macOS lanes.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Full real Capture -> Plan -> Session -> external resource -> Lens -> Replan with voice, live browser pages, external-screen context, provider and tomorrow adaptation remains open."
     },
     {
@@ -1538,7 +1538,7 @@
       "automated": "177 tests plus typecheck/lint/build pass; planner, duration, session carryover and calendar export suites pass.",
       "live": "Installed Plan smoke passes reserve/lock/edit/drag/cancel/rebalance/restart persistence and renders the manual .ics export action; native save-dialog interaction is not claimed.",
       "mac": "Installed Plan smoke passes against app.asar SHA-256 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; current Plan screenshot and operated video are retained.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Expected grade impact, mastery/dependency/spacing/learning, Autopilot, automatic external publishing, native calendar save/import and Windows interaction remain open."
     },
     {
@@ -1555,7 +1555,7 @@
       "automated": "Lens-action contracts and installed synthetic smoke cover explicit source/note/mistake/Canvas/follow-up/resource actions, selection modes and no arbitrary provider tools; no live provider response.",
       "live": "Bounded Lens action smoke passes with no renderer errors and operated artifacts.",
       "mac": "Installed Lens smoke passes with no renderer errors; current app.asar hash is 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No interactive Lens/overlay proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No interactive Lens/overlay proof.",
       "blocker": "Voice, external-screen interpretation, OpenRouter authentication, full overlay matrix, launch-app proof and Windows runtime remain open."
     },
     {
@@ -1572,7 +1572,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1589,7 +1589,7 @@
       "automated": "177 tests plus extension/host checks cover capability states, bounded browser envelopes, origin/token rejection, Google state validation and privacy-safe fallbacks.",
       "live": "Installed loopback browser bridge, account/sync/conflict and connection UI prove the local boundary; live OAuth, browser pages and production sync are not claimed.",
       "mac": "Installed browser-bridge and account/sync lanes pass against app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Live Google OAuth, real Chrome/Edge/Classroom/Khan/Quizlet surfaces, email ingestion and production cloud deployment remain open."
     },
     {
@@ -1606,7 +1606,7 @@
       "automated": "Acceptance/sync/migration smokes plus 177 tests cover offline core, restart persistence, 503 retry, 409 interrupted-upload reconciliation, conflict preservation, user-approved remote-copy application and fail-closed recovery.",
       "live": "Bounded loopback fixtures show reconnect/retry/conflict review without silent local overwrite.",
       "mac": "Installed account, cloud-sync, conflict, migration, acceptance and Plan smokes pass; current app.asar hash is 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No Windows interactive sync proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No Windows interactive sync proof.",
       "blocker": "Production migration/RLS, session refresh, production remote merge and full cross-platform acceptance remain open."
     },
     {
@@ -1623,7 +1623,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1640,7 +1640,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1657,7 +1657,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1674,7 +1674,7 @@
       "automated": "npm run check passes with 177 domain tests and 10 extension tests plus production build; npm run package succeeds; release-boundary smoke verifies build inventory and no embedded credential material.",
       "live": "The current macOS arm64 artifact was installed at the canonical Applications path, its archive hash was compared byte-for-byte, and the installed executable passed fresh-launch plus account/sync/conflict/migration/Lens/Plan/browser-bridge/session-evidence/acceptance smokes.",
       "mac": "Installed /Users/henry/Applications/The Desk V1.app matches app.asar 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; strict deep codesign verification passes and a rollback copy is preserved.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. No installed Windows restart/update proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. No installed Windows restart/update proof.",
       "blocker": "Update path, notarized distribution, crash/power-loss mid-transaction recovery and Windows installed UI remain unverified."
     },
     {
@@ -1691,7 +1691,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1708,7 +1708,7 @@
       "automated": "npm run check passes with 177 domain tests and 10 extension tests plus production build; npm run package succeeds.",
       "live": "Canonical macOS install completed with rollback backup and exact app.asar hash match; fresh packaged launch and installed account, cloud-sync, conflict, Lens, Plan, browser-bridge, session-evidence and broad acceptance smokes pass.",
       "mac": "Canonical macOS install completed with rollback backup and exact app.asar hash match 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; fresh packaged launch and installed smokes pass. The artifact is signed with the local Apple Development identity and passes strict deep verification, but notarization was skipped.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549. Not applicable to this gate.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8. Not applicable to this gate.",
       "blocker": "Live provider/browser/voice/extension flows, notarization and full V1 vertical proof remain open."
     },
     {
@@ -1725,7 +1725,7 @@
       "automated": null,
       "live": null,
       "mac": null,
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "No V1 implementation or verification evidence recorded."
     },
     {
@@ -1742,7 +1742,7 @@
       "automated": "177 tests plus 10 extension tests, typecheck/lint/build and bounded installed smoke lanes pass; no critical/high data-loss or renderer-secret finding was observed in these checks.",
       "live": "Installed local account, sync/conflict, migration, Lens, Plan, browser-bridge, session-evidence and acceptance checks pass with renderer-error assertions.",
       "mac": "Current installed package app.asar is 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9; strict deep codesign passes, but notarization and external service acceptance are not claimed.",
-      "windows": "GitHub Actions run 34060239023 passed npm ci, npm run check and npm run package on macOS and Windows for commit 112a549; no requirement-specific Windows UI proof.",
+      "windows": "GitHub Actions run 34063329980 passed npm ci, npm run check and npm run package on macOS and Windows for commit f83a9c8; no requirement-specific Windows UI proof.",
       "blocker": "Open external/release gates remain: OpenRouter authentication, production Supabase migration/RLS/session refresh/merge, live Google/browser/voice/external-screen flows, Windows interactive proof, notarization and the complete real-world vertical."
     }
   ],
