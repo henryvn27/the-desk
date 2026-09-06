@@ -56,6 +56,35 @@ export type GradeEntry = z.infer<typeof gradeEntryInput> & {
   updatedAt: string;
   authority: "user-entered";
 };
+export const assessmentKind = z.enum([
+  "quiz",
+  "test",
+  "exam",
+  "final",
+  "midterm",
+  "project",
+  "essay",
+  "lab",
+  "presentation",
+  "standardized-test",
+  "other",
+]);
+export const assessmentInput = z.object({
+  classId: id,
+  title: z.string().trim().min(1).max(500),
+  kind: assessmentKind,
+  taskIds: z.array(id).max(100),
+  dueAt: z.iso.datetime().nullable(),
+  gradeCategoryId: id.nullable(),
+  notes: z.string().trim().max(5000),
+});
+export type AssessmentInput = z.infer<typeof assessmentInput>;
+export type Assessment = AssessmentInput & {
+  id: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
 export const taskInput = z.object({
   gradeContext: z
     .object({
@@ -345,6 +374,7 @@ export type Snapshot = {
   planningMode: PlanningMode;
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
+  assessments: Assessment[];
   concepts: Concept[];
   attempts: Attempt[];
   planChanges: PlanChange[];
@@ -432,6 +462,18 @@ export const command = z.discriminatedUnion("type", [
     id: id.optional(),
     revision: z.number().int().nonnegative().optional(),
     input: gradeEntryInput,
+  }),
+  z.object({ type: z.literal("assessment.create"), input: assessmentInput }),
+  z.object({
+    type: z.literal("assessment.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: assessmentInput,
+  }),
+  z.object({
+    type: z.literal("assessment.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
   }),
   z.object({
     type: z.literal("planning.rebalance"),

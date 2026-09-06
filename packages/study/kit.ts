@@ -1,4 +1,5 @@
 import type {
+  Assessment,
   Attempt,
   Concept,
   Mistake,
@@ -10,6 +11,7 @@ import type {
 export function sessionKit(
   task: Task,
   state: Pick<Snapshot, "sources" | "sessions"> & {
+    assessments?: Assessment[];
     mistakes?: Mistake[];
     concepts?: Concept[];
     attempts?: Attempt[];
@@ -71,6 +73,18 @@ export function sessionKit(
         b.createdAt.localeCompare(a.createdAt),
     )
     .slice(0, 5);
+  const assessments = [...(state.assessments ?? [])]
+    .filter(
+      (assessment) =>
+        assessment.classId === task.classId &&
+        assessment.taskIds.includes(task.id),
+    )
+    .sort(
+      (a, b) =>
+        (a.dueAt ? Date.parse(a.dueAt) : Infinity) -
+          (b.dueAt ? Date.parse(b.dueAt) : Infinity) ||
+        a.title.localeCompare(b.title),
+    );
   return {
     linkedSources,
     classSources,
@@ -78,5 +92,6 @@ export function sessionKit(
     mistakes,
     concepts,
     attempts,
+    assessments,
   };
 }

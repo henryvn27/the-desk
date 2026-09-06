@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
+  Assessment,
   Concept,
   Attempt,
   Mistake,
@@ -219,5 +220,44 @@ test("session kit includes recent attempts linked to the assignment", () => {
       (attempt) => attempt.id,
     ),
     ["linked-attempt"],
+  );
+});
+
+test("session kit includes linked assessment context and excludes other tasks", () => {
+  const assessments: Assessment[] = [
+    {
+      id: "linked-assessment",
+      classId: task.classId,
+      title: "Kinematics test",
+      kind: "test",
+      taskIds: [task.id],
+      dueAt: "2026-09-08T13:00:00Z",
+      gradeCategoryId: null,
+      notes: "Bring the formula sheet.",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "other-assessment",
+      classId: task.classId,
+      title: "Other test",
+      kind: "quiz",
+      taskIds: ["other"],
+      dueAt: null,
+      gradeCategoryId: null,
+      notes: "",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  assert.deepEqual(
+    sessionKit(task, {
+      sources: [],
+      sessions: [],
+      assessments,
+    }).assessments.map((assessment) => assessment.id),
+    ["linked-assessment"],
   );
 });

@@ -301,6 +301,36 @@ test("recorded importance and assessment kind guide flexible work", () => {
   assert.match(result.blocks[0]!.why, /high importance/);
   assert.match(result.blocks[1]!.why, /Assessment preparation/);
 });
+test("linked assessments guide flexible work with an explicit explanation", () => {
+  const result = plan(
+    [task("unrelated", 30, null), task("prep", 30, null)],
+    new Date("2026-09-07T08:00:00Z"),
+    new Date("2026-09-07T09:00:00Z"),
+    0,
+    new Date("2026-09-07T09:00:00Z"),
+    {
+      gradeCategories: [],
+      gradeEntries: [],
+      assessments: [
+        {
+          id: "assessment",
+          classId: "class",
+          title: "Kinematics test",
+          kind: "test",
+          taskIds: ["prep"],
+          dueAt: null,
+          gradeCategoryId: null,
+          notes: "",
+          revision: 0,
+          createdAt: "2026-09-05T12:00:00Z",
+          updatedAt: "2026-09-05T12:00:00Z",
+        },
+      ],
+    },
+  );
+  assert.equal(result.blocks[0]!.taskId, "prep");
+  assert.match(result.blocks[0]!.why, /upcoming assessment/);
+});
 
 test("complete grade context can rank potential influence, but unknown work is not treated as zero", () => {
   const context = {

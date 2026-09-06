@@ -17,6 +17,7 @@ import {
   type CaptureInboxItem,
   type GradeCategory,
   type GradeEntry,
+  type Assessment,
   type RebalancePreview,
   type PlanChange,
   type StudyBlock,
@@ -39,7 +40,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 28) {
+    if (version > 29) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -122,6 +123,10 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=28; COMMIT;",
       );
+    if (version <= 28)
+      this.db.exec(
+        "BEGIN; CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL); PRAGMA user_version=29; COMMIT;",
+      );
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -168,6 +173,7 @@ export class DeskStore {
       state.sessions,
       state.gradeCategories,
       state.gradeEntries,
+      state.assessments,
       state.mistakes,
       state.concepts,
       state.attempts,
@@ -236,6 +242,10 @@ export class DeskStore {
         .prepare("SELECT data FROM grade_entries")
         .all()
         .map((r) => JSON.parse(r.data as string) as GradeEntry),
+      assessments: this.db
+        .prepare("SELECT data FROM assessments ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Assessment),
       concepts: this.db
         .prepare("SELECT data FROM concepts ORDER BY rowid")
         .all()
@@ -465,6 +475,77 @@ export class DeskStore {
             "INSERT INTO grade_entries VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,data=excluded.data",
           )
           .run(entityId, c.input.categoryId, JSON.stringify(entry));
+      }
+      if (
+        c.type === "assessment.create" ||
+        c.type === "assessment.update" ||
+        c.type === "assessment.forget"
+      ) {
+        const previous =
+          c.type === "assessment.create"
+            ? undefined
+            : state.assessments.find((assessment) => assessment.id === c.id);
+        if (
+          c.type !== "assessment.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This assessment changed elsewhere. Reopen it before saving.",
+          );
+        const input = c.type === "assessment.forget" ? undefined : c.input;
+        const classId = input?.classId ?? previous?.classId;
+        if (!classId || !state.classes.some((course) => course.id === classId))
+          throw Error("Choose an existing class for this assessment.");
+        if (
+          input?.taskIds.some(
+            (taskId) =>
+              !state.tasks.some(
+                (task) => task.id === taskId && task.classId === classId,
+              ),
+          )
+        )
+          throw Error("Every linked task must belong to the selected class.");
+        if (
+          input?.gradeCategoryId &&
+          !state.gradeCategories.some(
+            (category) =>
+              category.id === input.gradeCategoryId &&
+              category.classId === classId,
+          )
+        )
+          throw Error(
+            "The linked grade category must belong to the selected class.",
+          );
+        if (
+          input &&
+          state.assessments.some(
+            (assessment) =>
+              assessment.id !== previous?.id &&
+              assessment.classId === classId &&
+              assessment.title.toLowerCase() === input.title.toLowerCase(),
+          )
+        )
+          throw Error(
+            "An assessment with this title already exists in the class.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const assessment: Assessment = {
+            ...input,
+            taskIds: [...new Set(input.taskIds)],
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO assessments VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET class_id=excluded.class_id,data=excluded.data",
+            )
+            .run(entityId, assessment.classId, JSON.stringify(assessment));
+        } else {
+          this.db.prepare("DELETE FROM assessments WHERE id=?").run(entityId);
+        }
       }
       if (c.type === "planning.rebalance") {
         const pending = this.rebalance;

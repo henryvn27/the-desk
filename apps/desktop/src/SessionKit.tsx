@@ -147,6 +147,20 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.assessments.length > 0 && (
+        <div>
+          <h4>Assessment context</h4>
+          {kit.assessments.map((assessment) => (
+            <p key={assessment.id}>
+              {assessment.title} · {assessment.kind.replace("-", " ")}
+              {assessment.dueAt
+                ? " · " + new Date(assessment.dueAt).toLocaleString()
+                : ""}
+              {assessment.notes && <> · {assessment.notes}</>}
+            </p>
+          ))}
+        </div>
+      )}
       {!task.resource &&
         !task.notes &&
         !kit.linkedSources.length &&
@@ -154,7 +168,8 @@ export function SessionKit({
         !kit.previousReviews.length &&
         !kit.mistakes.length &&
         !kit.concepts.length &&
-        !kit.attempts.length && (
+        !kit.attempts.length &&
+        !kit.assessments.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source
             in Library.
