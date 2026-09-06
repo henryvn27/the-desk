@@ -43,7 +43,7 @@
       "title": "Live OpenRouter authentication and Lens grounding unverified",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: sanitized live text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 163 automated tests, release-boundary provider-failure checks and installed synthetic import/routing/restart/disconnect smoke pass.",
+      "evidence": "2026-09-06: sanitized live text and synthetic-image requests both returned HTTP 401 authentication; no successful answer or cost verified. 173 automated tests, release-boundary provider-failure checks and installed synthetic import/routing/restart/disconnect smoke pass.",
       "notes": "No further live retries until credential/account state changes. Do not expose or copy the developer key. Account logging settings and real grounding remain unverified; independent V1 work continues."
     },
     {
@@ -83,19 +83,19 @@
     {
       "id": "SYNC-001",
       "area": "cloud sync",
-      "title": "Production Supabase deployment and remote-copy apply remain unavailable",
+      "title": "Production Supabase deployment and merge/session refresh remain unavailable",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: local SQLite, loopback auth/REST, 503 retry, 409 lost-response reconciliation, conflict preservation and interrupted post-commit recovery pass. The production migration/RLS deployment is not applied; remote-copy application/merge and session refresh are not verified.",
-      "notes": "Only publishable client credentials are available. Do not add a privileged service key to the desktop app."
+      "evidence": "2026-09-06: local SQLite, loopback auth/REST, 503 retry, 409 lost-response reconciliation, conflict preservation, user-approved remote-copy application tests and interrupted post-commit recovery pass. The production migration/RLS deployment, production session refresh and cross-client merge are not verified.",
+      "notes": "Only publishable client credentials are available. Do not add a privileged service key to the desktop app; local remote-copy application is implemented behind explicit conflict resolution."
     },
     {
       "id": "RELEASE-001",
       "area": "release",
-      "title": "macOS directory artifact is ad hoc signed and not notarized",
+      "title": "macOS directory artifact is development-signed and not notarized",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: release and installed app.asar hashes match f98bd59b545080cfaed5ef527f4186dd067d9c085d56c1454036c902265656f5. codesign reports Signature=adhoc and strict deep verification fails; no notarized release is claimed.",
+      "evidence": "2026-09-06: release and installed app.asar hashes match e7ec0f1b14b3d018ed533e5cec6c3f6efb39e9087986765118ea0f24370d4d6d. codesign reports the local Apple Development identity and strict deep verification passes; electron-builder skipped notarization, so no notarized release is claimed.",
       "notes": "Requires the authorized signing/notarization environment and release credentials; local implementation work continues independently."
     },
     {
