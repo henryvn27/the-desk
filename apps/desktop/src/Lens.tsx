@@ -413,11 +413,18 @@ export function Lens({
                 <button
                   type="button"
                   disabled={actionBusy}
-                  onClick={() =>
-                    void window.desk
-                      .openResource(taskId)
-                      .catch((error) => setStatus(userError(error)))
-                  }
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setStatus("");
+                    try {
+                      await window.desk.openResource(taskId);
+                      setStatus("Opened task resource.");
+                    } catch (error) {
+                      setStatus(userError(error));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
                 >
                   Open task resource
                 </button>

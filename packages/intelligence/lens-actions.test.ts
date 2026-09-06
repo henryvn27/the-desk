@@ -65,6 +65,27 @@ test("Lens follow-up can prepare the active task's validated HTTPS resource", ()
   );
 });
 
+test("Lens action builders reject invalid context and non-HTTPS resources", () => {
+  const classId = "00000000-0000-4000-8000-000000000001";
+  const taskId = "00000000-0000-4000-8000-000000000002";
+  const answer = "Resolve each force into components.";
+  const draft = {
+    concept: "Force components",
+    originalAttempt: "I added the magnitudes directly.",
+    whatWentWrong: "I mixed components from different axes.",
+  };
+
+  assert.throws(() => lensAnswerMemoryInput("", classId));
+  assert.throws(() => lensAnswerSourceInput(answer, "not-a-uuid", taskId));
+  assert.throws(() =>
+    lensAnswerMistakeInput(answer, classId, "not-a-uuid", draft),
+  );
+  assert.throws(() => lensAnswerCanvasScene(answer, "not-a-uuid"));
+  assert.throws(() =>
+    lensFollowUpTaskInput(answer, classId, "http://example.edu"),
+  );
+});
+
 test("explicit Lens mistake and Canvas artifact actions persist across restart", () => {
   const directory = mkdtempSync(join(tmpdir(), "desk-lens-actions-"));
   const path = join(directory, "desk.sqlite");
@@ -124,6 +145,12 @@ test("explicit Lens mistake and Canvas artifact actions persist across restart",
     assert.deepEqual(savedCanvas.scene.sourceIds, [source.id]);
     assert.equal(savedCanvas.scene.elements[0]!.type, "text");
     assert.equal(savedCanvas.scene.elements[0]!.originalText, answer);
+    assert.equal(savedCanvas.scene.elements[0]!.customData?.createdBy, "lens");
+    assert.equal(
+      savedCanvas.scene.elements[0]!.customData?.sourceId,
+      source.id,
+    );
+    assert.equal(source.authority, "user-provided-text");
     assert.equal(source.text, answer);
   } finally {
     store.close();

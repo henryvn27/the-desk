@@ -46,9 +46,14 @@ try {
       filePaths: [path],
     });
     globalThis.lensRequests = [];
+    globalThis.openedResources = [];
     globalThis.fetch = async (url, init) => {
       const body = JSON.parse(init.body);
-      globalThis.lensRequests.push({ url: String(url), model: body.model });
+      globalThis.lensRequests.push({
+        url: String(url),
+        model: body.model,
+        hasTools: Object.prototype.hasOwnProperty.call(body, "tools"),
+      });
       return new Response(
         JSON.stringify({
           model: body.model,
@@ -147,14 +152,23 @@ try {
     .getByText("Lens resource review prepared.", { exact: true })
     .waitFor();
   await app.evaluate(({ shell }) => {
-    globalThis.openedResources = [];
     shell.openExternal = async (url) => {
       globalThis.openedResources.push(String(url));
     };
   });
+  assert.deepEqual(
+    await app.evaluate(() => globalThis.openedResources),
+    [],
+    "Lens must not open an external resource before the explicit open action",
+  );
   await lens
     .getByRole("button", { name: "Open task resource", exact: true })
     .click();
+  await waitFor(
+    async () =>
+      (await app.evaluate(() => globalThis.openedResources)).length === 1,
+    "Explicit Lens resource open did not reach the system browser",
+  );
   const snapshot = await page.evaluate(() => window.desk.snapshot());
   const source = snapshot.sources.at(-1);
   const task = snapshot.tasks.find(
@@ -175,6 +189,7 @@ try {
     requests[0].url,
     "https://openrouter.ai/api/v1/chat/completions",
   );
+  assert.equal(requests[0].hasTools, false);
   assert.ok(source);
   assert.equal(source.title, "Lens answer");
   assert.equal(
