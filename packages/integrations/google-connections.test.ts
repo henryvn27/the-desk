@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   emptyGoogleConnections,
+  googleCapabilityIds,
   googleCapabilities,
   updateGoogleConnections,
   type GoogleConnections,
@@ -306,4 +307,176 @@ test("duplicate identities and duplicate permission requests fail closed", () =>
       ),
     /progressively/,
   );
+});
+
+test("identity input is normalized and cannot carry provider credentials", () => {
+  const state = updateGoogleConnections(
+    emptyGoogleConnections(),
+    {
+      type: "identity.add",
+      identity: {
+        id: "school",
+        kind: "school",
+        label: "  School Google  ",
+        email: "  school@example.edu  ",
+        accessToken: "should-not-enter-state",
+      } as never,
+    },
+    at,
+  );
+  const identity = state.identities[0]!;
+  assert.equal(identity.label, "School Google");
+  assert.equal(identity.email, "school@example.edu");
+  assert.equal("accessToken" in identity, false);
+  assert.equal("refreshToken" in identity, false);
+  assert.throws(
+    () =>
+      updateGoogleConnections(
+        emptyGoogleConnections(),
+        {
+          type: "identity.add",
+          identity: {
+            id: "school",
+            kind: "other",
+            label: "School Google",
+            email: "school@example.edu",
+          } as never,
+        },
+        at,
+      ),
+    /kind/,
+  );
+});
+
+test("authorization outcomes are bounded and pending work can be cancelled", () => {
+  let state = addIdentity(emptyGoogleConnections(), "school", "school");
+  assert.throws(
+    () =>
+      updateGoogleConnections(
+        state,
+        {
+          type: "authorization.resolve",
+          identityId: "school",
+          outcomes: [],
+        },
+        at,
+      ),
+    /at least one/,
+  );
+  state = updateGoogleConnections(
+    state,
+    {
+      type: "connection.connect",
+      identityId: "school",
+      capabilities: ["calendar.events.read"],
+    },
+    at,
+  );
+  assert.throws(
+    () =>
+      updateGoogleConnections(
+        state,
+        {
+          type: "authorization.resolve",
+          identityId: "school",
+          outcomes: [
+            {
+              capability: "calendar.events.read",
+              result: "oauth-token" as never,
+            },
+          ],
+        },
+        at,
+      ),
+    /authorization result/,
+  );
+  const pending = state;
+  state = updateGoogleConnections(
+    state,
+    { type: "connection.disconnect", identityId: "school" },
+    at,
+  );
+  assert.equal(state.identities[0]!.phase, "disconnected");
+  assert.ok(
+    Object.values(state.identities[0]!.permissions).every(
+      (permission) => permission === "not-requested",
+    ),
+  );
+  assert.equal(pending.identities[0]!.phase, "authorization-pending");
+});
+
+test("authorized and blocked identities stay isolated through later commands", () => {
+  let state = addIdentity(emptyGoogleConnections(), "personal", "personal");
+  state = addIdentity(state, "school", "school");
+  state = updateGoogleConnections(
+    state,
+    {
+      type: "connection.connect",
+      identityId: "personal",
+      capabilities: ["calendar.events.read"],
+    },
+    at,
+  );
+  state = updateGoogleConnections(
+    state,
+    {
+      type: "authorization.resolve",
+      identityId: "personal",
+      outcomes: [
+        { capability: "calendar.events.read", result: "authorized" },
+      ],
+    },
+    at,
+  );
+  state = updateGoogleConnections(
+    state,
+    {
+      type: "connection.connect",
+      identityId: "school",
+      capabilities: ["classroom.coursework.read"],
+    },
+    at,
+  );
+  state = updateGoogleConnections(
+    state,
+    {
+      type: "authorization.resolve",
+      identityId: "school",
+      outcomes: [
+        {
+          capability: "classroom.coursework.read",
+          result: "admin-blocked",
+        },
+      ],
+    },
+    at,
+  );
+  assert.equal(state.identities[0]!.phase, "connected");
+  assert.equal(state.identities[1]!.phase, "blocked");
+  state = updateGoogleConnections(
+    state,
+    { type: "connection.disconnect", identityId: "school" },
+    at,
+  );
+  assert.equal(state.identities[0]!.phase, "connected");
+  assert.equal(
+    state.identities[0]!.permissions["calendar.events.read"],
+    "authorized",
+  );
+});
+
+test("Google capability descriptors stay read-only and return safe copies", () => {
+  assert.equal(Object.isFrozen(googleCapabilityIds), true);
+  assert.deepEqual(
+    googleCapabilities().map(({ id }) => id),
+    [...googleCapabilityIds],
+  );
+  assert.ok(
+    googleCapabilities().every(
+      ({ id, fallback }) => id.endsWith(".read") && fallback,
+    ),
+  );
+  const descriptors = googleCapabilities();
+  descriptors[0]!.fallback = "mutated locally";
+  assert.notEqual(googleCapabilities()[0]!.fallback, "mutated locally");
 });
