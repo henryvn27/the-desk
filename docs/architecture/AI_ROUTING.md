@@ -45,3 +45,6 @@ Local Lens grounding now selects sources linked explicitly to the active task, t
 
 
 Source priority now follows user-reported class-material, assigned-textbook, educational-reference, general-web, then unspecified; task association breaks ties. Context includes kindReportedBy=user and the unchanged ingestion authority. The user can correct source type in the Library. This implements reported source hierarchy, not independent verification of a teacher, publisher, page or claim. Relevance retrieval, citations and live source-fidelity evaluation remain open.
+
+
+Grounding uses bounded lexical passage selection from the validated current question. Overlapping 3,000-character windows are scored by distinct non-stopword matches; repeated tokens do not increase score. Reported source hierarchy remains first, then lexical coverage, task association and stable ID. Excerpts retain exact UTF-16 offsets into original text, truncation, match count and explicit opening-fallback when nothing matches. This retrieves later passages without a network/index/model call. It is not semantic retrieval, proof of relevance, page-based citation or answer-fidelity verification.

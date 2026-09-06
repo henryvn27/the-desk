@@ -813,12 +813,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "Saved tutoring modes; trusted-main bounded associated source excerpts ordered by user-reported class material, assigned textbook, educational reference, general web, then unspecified. Source type is correctable with revision checks; ingestion authority is preserved.",
-      "automated": "92 checks pass including reported source hierarchy, provenance, correction persistence/stale rejection, scope exclusion, size/truncation and provider action rejection.",
+      "implementation": "Saved tutoring modes; trusted-main bounded associated source excerpts ordered by user-reported class material, assigned textbook, educational reference, general web, then unspecified. Source type is correctable with revision checks; ingestion authority is preserved. Local lexical retrieval selects matching passages beyond source openings, with exact offsets and explicit no-match fallback.",
+      "automated": "95 tests pass: lexical later-passage selection, offsets, distinct-term scoring, fallback, within-type ranking plus existing source hierarchy/scope/budget, persistence and action-boundary checks.",
       "live": "Synthetic provider responses only; no successful live OpenRouter response.",
-      "mac": "Unsigned installed synthetic UI smoke passes source creation/correction, reported hierarchy/provenance in outbound requests, unrelated exclusion and restart. Screenshot and operated video retained; live answer fidelity unverified.",
+      "mac": "Unsigned installed synthetic smoke verifies matching later-passage inclusion with exact source offsets, unrelated exclusion, tutoring modes/action rejection and restart; prior source-type UI proof retained. Live answer fidelity unverified.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Relevance retrieval, independent source verification, citations and live teaching quality remain open; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
+      "blocker": "Semantic relevance, independent source verification, validated citations and live teaching quality remain open; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
     },
     {
       "id": "MEMORY-001",

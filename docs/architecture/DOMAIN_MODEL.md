@@ -87,3 +87,6 @@ Lens context is a read-only projection of the active task, task-linked sources a
 
 
 Schema 22 adds source kind (default unspecified) and revision (default zero). Original text, links and user-provided-text authority remain intact. New-source input may record a reported kind; source.classify compares revisions and changes only kind plus revision. Stale or invalid corrections fail atomically. Legacy sources are not assigned inferred authority.
+
+
+Lens passage retrieval is read-only and schema 22 remains unchanged. The current validated question selects exact original substrings; source records are not rewritten. Eligible associations and the 20,000-character serialized context limit remain enforced. Offset metadata refers to UTF-16 string positions, not document pages.

@@ -84,3 +84,23 @@ test("reported source hierarchy precedes association priority without upgrading 
     ),
   );
 });
+
+test("within one reported source type lexical coverage precedes task association", () => {
+  const sources = [
+    source("task-linked", ["task"], [], "Generic notes"),
+    source(
+      "class-wide",
+      [],
+      ["class"],
+      "Static friction depends on normal force.",
+    ),
+  ];
+  const result = JSON.parse(
+    lensContext({ ...state, sources }, "static friction normal force"),
+  );
+  assert.deepEqual(
+    result.sources.map((s: { id: string }) => s.id),
+    ["class-wide", "task-linked"],
+  );
+  assert.equal(result.sources[1].selectionMethod, "opening-fallback");
+});

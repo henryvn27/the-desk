@@ -216,10 +216,8 @@ app.whenReady().then(() => {
     if (lensRequest) throw Error("A Lens response is already in progress.");
     const snapshot = store.snapshot();
     const active = snapshot.sessions.find((s) => !s.endedAt);
-    const input = lensInputSchema.parse({
-      ...value,
-      context: lensContext(snapshot),
-    });
+    const input = lensInputSchema.parse({ ...value, context: undefined });
+    input.context = lensContext(snapshot, input.question);
     const key = credentials.read();
     lensRequest = new AbortController();
     try {
