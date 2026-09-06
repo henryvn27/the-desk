@@ -7,6 +7,7 @@ The product contract §4 defines the required academic graph. This document desc
 | Object | Storage and relationships | Evidence or authority |
 |---|---|---|
 | User | `users`; one local profile per SQLite store | Student-entered display name, optional email and time zone; local identity only |
+| Desk account session | Electron `safeStorage` encrypted file outside SQLite | Supabase-authenticated account identity; separate from local User and school connections; no cloud graph or sync copy |
 | Academic period | `academic_periods` plus `period_classes`; many-to-many class links | Student-entered name, period kind, date range and notes |
 | Space | `spaces` plus `space_classes`; many-to-many class links | Student-entered school, program, workspace or other context |
 | Class | `classes`; one class has many tasks | Student-entered name |
@@ -48,7 +49,7 @@ The product contract §4 defines the required academic graph. This document desc
 
 ## Required graph still missing
 
-Account/login identity and connected integration records remain unimplemented. The static connection catalog reports declared surfaces and current fallback states; it is not a connected account or sync engine. The local User profile is not an account or security boundary. Many-to-many relationships among those objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
+Connected integration records remain unimplemented. The static connection catalog reports declared surfaces and current fallback states; it is not a connected account or sync engine. Desk account authentication now exists as a trusted Electron/Supabase boundary, but it is not a multi-user local graph, Google identity manager or sync engine. The local User profile remains separate from account identity and is not a security boundary. Many-to-many relationships among school connections and academic objects must be represented explicitly as those vertical flows are added. Task notes and the single resource URL are not substitutes for the required graph.
 
 The current local profile is not a multi-user security boundary. JSON payload persistence is not evidence that absent objects, synchronization, provenance corrections or confidence history are supported.
 
@@ -138,3 +139,5 @@ Schema 34 adds durable `academic_periods` and `spaces` with separate many-to-man
 Schema 35 adds one durable local `users` profile per SQLite store. The User record stores an explicit display name, optional email and time zone with revision-safe create/edit/forget, user-entered authority and restart persistence. Settings exposes the profile and states that account login and school connections are separate capabilities; AI telemetry associates later local runs with the profile ID when present. This is local identity metadata, not authentication, multi-user isolation, account deletion, sync or school roster identity.
 
 Schema 36 adds durable computed Plan versions. Auto-plan saves a version when confirmed work is reserved, and an approved rebalance saves the resulting version; each record retains its horizon, planning mode, trigger, saved block IDs, unscheduled work, overload total, planner basis hash and computed authority. The Plan view exposes recent versions after restart so a student can inspect what Desk committed and what did not fit. Manual block edits remain separate from these planner snapshots, and persistent account, integration, sync and provider capabilities remain outside the local graph.
+
+The account boundary is intentionally outside SQLite. `SupabaseAccount` validates email/password credentials and auth responses in the trusted main process, accepts only HTTPS project URLs (with loopback permitted for tests), stores the session through Electron `safeStorage`, and exposes only configured/authenticated/email/user-id status to the renderer. It does not refresh sessions, manage multiple Google identities, apply remote data, or upload the local outbox. Production Supabase auth, RLS and sync transport remain separate follow-up work.

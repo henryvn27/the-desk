@@ -117,10 +117,10 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "apps/desktop; packages/domain; packages/planner",
-      "automated": "npm run check; see Verification/BASELINE.md",
-      "live": "npm run test:desktop: first slice only",
-      "mac": "Installed unsigned arm64 development build smoke passes",
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
+      "automated": "npm run check; 137 tests plus typecheck/lint/build; see Verification/BASELINE.md",
+      "live": "Installed unsigned macOS account, Lens and broad desktop smokes pass; the account boundary uses an isolated loopback fixture and does not claim production cloud sync.",
+      "mac": "Installed unsigned arm64 Electron account, Lens and broad desktop regression pass; app.asar matches the packaged app.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34050998271 for commit b8bfa5d; no requirement-specific Windows UI proof.",
       "blocker": "Remaining acceptance criteria are not implemented/verified; see contract and BASELINE.md."
     },
     {
@@ -172,11 +172,11 @@
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
       "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/user.test.ts; packages/domain/academic-context.test.ts; packages/domain/plan.test.ts; packages/study/kit.ts; packages/study/kit.test.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/AcademicContext.tsx; apps/desktop/src/StudyPlan.tsx; apps/desktop/src/SessionKit.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs; scripts/smoke-context.mjs; scripts/smoke-plans.mjs",
-      "automated": "131 tests plus typecheck/lint/build: schema-36 durable computed Plan versions and schema-35 local User profile with schema-34 Academic period/Space persistence, typed kinds/date validation, class-link deduplication, duplicate/unknown-link rejection, revision-safe CRUD, linked-record forget guards, restart persistence, telemetry profile association, planner basis hashing, saved block and unscheduled-work snapshots, and Session Kit class filtering, alongside prior domain, authority, teacher, hierarchy, assessment, attempt and session coverage.",
-      "live": "Installed unsigned macOS Plan smoke creates a task, records Auto-plan, previews and approves a rebalance, confirms two persisted Plan versions after restart; User, Academic context, Units, Teacher, evidence, authority, assessment, Attempts, desktop, checklist and Session Kit regressions also pass.",
-      "mac": "Unsigned installed arm64 Plan, User, Academic context, hierarchy, Teacher, evidence, assessment, Attempts, Authority, desktop, checklist and Session Kit smokes and app.asar/package byte comparison pass",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34045188001; no requirement-specific Windows UI proof.",
-      "blocker": "Partial graph only. Account/login identity, integrations, connection capabilities, graded-work extraction, synchronization, prerequisites, hierarchy-aware planner behavior and Windows interaction remain incomplete."
+      "automated": "137 tests plus typecheck/lint/build: schema-37 durable local outbox/conflict records, schema-36 Plan versions, schema-35 local User profile, Supabase account URL/credential/session validation, trusted account IPC and encrypted restart persistence, alongside prior domain, authority, teacher, hierarchy, assessment, attempt and session coverage.",
+      "live": "Installed unsigned macOS account smoke keeps account identity separate from school connections while local User/class/task data remains in SQLite; Plan, User, Academic context, Units, Teacher, evidence, authority, assessment, Attempts, desktop, checklist and Session Kit regressions also pass.",
+      "mac": "Unsigned installed arm64 account, Plan, User, Academic context, hierarchy, Teacher, evidence, assessment, Attempts, Authority, desktop, checklist and Session Kit smokes and app.asar/package byte comparison pass",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34050998271 for commit b8bfa5d; no requirement-specific Windows UI proof.",
+      "blocker": "Partial graph only. Account authentication is a separate trusted boundary, while account-to-school connection linkage, integrations, connection capabilities, graded-work extraction, synchronization, prerequisites, hierarchy-aware planner behavior and Windows interaction remain incomplete."
     },
     {
       "id": "DOMAIN-002",
@@ -852,12 +852,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/intelligence; apps/desktop; packages/domain; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs",
-      "automated": "134 tests plus typecheck/lint/build: local JSON export serializes an authoritative SQLite snapshot without provider credentials, and the destructive path requires native confirmation before recreating the database.",
-      "live": "Installed unsigned macOS user-data smoke exports a populated local profile/class/task snapshot, asserts no OPENROUTER_API_KEY string is present, requires an explicit native delete confirmation, and verifies classes/tasks stay empty after restart; local sync conflict smoke preserves both copies and requires a decision.",
-      "mac": "Unsigned installed arm64 user-data, sync, Lens and broad desktop smokes pass; Local data Settings screenshot and operated video are retained at artifacts/user/ and the user-facing outputs folder; installed app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 34049319837 for commit 4d9b1eb; no requirement-specific Windows UI proof.",
-      "blocker": "Local export/deletion and conflict-preservation controls are verified. Account/auth, live provider privacy settings, asynchronous cloud transport, remote-copy application, interrupted-upload recovery, broader privacy/security review and Windows interaction remain incomplete."
+      "implementation": "packages/intelligence; packages/domain; apps/desktop; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/electron/supabase.ts; packages/integrations/supabase-auth.ts; apps/desktop/src/UserSettings.tsx; apps/desktop/src/AccountSettings.tsx; apps/desktop/src/main.tsx; scripts/smoke-user.mjs; scripts/smoke-account.mjs",
+      "automated": "137 tests plus typecheck/lint/build: local JSON export serializes an authoritative SQLite snapshot without provider credentials, deletion requires native confirmation, and Supabase account sessions stay encrypted in Electron safeStorage with no renderer credential access.",
+      "live": "Installed unsigned macOS user-data smoke exports/deletes an isolated local profile/class/task snapshot and preserves conflict copies; installed account smoke signs in, persists and signs out through a loopback fixture without exposing credentials to the renderer.",
+      "mac": "Unsigned installed arm64 user-data, sync, account, Lens and broad desktop smokes pass; user-data and account screenshots/operated videos are retained at artifacts/user/, artifacts/account/ and the user-facing outputs folder; installed app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34050998271 for commit b8bfa5d; no requirement-specific Windows UI proof.",
+      "blocker": "Local export/deletion, conflict-preservation and encrypted account-session controls are verified. Production Supabase account privacy/RLS, live provider privacy settings, asynchronous cloud transport, remote-copy application, interrupted-upload recovery, broader privacy/security review and Windows interaction remain incomplete."
     },
     {
       "id": "SYNC-001",
@@ -872,12 +872,12 @@
       ],
       "status": "IN_PROGRESS",
       "verification": "PARTIAL",
-      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/sync.test.ts; apps/desktop/src/SyncSettings.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-sync.mjs",
-      "automated": "134 tests plus typecheck/lint/build: schema 37 exposes durable outbox status/attempt metadata and preserves both opaque local and remote conflict copies; local writes remain distinct from cloud sync.",
-      "live": "Installed unsigned macOS sync smoke creates a local class, retries without claiming upload, records a preserved local/remote conflict, requests an explicit keep-local resolution, and verifies the operation, copies and resolution survive restart; installed connection, Lens and broad desktop regressions also pass.",
-      "mac": "Unsigned installed arm64 sync, connection, Lens and broad desktop smokes pass; conflict screenshot and operated video are retained at artifacts/sync/, and app.asar matches the packaged artifact.",
-      "windows": "Hosted macOS/Windows checks/build/package pass at 5b6e7bb (run 34048574058); no requirement-specific Windows UI proof.",
-      "blocker": "SQLite local authority, durable retry metadata and conflict preservation/resolution are bounded and honest, but account/auth, asynchronous Supabase transport, remote-copy application, interrupted-upload recovery and Windows interaction remain incomplete."
+      "implementation": "packages/domain/contracts.ts; packages/domain/store.ts; packages/domain/sync.test.ts; apps/desktop/electron/supabase.ts; packages/integrations/supabase-auth.ts; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/src/AccountSettings.tsx; apps/desktop/src/SyncSettings.tsx; apps/desktop/src/main.tsx; apps/desktop/src/style.css; scripts/smoke-sync.mjs; scripts/smoke-account.mjs",
+      "automated": "137 tests plus typecheck/lint/build: schema 37 exposes durable outbox status/attempt metadata and preserves both opaque local and remote conflict copies; local writes remain distinct from cloud sync, while the account boundary validates Supabase auth and encrypted restart persistence.",
+      "live": "Installed unsigned macOS sync smoke creates a local class, retries without claiming upload, preserves a local/remote conflict and resolves it explicitly; installed account smoke authenticates against an isolated loopback fixture and confirms restart persistence without claiming a cloud copy; installed connection, Lens and broad desktop regressions also pass.",
+      "mac": "Unsigned installed arm64 sync, account, connection, Lens and broad desktop smokes pass; conflict and account screenshots/operated videos are retained at artifacts/sync/ and artifacts/account/, and app.asar matches the packaged artifact.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34050998271 for commit b8bfa5d; no requirement-specific Windows UI proof.",
+      "blocker": "SQLite local authority, durable retry metadata, conflict preservation/resolution and a bounded account/auth boundary are honest, but asynchronous Supabase transport, RLS-scoped remote-copy application, interrupted-upload recovery and Windows interaction remain incomplete."
     },
     {
       "id": "ACCOUNT-001",
@@ -888,14 +888,14 @@
         "Keep account/login identity separate from school connections.",
         "Allow multiple Google identities for personal and school use and request Google permissions progressively."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop/electron/supabase.ts; packages/integrations/supabase-auth.ts; apps/desktop/electron/main.ts; apps/desktop/electron/preload.ts; apps/desktop/src/AccountSettings.tsx; packages/domain/contracts.ts; scripts/smoke-account.mjs",
+      "automated": "137 tests plus typecheck/lint/build: Supabase auth URL and credential schemas, renderer-safe session summaries, trusted main-process IPC, encrypted safeStorage persistence, local SQLite-authoritative messaging, environment boundary and bounded localhost test transport.",
+      "live": "Installed unsigned arm64 account smoke signs in against an isolated loopback Supabase-compatible server, persists the encrypted session across restart, signs out, creates a second account, checks request counts and renderer error absence; no production Supabase request or credential value is used.",
+      "mac": "Unsigned installed arm64 account smoke and broad desktop/Lens regressions pass; account screenshot and operated video are retained at artifacts/account/ and the user-facing outputs folder; installed app.asar matches the packaged app.asar.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34050998271 for commit b8bfa5d; no requirement-specific Windows UI proof.",
+      "blocker": "Desk identity/account auth is bounded and separate from school connections, but multiple Google identities, progressive Google permissions, real Supabase project auth/RLS, asynchronous sync, and Windows interaction remain incomplete."
     },
     {
       "id": "NOTEBOOK-001",
