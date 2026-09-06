@@ -1,9 +1,12 @@
-export const googleCapabilityIds = [
+const googleCapabilityIdList = [
   "calendar.events.read",
   "mail.school.read",
   "classroom.coursework.read",
   "drive.files.read",
 ] as const;
+
+/** Keep the adapter-visible scope list read-only at runtime as well as in TS. */
+export const googleCapabilityIds = Object.freeze(googleCapabilityIdList);
 
 export type GoogleCapabilityId = (typeof googleCapabilityIds)[number];
 export type ConnectionPhase =
@@ -49,6 +52,13 @@ export type AuthorizationOutcome = {
   capability: GoogleCapabilityId;
   result: "authorized" | "permission-denied" | "admin-blocked" | "unavailable";
 };
+
+const authorizationResults = [
+  "authorized",
+  "permission-denied",
+  "admin-blocked",
+  "unavailable",
+] as const;
 
 export type GoogleConnectionCommand =
   | {
@@ -113,7 +123,8 @@ export function updateGoogleConnections(
   command: GoogleConnectionCommand,
   now: Date,
 ): GoogleConnections {
-  if (!Number.isFinite(+now)) throw new RangeError("Invalid connection time.");
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime()))
+    throw new RangeError("Invalid connection time.");
   const at = now.toISOString();
 
   if (command.type === "identity.add") {
@@ -173,17 +184,18 @@ export function updateGoogleConnections(
     const pending = googleCapabilityIds.filter(
       (id) => connection.permissions[id] === "authorization-pending",
     );
-    const outcomes = uniqueCapabilities(
-      command.outcomes.map(({ capability }) => capability),
+    const outcomes = validateAuthorizationOutcomes(command.outcomes);
+    const outcomeCapabilities = uniqueCapabilities(
+      outcomes.map(({ capability }) => capability),
     );
     if (
-      pending.length !== outcomes.length ||
-      pending.some((capability) => !outcomes.includes(capability))
+      pending.length !== outcomeCapabilities.length ||
+      pending.some((capability) => !outcomeCapabilities.includes(capability))
     )
       throw Error(
         "Authorization outcomes must resolve every pending capability.",
       );
-    for (const outcome of command.outcomes)
+    for (const outcome of outcomes)
       connection.permissions[outcome.capability] = outcome.result;
     connection.phase = phaseFromPermissions(connection.permissions);
   }
@@ -238,15 +250,47 @@ function beginAuthorization(
   connection.phase = "authorization-pending";
 }
 
-function uniqueCapabilities(
-  capabilities: GoogleCapabilityId[],
-): GoogleCapabilityId[] {
-  const unique = [...new Set(capabilities)];
-  if (unique.length !== capabilities.length)
+function uniqueCapabilities(capabilities: unknown): GoogleCapabilityId[] {
+  if (!Array.isArray(capabilities))
+    throw Error("Google capabilities must be an array.");
+  const normalized = capabilities.map((capability) => {
+    if (
+      typeof capability !== "string" ||
+      !googleCapabilityIds.some((known) => known === capability)
+    )
+      throw Error("Unknown Google capability.");
+    return capability as GoogleCapabilityId;
+  });
+  const unique = [...new Set(normalized)];
+  if (unique.length !== normalized.length)
     throw Error("Google capabilities must be unique.");
-  if (unique.some((item) => !googleCapabilityIds.includes(item)))
-    throw Error("Unknown Google capability.");
   return unique;
+}
+
+function validateAuthorizationOutcomes(
+  outcomes: unknown,
+): AuthorizationOutcome[] {
+  if (!Array.isArray(outcomes) || outcomes.length === 0)
+    throw Error("Provide at least one authorization outcome.");
+  return outcomes.map((outcome) => {
+    if (!outcome || typeof outcome !== "object")
+      throw Error("Invalid Google authorization outcome.");
+    const value = outcome as Record<string, unknown>;
+    if (
+      typeof value.capability !== "string" ||
+      !googleCapabilityIds.some((known) => known === value.capability)
+    )
+      throw Error("Unknown Google capability.");
+    if (
+      typeof value.result !== "string" ||
+      !authorizationResults.some((known) => known === value.result)
+    )
+      throw Error("Unknown Google authorization result.");
+    return {
+      capability: value.capability as GoogleCapabilityId,
+      result: value.result as AuthorizationOutcome["result"],
+    };
+  });
 }
 
 function phaseFromPermissions(
@@ -270,16 +314,27 @@ function initialPermissions(): Record<GoogleCapabilityId, PermissionState> {
 }
 
 function validateIdentity(
-  identity: Pick<GoogleConnection, "id" | "kind" | "label" | "email">,
-) {
+  identity: unknown,
+): Pick<GoogleConnection, "id" | "kind" | "label" | "email"> {
+  if (!identity || typeof identity !== "object")
+    throw Error("Google identity is invalid.");
+  const input = identity as Record<string, unknown>;
+  if (
+    typeof input.id !== "string" ||
+    typeof input.label !== "string" ||
+    typeof input.email !== "string"
+  )
+    throw Error("Google identity is invalid.");
   const value = {
-    id: identity.id.trim(),
-    kind: identity.kind,
-    label: identity.label.trim(),
-    email: identity.email.trim(),
+    id: input.id.trim(),
+    kind: input.kind,
+    label: input.label.trim(),
+    email: input.email.trim(),
   };
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value.id))
     throw Error("Google identity ID is invalid.");
+  if (value.kind !== "personal" && value.kind !== "school")
+    throw Error("Google identity kind is invalid.");
   if (!value.label || value.label.length > 100)
     throw Error("Google identity label is invalid.");
   if (
@@ -287,5 +342,10 @@ function validateIdentity(
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email)
   )
     throw Error("Google identity email is invalid.");
-  return value;
+  return {
+    id: value.id,
+    kind: value.kind as GoogleConnection["kind"],
+    label: value.label,
+    email: value.email,
+  };
 }
