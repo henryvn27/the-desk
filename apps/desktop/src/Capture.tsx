@@ -3,6 +3,7 @@ import { userError } from "./errors";
 import { useEffect, useRef, useState } from "react";
 import type {
   Class,
+  CapturePolicy,
   GradeCategory,
   TaskInput,
   Task,
@@ -21,9 +22,11 @@ export function Capture({
   onSave,
   onClose,
   existing,
+  policy = "balanced",
   initialDraft,
   onQueue,
 }: {
+  policy?: CapturePolicy;
   initialDraft?: CaptureDraft;
   onQueue?: (text: string) => Promise<void>;
   classes: Class[];
@@ -125,8 +128,10 @@ export function Capture({
             Enter manually
           </button>
           <p className="muted">
-            Interpreted text is saved to Capture Inbox for review. Manual
-            assignments are saved only when you confirm.
+            {policy === "conservative"
+              ? "Pasted text is saved to Inbox for review."
+              : `Your ${policy === "balanced" ? "Balanced" : "Autopilot"} capture policy may file complete assignments automatically. Other items stay in Inbox for review.`}{" "}
+            Manual assignments are saved only when you confirm.
           </p>
         </section>
       )}

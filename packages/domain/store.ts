@@ -1,3 +1,4 @@
+import { decideCapture } from "../intelligence/capture-policy";
 import { interpretCapture } from "../intelligence/capture";
 import { planWeek } from "../planner";
 import { startNotebook } from "../canvas/notebook";
@@ -6,6 +7,8 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import {
   command,
+  capturePolicy,
+  type TaskInput,
   defaultPlanningPreferences,
   planningPreferences,
   type Command,
@@ -31,7 +34,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 18) {
+    if (version > 19) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -89,6 +92,7 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE capture_inbox(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=18; COMMIT;",
       );
+    if (version <= 18) this.db.exec("BEGIN; PRAGMA user_version=19; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -154,6 +158,15 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      capturePolicy: capturePolicy.parse(
+        JSON.parse(
+          String(
+            this.db
+              .prepare("SELECT data FROM settings WHERE id='capture-policy'")
+              .get()?.data ?? '"balanced"',
+          ),
+        ),
+      ),
       captureInbox: this.db
         .prepare("SELECT data FROM capture_inbox ORDER BY rowid")
         .all()
@@ -219,6 +232,14 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "capture.policy") {
+        entityId = "capture-policy";
+        this.db
+          .prepare(
+            "INSERT INTO settings VALUES('capture-policy',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(JSON.stringify(c.mode));
+      }
       if (c.type === "inbox.capture") {
         const drafts = interpretCapture(c.text, {
           classes: state.classes,
@@ -237,7 +258,18 @@ export class DeskStore {
           );
         for (const draft of drafts) {
           entityId = randomUUID();
+          const decision = decideCapture(
+            draft,
+            state.capturePolicy,
+            this.snapshot().tasks,
+            now,
+          );
           const item: CaptureInboxItem = {
+            filing: {
+              policy: state.capturePolicy,
+              action: decision.action,
+              reason: decision.reason,
+            },
             id: entityId,
             revision: 0,
             status: "pending",
@@ -249,6 +281,15 @@ export class DeskStore {
             .prepare("INSERT INTO capture_inbox VALUES(?,?)")
             .run(entityId, JSON.stringify(item));
           this.queue(entityId, "inbox.created", timestamp);
+          if (decision.action === "auto-file") {
+            const task = this.createCapturedTask(
+              decision.input,
+              state,
+              now,
+              item,
+            );
+            this.queue(task.id, "task.auto-file", timestamp);
+          }
         }
       }
       if (c.type === "inbox.archive") {
@@ -644,49 +685,7 @@ export class DeskStore {
           (!item || item.status !== "pending" || item.revision !== c.revision)
         )
           throw Error("This capture changed. Reopen the inbox and try again.");
-        entityId = randomUUID();
-        const task: Task = {
-          ...c.input,
-          ...(item
-            ? {
-                captureEvidence: {
-                  originalText: item.draft.provenance.originalText,
-                  sourceText: item.draft.provenance.sourceText,
-                  capturedAt: item.draft.provenance.capturedAt,
-                  authority: item.draft.provenance.authority,
-                  confidence: item.draft.confidence,
-                  candidateDates: item.draft.deadline?.candidates ?? [],
-                  uncertainties: item.draft.uncertainties.map((u) => u.message),
-                },
-              }
-            : {}),
-          id: entityId,
-          completed: false,
-          revision: 0,
-          createdAt: timestamp,
-          ...(active &&
-          state.planningMode === "auto-plan" &&
-          c.input.deadlineConfirmed
-            ? { autoPlanPending: true }
-            : {}),
-        };
-        this.db
-          .prepare("INSERT INTO tasks VALUES(?,?,?)")
-          .run(entityId, task.classId, JSON.stringify(task));
-        if (!active) this.reserveCapturedTask(task, now);
-        if (item) {
-          this.db.prepare("UPDATE capture_inbox SET data=? WHERE id=?").run(
-            JSON.stringify({
-              ...item,
-              taskId: task.id,
-              status: "accepted",
-              revision: item.revision + 1,
-              updatedAt: timestamp,
-            }),
-            item.id,
-          );
-          this.queue(item.id, "inbox.accepted", timestamp);
-        }
+        entityId = this.createCapturedTask(c.input, state, now, item).id;
       }
       if (c.type === "task.update") {
         const existing = state.tasks.find((t) => t.id === c.id);
@@ -725,6 +724,10 @@ export class DeskStore {
           throw Error("This task has checklist work and cannot be undone.");
         if (state.sessions.some((s) => s.taskId === c.id))
           throw Error("This task has study history and cannot be undone.");
+        if ((state.tasks.find((t) => t.id === c.id)?.revision ?? 0) > 0)
+          throw Error(
+            "This assignment was edited and cannot be undone. Review it in Library.",
+          );
         if (!state.tasks.some((t) => t.id === c.id))
           throw Error("Task no longer exists.");
         entityId = c.id;
@@ -970,6 +973,59 @@ export class DeskStore {
         .prepare("INSERT INTO plan_changes VALUES(?,?,?)")
         .run(change.id, timestamp, JSON.stringify(change));
     }
+  }
+  private createCapturedTask(
+    input: TaskInput,
+    state: Snapshot,
+    now: Date,
+    item?: CaptureInboxItem,
+  ): Task {
+    const entityId = randomUUID();
+    const timestamp = now.toISOString();
+    const active = state.sessions.find((s) => !s.endedAt);
+    const task: Task = {
+      ...input,
+      ...(item
+        ? {
+            captureEvidence: {
+              originalText: item.draft.provenance.originalText,
+              sourceText: item.draft.provenance.sourceText,
+              capturedAt: item.draft.provenance.capturedAt,
+              authority: item.draft.provenance.authority,
+              confidence: item.draft.confidence,
+              candidateDates: item.draft.deadline?.candidates ?? [],
+              uncertainties: item.draft.uncertainties.map((u) => u.message),
+            },
+          }
+        : {}),
+      id: entityId,
+      completed: false,
+      revision: 0,
+      createdAt: timestamp,
+      ...(active &&
+      state.planningMode === "auto-plan" &&
+      input.deadlineConfirmed
+        ? { autoPlanPending: true }
+        : {}),
+    };
+    this.db
+      .prepare("INSERT INTO tasks VALUES(?,?,?)")
+      .run(entityId, task.classId, JSON.stringify(task));
+    if (!active) this.reserveCapturedTask(task, now);
+    if (item) {
+      this.db.prepare("UPDATE capture_inbox SET data=? WHERE id=?").run(
+        JSON.stringify({
+          ...item,
+          taskId: task.id,
+          status: "accepted",
+          revision: item.revision + 1,
+          updatedAt: timestamp,
+        }),
+        item.id,
+      );
+      this.queue(item.id, "inbox.accepted", timestamp);
+    }
+    return task;
   }
   private queue(id: string, operation: string, at: string) {
     this.db

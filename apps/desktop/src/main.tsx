@@ -1,3 +1,4 @@
+import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
@@ -32,6 +33,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  capturePolicy: "balanced",
   captureInbox: [],
   planningMode: "auto-plan",
   gradeCategories: [],
@@ -53,6 +55,7 @@ function App() {
     [capture, setCapture] = useState(false),
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
+  const [captureNotice, setCaptureNotice] = useState("");
   const [editing, setEditing] = useState<Task>();
   const [reviewingCapture, setReviewingCapture] = useState<CaptureInboxItem>();
   const [canvas, setCanvas] =
@@ -362,6 +365,7 @@ function App() {
             {error}
           </p>
         )}
+        {captureNotice && <p role="status">{captureNotice}</p>}
         {lastId && (
           <p role="status">
             Task saved.{" "}
@@ -501,6 +505,10 @@ function App() {
                 act({ type: "planning.preferences", input }, true)
               }
             />
+            <CapturePolicySettings
+              mode={data.capturePolicy}
+              save={(mode) => act({ type: "capture.policy", mode }, true)}
+            />
             <ProviderSettings />
             <h2>Connections</h2>
             <p>
@@ -546,6 +554,7 @@ function App() {
       )}
       {editing && (
         <Capture
+          policy={data.capturePolicy}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
@@ -571,6 +580,7 @@ function App() {
       {reviewingCapture && (
         <Capture
           key={reviewingCapture.id}
+          policy={data.capturePolicy}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
@@ -596,19 +606,24 @@ function App() {
       )}
       {capture && (
         <Capture
+          policy={data.capturePolicy}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
           sessions={data.sessions}
           busy={busy}
           onQueue={async (text) => {
-            await act(
+            const next = await act(
               {
                 type: "inbox.capture",
                 text,
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               },
               true,
+            );
+            const items = next!.captureInbox.slice(data.captureInbox.length);
+            setCaptureNotice(
+              `Capture saved: ${items.filter((i) => i.status === "accepted").length} filed, ${items.filter((i) => i.status === "pending").length} waiting for review.`,
             );
             setCapture(false);
             setPage("Capture Inbox");

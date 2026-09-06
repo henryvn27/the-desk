@@ -15,30 +15,40 @@ export function CaptureInbox({
   review: (item: CaptureInboxItem) => void;
   change: (command: Command) => Promise<unknown>;
 }) {
-  const [archived, setArchived] = useState(false);
+  const [view, setView] = useState<CaptureInboxItem["status"]>("pending");
   const [error, setError] = useState("");
-  const visible = items.filter(
-    (i) => i.status === (archived ? "archived" : "pending"),
-  );
+  const visible = items.filter((i) => i.status === view);
   return (
     <section>
       <h1>Capture Inbox</h1>
       <p>
-        Saved for review. These items are not assignments and do not reserve
-        study time yet.
+        Pending captures wait for your review. Filed captures are assignments
+        and follow your planning preferences.
       </p>
       <div className="actions">
-        <button aria-pressed={!archived} onClick={() => setArchived(false)}>
-          Pending ({items.filter((i) => i.status === "pending").length})
-        </button>
-        <button aria-pressed={archived} onClick={() => setArchived(true)}>
-          Archived ({items.filter((i) => i.status === "archived").length})
-        </button>
+        {(["pending", "archived", "accepted"] as const).map((status) => (
+          <button
+            key={status}
+            aria-pressed={view === status}
+            onClick={() => setView(status)}
+          >
+            {status === "pending"
+              ? "Pending"
+              : status === "archived"
+                ? "Archived"
+                : "Filed"}{" "}
+            ({items.filter((i) => i.status === status).length})
+          </button>
+        ))}
       </div>
       {error && <p role="alert">{error}</p>}
       {!visible.length && (
         <p>
-          {archived ? "No archived captures." : "Nothing waiting for review."}
+          {view === "archived"
+            ? "No archived captures."
+            : view === "accepted"
+              ? "No filed captures yet."
+              : "Nothing waiting for review."}
         </p>
       )}
       {visible.map((item) => (
@@ -48,14 +58,23 @@ export function CaptureInbox({
             Pasted text ·{" "}
             {new Date(item.draft.provenance.capturedAt).toLocaleString()}
           </p>
-          {item.draft.uncertainties.length > 0 ? (
+          {view === "accepted" ? (
+            <p>
+              {item.filing?.action === "auto-file"
+                ? item.filing.reason
+                : "Reviewed and filed as an assignment."}
+            </p>
+          ) : item.draft.uncertainties.length > 0 ? (
             <ul>
               {item.draft.uncertainties.map((u, n) => (
                 <li key={n}>{u.message}</li>
               ))}
             </ul>
           ) : (
-            <p>Extracted fields are ready for your confirmation.</p>
+            <p>
+              {item.filing?.reason ??
+                "Extracted fields are ready for your confirmation."}
+            </p>
           )}
           <details>
             <summary>Source text</summary>
@@ -64,7 +83,7 @@ export function CaptureInbox({
             </p>
           </details>
           <div className="actions">
-            {!archived && (
+            {view === "pending" && (
               <button disabled={busy} onClick={() => review(item)}>
                 Review capture
               </button>
@@ -73,15 +92,23 @@ export function CaptureInbox({
               disabled={busy}
               onClick={() => {
                 setError("");
-                void change({
-                  type: "inbox.archive",
-                  id: item.id,
-                  revision: item.revision,
-                  archived: !archived,
-                }).catch((e) => setError(userError(e)));
+                void change(
+                  view === "accepted" && item.taskId
+                    ? { type: "task.undo", id: item.taskId }
+                    : {
+                        type: "inbox.archive",
+                        id: item.id,
+                        revision: item.revision,
+                        archived: view !== "archived",
+                      },
+                ).catch((e) => setError(userError(e)));
               }}
             >
-              {archived ? "Restore capture" : "Archive capture"}
+              {view === "accepted"
+                ? "Undo filing"
+                : view === "archived"
+                  ? "Restore capture"
+                  : "Archive capture"}
             </button>
           </div>
         </article>

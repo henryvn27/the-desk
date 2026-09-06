@@ -188,7 +188,14 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   bufferPercent: 15,
 };
 export type PlanningMode = "suggest" | "auto-plan";
+export const capturePolicy = z.enum(["conservative", "balanced", "autopilot"]);
+export type CapturePolicy = z.infer<typeof capturePolicy>;
 export type CaptureInboxItem = {
+  filing?: {
+    policy: CapturePolicy;
+    action: "review" | "auto-file";
+    reason: string;
+  };
   id: string;
   revision: number;
   status: "pending" | "archived" | "accepted";
@@ -197,6 +204,7 @@ export type CaptureInboxItem = {
   updatedAt: string;
 };
 export type Snapshot = {
+  capturePolicy: CapturePolicy;
   captureInbox: CaptureInboxItem[];
   planningMode: PlanningMode;
   gradeCategories: GradeCategory[];
@@ -211,6 +219,7 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("capture.policy"), mode: capturePolicy }),
   z.object({
     type: z.literal("inbox.capture"),
     text: z
