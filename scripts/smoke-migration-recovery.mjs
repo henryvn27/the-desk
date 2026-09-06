@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -36,6 +37,34 @@ function outboxColumns(database) {
 
 function rows(statement) {
   return statement.all().map((row) => ({ ...row }));
+}
+
+function waitForReady(child) {
+  return new Promise((resolveReady, rejectReady) => {
+    let output = "";
+    const timer = setTimeout(() => {
+      rejectReady(new Error(`Interrupted writer did not become ready: ${output}`));
+    }, 10_000);
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+      if (!output.includes("READY")) return;
+      clearTimeout(timer);
+      resolveReady();
+    });
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      rejectReady(error);
+    });
+    child.once("exit", (code, signal) => {
+      if (output.includes("READY")) return;
+      clearTimeout(timer);
+      rejectReady(
+        new Error(
+          `Interrupted writer exited before READY (code=${code}, signal=${signal})`,
+        ),
+      );
+    });
+  });
 }
 
 const openAndInspect = `
@@ -194,6 +223,81 @@ try {
   );
   resumedDatabase.close();
 
+  const interruptedPath = join(directory, "interrupted.sqlite");
+  const interruptedWriter = spawn(
+    process.execPath,
+    [
+      "--no-warnings",
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      `
+        import { DeskStore } from "./packages/domain/store.ts";
+        const store = new DeskStore(process.env.DESK_FIXTURE_PATH);
+        const created = store.execute({ type: "class.create", name: "Interrupted Physics" });
+        store.execute({
+          type: "task.create",
+          input: {
+            title: "Recovery worksheet",
+            classId: created.classes.at(-1).id,
+            dueAt: null,
+            minutes: 30,
+            resource: null,
+            notes: "Committed before the process is interrupted.",
+            deadlineConfirmed: false,
+            workKind: "assignment",
+            importance: "normal",
+          },
+        });
+        console.log("READY");
+        setInterval(() => {}, 1_000);
+      `,
+    ],
+    {
+      cwd: repository,
+      env: { ...process.env, DESK_FIXTURE_PATH: interruptedPath },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  try {
+    await waitForReady(interruptedWriter);
+    const terminated = interruptedWriter.kill(
+      process.platform === "win32" ? undefined : "SIGKILL",
+    );
+    assert.equal(terminated, true);
+    const [exitCode, exitSignal] = await once(interruptedWriter, "exit");
+    assert.ok(
+      exitSignal !== null || exitCode !== 0,
+      "The recovery fixture must end through process interruption",
+    );
+
+    const recovered = runStore(interruptedPath, openAndInspect);
+    assert.deepEqual(
+      recovered.snapshot.classes.map(({ name }) => name),
+      ["Interrupted Physics"],
+    );
+    assert.deepEqual(
+      recovered.snapshot.tasks.map(({ title }) => title),
+      ["Recovery worksheet"],
+    );
+    assert.equal(recovered.snapshot.outbox.length, 2);
+    assert.ok(
+      recovered.snapshot.outbox.every((operation) => operation.status === "queued"),
+    );
+    const recoveredDatabase = new DatabaseSync(interruptedPath);
+    assert.equal(
+      recoveredDatabase.prepare("PRAGMA integrity_check").get().integrity_check,
+      "ok",
+    );
+    recoveredDatabase.close();
+  } finally {
+    if (interruptedWriter.exitCode === null && !interruptedWriter.killed)
+      interruptedWriter.kill(
+        process.platform === "win32" ? undefined : "SIGKILL",
+      );
+  }
+
   for (const fixture of [
     {
       name: "future",
@@ -272,9 +376,10 @@ try {
           "legacy JSON data stays byte-for-byte stable and new outbox fields receive safe defaults",
           "an existing schema-37 outbox payload survives resumed schema-38 migration exactly",
           "future and structurally corrupt schemas are rejected without replacing their schema, version or sentinel data",
+          "an abruptly terminated writer reopens with committed class/task/outbox data and passes SQLite integrity check",
         ],
         limitations: [
-          "does not terminate a live process mid-transaction or simulate power loss and WAL recovery",
+          "terminates after committed writes; does not simulate power loss in the middle of an SQLite transaction",
           "runs on the current macOS host and does not prove Windows SQLite or packaged-app behavior",
         ],
       },
