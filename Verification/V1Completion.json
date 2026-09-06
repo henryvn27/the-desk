@@ -133,14 +133,14 @@
         "Do not migrate the product back into Swift or build two independent native apps.",
         "The V1 is a full rebuild; Swift/Apple implementation and architecture are historical Git context only, and the Electron/React/TypeScript desktop product is the sole V1 implementation target."
       ],
-      "status": "IMPLEMENTED_UNVERIFIED",
-      "verification": "UNVERIFIED",
-      "implementation": "Verification/IssueLedger.json; Verification/V1Completion.json; full rebuild branch",
-      "automated": null,
-      "live": null,
-      "mac": null,
-      "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "Ongoing consistency and final release review required."
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "apps/desktop; packages; package.json; scripts/check-electron-only.mjs; docs/architecture/ARCHITECTURE.md",
+      "automated": "npm run check:electron-only passes against the tracked tree and is required by npm run check; it fails on Swift, Xcode project, or Xcode workspace files.",
+      "live": "Electron/React/TypeScript is the only tracked V1 implementation surface; the installed unsigned macOS app and hosted macOS/Windows package checks run from the same branch. Historical Swift references remain documentation-only.",
+      "mac": "Unsigned installed arm64 Electron app and app.asar/package comparison pass; no Swift/Xcode implementation files are tracked.",
+      "windows": "Hosted macOS/Windows checks/build/package pass at 34045742565; no requirement-specific Windows UI proof.",
+      "blocker": "The full Electron rebuild is guarded and no Swift/Xcode implementation remains. Windows interactive evidence and final release review remain open."
     },
     {
       "id": "PILLAR-001",
