@@ -42,6 +42,14 @@ async function listen(
   return { server, url: `http://127.0.0.1:${address.port}` };
 }
 
+async function waitFor(check: () => boolean, message: string) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (check()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw Error(message);
+}
+
 test("sync coordinator records transport failures and retries without false success", async () => {
   const directory = await mkdtemp(join(tmpdir(), "desk-sync-coordinator-error-"));
   const database = join(directory, "desk.sqlite");
@@ -82,6 +90,54 @@ test("sync coordinator records transport failures and retries without false succ
     assert.equal(store.snapshot().outbox.at(-1)?.status, "synced");
     coordinator.close();
   } finally {
+    store.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("sync coordinator retries a transient failure without another manual sync", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "desk-sync-coordinator-reconnect-"));
+  const database = join(directory, "desk.sqlite");
+  let postAttempts = 0;
+  const { server, url } = await listen((request, response) => {
+    if (!request.url?.startsWith("/rest/v1/desk_sync_operations")) {
+      response.writeHead(404).end();
+      return;
+    }
+    if (request.method === "GET") {
+      response.writeHead(200, { "content-type": "application/json" }).end("[]");
+      return;
+    }
+    postAttempts += 1;
+    if (postAttempts === 1) {
+      response.writeHead(503).end();
+      return;
+    }
+    response.writeHead(201).end();
+  });
+  const store = new DeskStore(database);
+  const coordinator = new SupabaseSyncCoordinator(
+    () => store,
+    fakeAccount(url),
+    { retryDelayMs: 10 },
+  );
+  try {
+    store.execute({ type: "class.create", name: "Reconnect Physics" });
+    const initial = await coordinator.syncNow();
+    assert.equal(initial.phase, "error");
+    assert.equal(initial.queued, 1);
+    assert.equal(postAttempts, 1);
+
+    await waitFor(
+      () => coordinator.status().phase === "synced",
+      "sync coordinator did not recover after the transient failure",
+    );
+    assert.equal(coordinator.status().queued, 0);
+    assert.equal(postAttempts, 2);
+    assert.equal(store.snapshot().outbox.at(-1)?.status, "synced");
+  } finally {
+    coordinator.close();
     store.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(directory, { recursive: true, force: true });

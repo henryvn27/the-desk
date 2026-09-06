@@ -9,20 +9,30 @@ import type { SupabaseAccount } from "./supabase";
 
 type SyncAccountBoundary = Pick<SupabaseAccount, "status" | "syncContext">;
 
+export type SupabaseSyncCoordinatorOptions = {
+  retryDelayMs?: number;
+};
+
 export class SupabaseSyncCoordinator {
   private timer: NodeJS.Timeout | undefined;
   private running: Promise<void> | undefined;
+  private enabled = true;
   private phase: DeskSyncPhase = "disabled";
   private lastSyncedAt: string | null = null;
   private lastError: string | null = null;
   private uploaded = 0;
+  private readonly retryDelayMs: number;
 
   constructor(
     private readonly getStore: () => DeskStore,
     private readonly account: SyncAccountBoundary,
-  ) {}
+    options: SupabaseSyncCoordinatorOptions = {},
+  ) {
+    this.retryDelayMs = Math.max(1, Math.trunc(options.retryDelayMs ?? 5000));
+  }
 
   schedule() {
+    this.enabled = true;
     if (this.timer || this.running) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
@@ -34,6 +44,10 @@ export class SupabaseSyncCoordinator {
     if (this.running) {
       await this.running;
       return this.status();
+    }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
     }
     this.running = this.run();
     try {
@@ -70,8 +84,17 @@ export class SupabaseSyncCoordinator {
   }
 
   close() {
+    this.enabled = false;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
+  }
+
+  private scheduleRetry() {
+    if (!this.enabled || this.timer) return;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      void this.syncNow();
+    }, this.retryDelayMs);
   }
 
   private async run() {
@@ -127,9 +150,11 @@ export class SupabaseSyncCoordinator {
         store.markSyncFailure(envelope.id, new Date().toISOString(), message);
         this.lastError = message;
         this.phase = "error";
+        this.scheduleRetry();
         break;
       }
     }
     if (this.phase === "syncing") this.phase = conflictDetected ? "conflict" : "synced";
+    if (this.phase !== "error" && store.syncBatch(1).length) this.scheduleRetry();
   }
 }
