@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { lensAnswerSourceInput, lensFollowUpTaskInput } from "./lens-actions";
+import {
+  lensAnswerMemoryInput,
+  lensAnswerSourceInput,
+  lensFollowUpTaskInput,
+} from "./lens-actions";
+
+test("Lens answer memory action creates an explicit class-scoped note payload", () => {
+  const result = lensAnswerMemoryInput(
+    "The normal force balances the perpendicular component.",
+    "00000000-0000-4000-8000-000000000001",
+  );
+  assert.equal(result.category, "other");
+  assert.equal(result.classId, "00000000-0000-4000-8000-000000000001");
+  assert.equal(result.text, "The normal force balances the perpendicular component.");
+});
 
 test("Lens answer action creates a user-linked source payload", () => {
   const result = lensAnswerSourceInput(

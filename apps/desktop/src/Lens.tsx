@@ -7,6 +7,7 @@ import type {
 } from "../../../packages/intelligence/lens-provider";
 import type { Command } from "../../../packages/domain/contracts";
 import {
+  lensAnswerMemoryInput,
   lensAnswerSourceInput,
   lensFollowUpTaskInput,
 } from "../../../packages/intelligence/lens-actions";
@@ -299,6 +300,29 @@ export function Lens({
                   }}
                 >
                   Save answer as source
+                </button>
+              )}
+              {classId && (
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setStatus("");
+                    try {
+                      await save({
+                        type: "memory.create",
+                        input: lensAnswerMemoryInput(answer, classId),
+                      });
+                      setStatus("Lens answer saved as explicit memory.");
+                    } catch (error) {
+                      setStatus(userError(error));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
+                >
+                  Save answer as memory
                 </button>
               )}
               {classId && (

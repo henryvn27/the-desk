@@ -113,6 +113,12 @@ try {
     .click();
   await lens.getByText("Lens answer saved as a source.", { exact: true }).waitFor();
   await lens
+    .getByRole("button", { name: "Save answer as memory", exact: true })
+    .click();
+  await lens
+    .getByText("Lens answer saved as explicit memory.", { exact: true })
+    .waitFor();
+  await lens
     .getByRole("button", { name: "Create follow-up task", exact: true })
     .click();
   await lens.getByText("Lens follow-up task created.", { exact: true }).waitFor();
@@ -129,6 +135,7 @@ try {
   const source = snapshot.sources.at(-1);
   const task = snapshot.tasks.find((item) => item.title === "Review force balance");
   const followUp = snapshot.tasks.find((item) => item.title === "Review Lens answer");
+  const memory = snapshot.memories.at(-1);
   const [requests, openedResources] = await app.evaluate(() => [
     globalThis.lensRequests,
     globalThis.openedResources,
@@ -142,6 +149,11 @@ try {
   assert.ok(followUp);
   assert.equal(followUp.workKind, "optional-review");
   assert.equal(followUp.notes, source.text);
+  assert.ok(memory);
+  assert.equal(memory.origin, "explicit");
+  assert.equal(memory.category, "other");
+  assert.equal(memory.text, source.text);
+  assert.equal(memory.classId, task.classId);
   assert.deepEqual(source.classIds, [task.classId]);
   assert.deepEqual(source.taskIds, [task.id]);
   assert.deepEqual(openedResources, ["https://example.edu/force-balance"]);
@@ -154,7 +166,7 @@ try {
   if (video) await copyFile(await video.path(), join(output, "lens-actions-operated.webm"));
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: synthetic Lens response exposes explicit linked-source and HTTPS resource actions; source links persist to the active class/task; no provider or arbitrary action is inferred.",
+    "PASS: synthetic Lens response exposes explicit source, memory, follow-up-task and HTTPS resource actions; saved records persist to the active class/task; no provider or arbitrary action is inferred.",
   );
 } finally {
   if (app) await app.close();

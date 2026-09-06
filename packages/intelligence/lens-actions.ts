@@ -1,9 +1,22 @@
 import {
+  memoryInput,
   sourceInput,
   taskInput,
   type SourceInput,
   type TaskInput,
+  type AcademicMemory,
 } from "../domain/contracts";
+
+export function lensAnswerMemoryInput(
+  answer: string,
+  classId: string,
+): Pick<AcademicMemory, "text" | "category" | "classId"> {
+  return memoryInput.parse({
+    text: answer,
+    category: "other",
+    classId,
+  });
+}
 
 export function lensAnswerSourceInput(
   answer: string,
