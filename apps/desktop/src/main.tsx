@@ -33,6 +33,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  tutoringMode: "balanced",
   capturePolicy: "balanced",
   captureInbox: [],
   planningMode: "auto-plan",
@@ -280,6 +281,8 @@ function App() {
   if (kind === "lens")
     return (
       <Lens
+        tutoringMode={data.tutoringMode}
+        saveTutoringMode={(mode) => act({ type: "tutor.mode", mode }, true)}
         title={activeTask?.title ?? "No active study context"}
         className={
           data.classes.find((c) => c.id === activeTask?.classId)?.name ?? ""

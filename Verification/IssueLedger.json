@@ -69,6 +69,14 @@
       "status": "open",
       "evidence": "Installed macOS menu smoke passed with repeated Undo selection followed by Redo; first selection did not change stored scene.",
       "notes": "Menu callbacks now use the supplied window. Distinguish automation activation from product focus behavior before closing. Windows interactive menu behavior remains unverified."
+    },
+    {
+      "id": "QA-LENS-003",
+      "area": "Lens",
+      "title": "Internal provider-error class leaked into visible rejection",
+      "severity": "low",
+      "status": "verified",
+      "evidence": "Synthetic installed tutoring smoke reproduced LensProviderError prefix. Shared userError now strips it; exact friendly rejection assertion passes."
     }
   ]
 }

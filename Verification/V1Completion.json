@@ -663,14 +663,14 @@
         "Allow explaining, hinting, teaching, analogous examples, attempt checks, and a full method when explicitly requested.",
         "Never autonomously type final answers into submitted work, submit assignments, send teacher messages, or perform academic work as the student."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "Saved Guide/Balanced/Direct modes, trusted-main teaching instructions, strict provider action rejection; no external-action tools.",
+      "automated": "88 checks pass including mode persistence, renderer override rejection and provider tool/function/output-action rejection.",
+      "live": "Synthetic provider responses only; no successful live OpenRouter response.",
+      "mac": "Unsigned installed synthetic tutoring smoke passes mode selection, request policy, friendly rejection, zero task creation and restart; screenshot/video inspected.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Class-source grounding and live teaching quality remain unverified; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
     },
     {
       "id": "VOICE-001",
@@ -811,14 +811,14 @@
         "Provide Guide me, Balanced (default), and Explain directly modes.",
         "Prefer teacher/class material, assigned textbook, trusted educational source, then general web; distinguish class facts from supporting explanations and allow another explanation."
       ],
-      "status": "UNIMPLEMENTED",
-      "verification": "UNVERIFIED",
-      "implementation": null,
-      "automated": null,
-      "live": null,
-      "mac": null,
+      "status": "IN_PROGRESS",
+      "verification": "PARTIAL",
+      "implementation": "Saved Guide/Balanced/Direct modes, trusted-main teaching instructions, strict provider action rejection; no external-action tools.",
+      "automated": "88 checks pass including mode persistence, renderer override rejection and provider tool/function/output-action rejection.",
+      "live": "Synthetic provider responses only; no successful live OpenRouter response.",
+      "mac": "Unsigned installed synthetic tutoring smoke passes mode selection, request policy, friendly rejection, zero task creation and restart; screenshot/video inspected.",
       "windows": "Hosted checks/build/directory package pass at effd09b (run 33997130565); no requirement-specific Windows UI proof.",
-      "blocker": "No V1 implementation or verification evidence recorded."
+      "blocker": "Class-source grounding and live teaching quality remain unverified; OpenRouter HTTP 401 requires external credential/account change. Windows interactive proof remains open."
     },
     {
       "id": "MEMORY-001",

@@ -1,3 +1,4 @@
+import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
 import { z } from "zod";
@@ -206,6 +207,7 @@ export type CaptureInboxItem = {
   updatedAt: string;
 };
 export type Snapshot = {
+  tutoringMode: TutoringMode;
   capturePolicy: CapturePolicy;
   captureInbox: CaptureInboxItem[];
   planningMode: PlanningMode;
@@ -221,6 +223,7 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("tutor.mode"), mode: tutoringMode }),
   z.object({ type: z.literal("capture.policy"), mode: capturePolicy }),
   z.object({
     type: z.literal("inbox.import"),

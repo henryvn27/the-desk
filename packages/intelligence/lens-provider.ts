@@ -1,5 +1,15 @@
+import {
+  teachingInstructions,
+  tutoringMode,
+  type TutoringMode,
+} from "./tutoring";
 import { z } from "zod";
-import { APPROVED_MODELS, CANONICAL_MODELS, inferenceRoute, type RoutingTier } from "./routing";
+import {
+  APPROVED_MODELS,
+  CANONICAL_MODELS,
+  inferenceRoute,
+  type RoutingTier,
+} from "./routing";
 
 export const LENS_MODEL = "openai/gpt-5.6-terra" as const;
 export const LENS_TIMEOUT_MS = 45_000;
@@ -144,6 +154,7 @@ export type LensTelemetryEvent = {
 };
 
 export type AskLensOptions = {
+  tutoringMode?: TutoringMode;
   tier?: RoutingTier;
   fetch?: typeof fetch;
   signal?: AbortSignal;
@@ -211,6 +222,7 @@ export async function askLens(
       "An OpenRouter API key is required.",
     );
 
+  const teachingMode = tutoringMode.parse(options.tutoringMode ?? "balanced");
   const route = inferenceRoute(
     options.tier ?? (input.imageDataUrl ? "MULTIMODAL" : "STANDARD"),
   );
@@ -256,7 +268,9 @@ export async function askLens(
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(buildRequest(parsedInput.data, route)),
+        body: JSON.stringify(
+          buildRequest(parsedInput.data, route, teachingMode),
+        ),
         signal: controller.signal,
       },
     );
@@ -333,6 +347,7 @@ export async function askLens(
 function buildRequest(
   input: LensInput,
   route: ReturnType<typeof inferenceRoute>,
+  mode: TutoringMode,
 ) {
   const content: Array<Record<string, unknown>> = [
     {
@@ -350,7 +365,10 @@ function buildRequest(
     ...route,
     stream: false,
     messages: [
-      { role: "system", content: INSTRUCTIONS },
+      {
+        role: "system",
+        content: INSTRUCTIONS + "\n\n" + teachingInstructions(mode),
+      },
       ...(input.history ?? []).map((turn) => ({
         role: turn.role,
         content: turn.content,
@@ -387,6 +405,17 @@ function parseModelOutput(
   const choice = Array.isArray(envelope.choices)
     ? envelope.choices[0]
     : undefined;
+  const toolCalls = choice?.message?.tool_calls;
+  if (
+    (toolCalls != null &&
+      (!Array.isArray(toolCalls) || toolCalls.length > 0)) ||
+    choice?.message?.function_call != null
+  )
+    throw new LensProviderError(
+      "malformed_response",
+      "Lens does not accept provider actions.",
+      status,
+    );
   if (choice?.finish_reason === "length")
     throw new LensProviderError(
       "incomplete",

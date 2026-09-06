@@ -1,3 +1,4 @@
+import { tutoringMode } from "../intelligence/tutoring";
 import { decideCapture } from "../intelligence/capture-policy";
 import { interpretCapture } from "../intelligence/capture";
 import { planWeek } from "../planner";
@@ -34,7 +35,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 20) {
+    if (version > 21) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -94,6 +95,7 @@ export class DeskStore {
       );
     if (version <= 18) this.db.exec("BEGIN; PRAGMA user_version=19; COMMIT;");
     if (version <= 19) this.db.exec("BEGIN; PRAGMA user_version=20; COMMIT;");
+    if (version <= 20) this.db.exec("BEGIN; PRAGMA user_version=21; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -159,6 +161,15 @@ export class DeskStore {
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      tutoringMode: tutoringMode.parse(
+        JSON.parse(
+          String(
+            this.db
+              .prepare("SELECT data FROM settings WHERE id='tutor-mode'")
+              .get()?.data ?? '"balanced"',
+          ),
+        ),
+      ),
       capturePolicy: capturePolicy.parse(
         JSON.parse(
           String(
@@ -233,6 +244,14 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "tutor.mode") {
+        entityId = "tutor-mode";
+        this.db
+          .prepare(
+            "INSERT INTO settings VALUES('tutor-mode',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(JSON.stringify(c.mode));
+      }
       if (c.type === "capture.policy") {
         entityId = "capture-policy";
         this.db

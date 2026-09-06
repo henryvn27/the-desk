@@ -233,6 +233,7 @@ app.whenReady().then(() => {
     lensRequest = new AbortController();
     try {
       return await askLens(input, key, {
+        tutoringMode: snapshot.tutoringMode,
         signal: lensRequest.signal,
         onTelemetry: (event) => store.recordAI(event, active?.id ?? null),
       });

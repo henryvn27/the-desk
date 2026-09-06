@@ -1,3 +1,4 @@
+import type { TutoringMode } from "../../../packages/intelligence/tutoring";
 import { userError } from "./errors";
 import { useState } from "react";
 import type {
@@ -8,10 +9,15 @@ type Point = { x: number; y: number };
 export function Lens({
   title,
   className,
+  tutoringMode,
+  saveTutoringMode,
 }: {
+  tutoringMode: TutoringMode;
+  saveTutoringMode: (mode: TutoringMode) => Promise<unknown>;
   title: string;
   className: string;
 }) {
+  const [savingMode, setSavingMode] = useState(false);
   const [paths, setPaths] = useState<Point[][]>([]),
     [drawing, setDrawing] = useState(false),
     [mode, setMode] = useState<"freehand" | "box" | "click">("freehand");
@@ -262,6 +268,30 @@ export function Lens({
           }}
         >
           <label>
+            Tutoring mode
+            <select
+              aria-label="Tutoring mode"
+              value={tutoringMode}
+              disabled={busy || savingMode}
+              onChange={async (e) => {
+                setSavingMode(true);
+                setStatus("");
+                try {
+                  await saveTutoringMode(e.target.value as TutoringMode);
+                  setStatus("Tutoring mode saved.");
+                } catch (error) {
+                  setStatus(userError(error));
+                } finally {
+                  setSavingMode(false);
+                }
+              }}
+            >
+              <option value="guide">Guide me</option>
+              <option value="balanced">Balanced</option>
+              <option value="direct">Explain directly</option>
+            </select>
+          </label>
+          <label>
             Ask The Desk
             <input
               value={question}
@@ -272,7 +302,10 @@ export function Lens({
             />
           </label>
           <div className="actions">
-            <button className="primary" disabled={busy || !question.trim()}>
+            <button
+              className="primary"
+              disabled={busy || savingMode || !question.trim()}
+            >
               {busy ? "Thinking…" : "Ask"}
             </button>
             <button type="button" onClick={() => void window.desk.dismiss()}>

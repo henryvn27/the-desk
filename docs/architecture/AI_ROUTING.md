@@ -36,3 +36,6 @@ Primary references:
 - https://openrouter.ai/docs/cookbook/administration/usage-accounting
 - https://openrouter.ai/docs/guides/privacy/data-collection
 - https://openrouter.ai/docs/guides/features/input-output-logging
+
+
+Lens now applies saved Guide me, Balanced (default), or Explain directly teaching instructions in the trusted main process. Explicit full-method requests remain allowed in every mode. Provider tool_calls/function_call payloads and extraneous output actions are rejected; no tools are offered. These are request and response boundaries, not proof that a model follows the pedagogy. Class-source retrieval and teaching-quality evaluation remain open; live OpenRouter authentication still returns HTTP 401 and was not retried.
