@@ -26,6 +26,10 @@ async function launch() {
 }
 try {
   await launch();
+  // The manual reserve/drag suite intentionally uses Suggest mode.
+  await page.evaluate(() =>
+    window.desk.command({ type: "planning.mode", mode: "suggest" }),
+  );
   await page.getByLabel("Class name", { exact: true }).fill("Physics");
   await page.getByRole("button", { name: "Add class", exact: true }).click();
   await page.getByRole("button", { name: "Physics", exact: true }).waitFor();
@@ -264,7 +268,7 @@ try {
   app = undefined;
   await launch();
   await page.getByRole("button", { name: "Plan", exact: true }).click();
-  await page.getByText("Rebalance history", { exact: true }).waitFor();
+  await page.getByText("Plan change history", { exact: true }).waitFor();
   assert.deepEqual(
     (await page.evaluate(() => window.desk.snapshot())).planChanges,
     rebalanced.planChanges,

@@ -27,6 +27,7 @@ declare global {
 }
 window.EXCALIDRAW_ASSET_PATH = location.origin + "/";
 const empty: Snapshot = {
+  planningMode: "auto-plan",
   gradeCategories: [],
   gradeEntries: [],
   planChanges: [],
@@ -451,6 +452,8 @@ function App() {
             <h1>Settings</h1>
             <PlanningSettings
               preferences={data.planning}
+              mode={data.planningMode}
+              saveMode={(mode) => act({ type: "planning.mode", mode }, true)}
               save={(input) =>
                 act({ type: "planning.preferences", input }, true)
               }

@@ -29,7 +29,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 12) {
+    if (version > 13) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -78,6 +78,7 @@ export class DeskStore {
       CREATE TABLE grade_entries(id TEXT PRIMARY KEY,category_id TEXT NOT NULL REFERENCES grade_categories(id),data TEXT NOT NULL);
       PRAGMA user_version=11; COMMIT;`);
     if (version <= 11) this.db.exec("BEGIN; PRAGMA user_version=12; COMMIT;");
+    if (version <= 12) this.db.exec("BEGIN; PRAGMA user_version=13; COMMIT;");
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -120,6 +121,7 @@ export class DeskStore {
       state.tasks,
       state.studyBlocks,
       state.planning,
+      state.planningMode,
       state.sessions,
       state.gradeCategories,
       state.gradeEntries,
@@ -131,12 +133,18 @@ export class DeskStore {
       .run(randomUUID(), "local", sessionId, "lens", JSON.stringify(event));
   }
   snapshot(): Snapshot {
+    const mode = this.db
+      .prepare("SELECT data FROM settings WHERE id='planning-mode'")
+      .get()?.data;
+    if (mode !== undefined && mode !== '"suggest"' && mode !== '"auto-plan"')
+      throw Error("Stored planning mode is invalid.");
     const classLinks = this.db.prepare("SELECT * FROM source_classes").all();
     const taskLinks = this.db.prepare("SELECT * FROM source_tasks").all();
     const settings = this.db
       .prepare("SELECT data FROM settings WHERE id='planning'")
       .get();
     return {
+      planningMode: mode === '"suggest"' ? "suggest" : "auto-plan",
       gradeCategories: this.db
         .prepare("SELECT data FROM grade_categories")
         .all()
@@ -197,6 +205,14 @@ export class DeskStore {
       const state = this.snapshot();
       const active = state.sessions.find((s) => !s.endedAt);
       let entityId = "";
+      if (c.type === "planning.mode") {
+        entityId = "planning-mode";
+        this.db
+          .prepare(
+            "INSERT INTO settings VALUES('planning-mode',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(JSON.stringify(c.mode));
+      }
       if (c.type === "grade.category") {
         if (!state.classes.some((course) => course.id === c.input.classId))
           throw Error("Class no longer exists.");
@@ -389,6 +405,7 @@ export class DeskStore {
           minutes: c.input.minutes,
           why: existing?.why ?? "Time reserved by you.",
           locked: c.type === "block.update" ? c.locked : false,
+          origin: "manual",
           revision: (existing?.revision ?? -1) + 1,
           createdAt: existing?.createdAt ?? timestamp,
           updatedAt: timestamp,
@@ -513,6 +530,50 @@ export class DeskStore {
         this.db
           .prepare("INSERT INTO tasks VALUES(?,?,?)")
           .run(entityId, task.classId, JSON.stringify(task));
+        if (
+          state.planningMode === "auto-plan" &&
+          !active &&
+          task.deadlineConfirmed
+        ) {
+          const result = planWeek(
+            [task],
+            new Date(+now + 180000),
+            state.planning,
+            state.studyBlocks,
+            state,
+          );
+          const added: StudyBlock[] = result.blocks.map((block) => ({
+            ...block,
+            id: randomUUID(),
+            origin: "auto-plan",
+            locked: false,
+            revision: 0,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          }));
+          for (const block of added) {
+            this.db
+              .prepare("INSERT INTO study_blocks VALUES(?,?,?)")
+              .run(block.id, block.taskId, JSON.stringify(block));
+            this.queue(block.id, "block.auto-plan", timestamp);
+          }
+          if (added.length) {
+            const change: PlanChange = {
+              id: randomUUID(),
+              createdAt: timestamp,
+              expiresAt: timestamp,
+              appliedAt: timestamp,
+              reason: `Auto-plan: ${task.title}`,
+              added,
+              replaced: [],
+              kept: [],
+              unscheduled: result.unscheduled,
+            };
+            this.db
+              .prepare("INSERT INTO plan_changes VALUES(?,?,?)")
+              .run(change.id, timestamp, JSON.stringify(change));
+          }
+        }
       }
       if (c.type === "task.update") {
         const existing = state.tasks.find((t) => t.id === c.id);
@@ -535,13 +596,23 @@ export class DeskStore {
           .run(updated.classId, JSON.stringify(updated), existing.id);
       }
       if (c.type === "task.undo") {
-        if (state.studyBlocks.some((b) => b.taskId === c.id))
+        const taskBlocks = state.studyBlocks.filter((b) => b.taskId === c.id);
+        if (
+          taskBlocks.some(
+            (b) =>
+              b.origin !== "auto-plan" ||
+              b.revision !== 0 ||
+              b.locked ||
+              b.cancelledAt,
+          )
+        )
           throw Error("This task has saved study blocks and cannot be undone.");
         if (state.sessions.some((s) => s.taskId === c.id))
           throw Error("This task has study history and cannot be undone.");
         if (!state.tasks.some((t) => t.id === c.id))
           throw Error("Task no longer exists.");
         entityId = c.id;
+        this.db.prepare("DELETE FROM study_blocks WHERE task_id=?").run(c.id);
         this.db.prepare("DELETE FROM tasks WHERE id=?").run(c.id);
       }
       if (c.type === "session.start") {

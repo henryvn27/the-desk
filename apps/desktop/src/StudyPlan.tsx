@@ -84,6 +84,11 @@ export function StudyPlan({
   return (
     <>
       <h1>Your plan</h1>
+      <p>
+        {data.planningMode === "auto-plan"
+          ? "Auto-plan reserves time for newly captured work. Existing commitments stay in place."
+          : "Suggest mode: reserve proposed time when you are ready."}
+      </p>
       <p className="muted">
         Next seven days · {data.planning.studyStart}–{data.planning.sleepCutoff}{" "}
         local time · {data.planning.bufferPercent}% breathing room

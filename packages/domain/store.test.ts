@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 12);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 13);
     assert.equal(
       check.prepare("SELECT COUNT(*) AS n FROM ai_runs").get()!.n,
       0,
@@ -449,6 +449,8 @@ test("saved blocks survive restart and reject conflicting, stale, locked, and la
   const path = join(directory, "test.sqlite");
   let store = new DeskStore(path);
   const now = new Date("2026-09-05T08:00:00Z");
+  // This fixture exercises manual commitments; Auto-plan is tested separately.
+  store.execute({ type: "planning.mode", mode: "suggest" });
   try {
     const classId = store.execute(
       { type: "class.create", name: "Physics" },
@@ -601,6 +603,8 @@ test("rebalance previews are atomic, stale-safe, expire, and retain locks and hi
   const path = join(directory, "test.sqlite");
   let store = new DeskStore(path);
   const now = new Date(2026, 8, 7, 8);
+  // This fixture exercises manual commitments; Auto-plan is tested separately.
+  store.execute({ type: "planning.mode", mode: "suggest" });
   try {
     const classId = store.execute(
       { type: "class.create", name: "Physics" },
@@ -872,5 +876,104 @@ test("assignment grade links reject cross-class context and grade changes invali
     );
   } finally {
     store.close();
+  }
+});
+
+test("Auto-plan defaults on, preserves commitments, and capture undo only removes untouched automatic blocks", () => {
+  const store = new DeskStore(":memory:");
+  const now = new Date(2026, 8, 7, 8);
+  try {
+    const classId = store.execute(
+      { type: "class.create", name: "Physics" },
+      now,
+    ).classes[0]!.id;
+    const input = {
+      title: "Problems",
+      classId,
+      minutes: 30,
+      dueAt: null,
+      deadlineConfirmed: true,
+      resource: null,
+      notes: "",
+    };
+    const first = store.execute({ type: "task.create", input }, now);
+    assert.equal(first.planningMode, "auto-plan");
+    assert.equal(first.studyBlocks.length, 1);
+    assert.equal(first.studyBlocks[0]!.origin, "auto-plan");
+    assert.match(first.planChanges[0]!.reason!, /Auto-plan/);
+    const second = store.execute(
+      { type: "task.create", input: { ...input, title: "Corrections" } },
+      now,
+    );
+    assert.deepEqual(
+      second.studyBlocks.find((b) => b.id === first.studyBlocks[0]!.id),
+      first.studyBlocks[0],
+    );
+    assert.ok(
+      Date.parse(second.studyBlocks[1]!.start) >=
+        Date.parse(second.studyBlocks[0]!.end),
+    );
+    store.execute({ type: "task.undo", id: first.tasks[0]!.id }, now);
+    assert.equal(store.snapshot().studyBlocks.length, 1);
+    const block = store.snapshot().studyBlocks[0]!;
+    store.execute(
+      {
+        type: "block.update",
+        id: block.id,
+        revision: block.revision,
+        input: { start: block.start, minutes: block.minutes },
+        locked: true,
+        lockedChangeApproved: false,
+        beyondDeadlineApproved: false,
+      },
+      now,
+    );
+    assert.throws(
+      () => store.execute({ type: "task.undo", id: block.taskId }, now),
+      /saved study blocks/,
+    );
+  } finally {
+    store.close();
+  }
+});
+test("Suggest mode persists without moving existing blocks, and active/uncertain work is not auto-reserved", () => {
+  const dir = mkdtempSync(join(tmpdir(), "desk-mode-"));
+  const path = join(dir, "test.sqlite");
+  let store = new DeskStore(path);
+  const now = new Date(2026, 8, 7, 8);
+  try {
+    const classId = store.execute(
+      { type: "class.create", name: "Physics" },
+      now,
+    ).classes[0]!.id;
+    const input = {
+      title: "Problems",
+      classId,
+      minutes: 30,
+      dueAt: null,
+      deadlineConfirmed: true,
+      resource: null,
+      notes: "",
+    };
+    const first = store.execute({ type: "task.create", input }, now);
+    store.execute({ type: "planning.mode", mode: "suggest" }, now);
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(store.snapshot().planningMode, "suggest");
+    assert.deepEqual(store.snapshot().studyBlocks, first.studyBlocks);
+    store.execute({ type: "task.create", input }, now);
+    assert.equal(store.snapshot().studyBlocks.length, 1);
+    store.execute({ type: "planning.mode", mode: "auto-plan" }, now);
+    store.execute(
+      { type: "task.create", input: { ...input, deadlineConfirmed: false } },
+      now,
+    );
+    assert.equal(store.snapshot().studyBlocks.length, 1);
+    store.execute({ type: "session.start", taskId: first.tasks[0]!.id }, now);
+    store.execute({ type: "task.create", input }, now);
+    assert.equal(store.snapshot().studyBlocks.length, 1);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true });
   }
 });

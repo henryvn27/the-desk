@@ -116,10 +116,11 @@ export function Rebalance({
       <p role="status">{status}</p>
       {!!data.planChanges.length && (
         <details>
-          <summary>Rebalance history</summary>
+          <summary>Plan change history</summary>
           {data.planChanges.map((change) => (
             <details key={change.id}>
               <summary>
+                {change.reason ?? "Approved rebalance"} ·{" "}
                 {new Date(change.appliedAt).toLocaleString()} ·{" "}
                 {change.replaced.length} released, {change.added.length} added
               </summary>

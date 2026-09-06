@@ -119,6 +119,7 @@ export const studyBlockTime = z.object({
   minutes: z.number().int().min(5).max(2400),
 });
 export type StudyBlock = Block & {
+  origin?: "auto-plan" | "manual";
   cancelledAt?: string;
   id: string;
   locked: boolean;
@@ -135,7 +136,10 @@ export type RebalancePreview = {
   kept: StudyBlock[];
   unscheduled: { taskId: string; minutes: number; reason: string }[];
 };
-export type PlanChange = RebalancePreview & { appliedAt: string };
+export type PlanChange = RebalancePreview & {
+  appliedAt: string;
+  reason?: string;
+};
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const planningPreferences = z
   .object({
@@ -155,7 +159,9 @@ export const defaultPlanningPreferences: PlanningPreferences = {
   studyDays: [0, 1, 2, 3, 4, 5, 6],
   bufferPercent: 15,
 };
+export type PlanningMode = "suggest" | "auto-plan";
 export type Snapshot = {
+  planningMode: PlanningMode;
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
   planChanges: PlanChange[];
@@ -168,6 +174,10 @@ export type Snapshot = {
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("planning.mode"),
+    mode: z.enum(["suggest", "auto-plan"]),
+  }),
   z.object({
     type: z.literal("grade.category"),
     id: id.optional(),
