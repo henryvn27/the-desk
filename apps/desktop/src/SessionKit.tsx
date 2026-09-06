@@ -129,13 +129,32 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {kit.attempts.length > 0 && (
+        <div>
+          <h4>Recent attempts</h4>
+          <p className="muted">
+            Explicitly recorded work linked to this assignment.
+          </p>
+          {kit.attempts.map((attempt) => (
+            <p key={attempt.id}>
+              {new Date(attempt.attemptedAt).toLocaleString()} ·{" "}
+              {attempt.result.replace("-", " ")} ·{" "}
+              {attempt.unaided
+                ? "unaided"
+                : String(attempt.hintCount) + " hints"}
+              {attempt.notes && <> · {attempt.notes}</>}
+            </p>
+          ))}
+        </div>
+      )}
       {!task.resource &&
         !task.notes &&
         !kit.linkedSources.length &&
         !kit.classSources.length &&
         !kit.previousReviews.length &&
         !kit.mistakes.length &&
-        !kit.concepts.length && (
+        !kit.concepts.length &&
+        !kit.attempts.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source
             in Library.

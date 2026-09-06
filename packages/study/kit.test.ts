@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
   Concept,
+  Attempt,
   Mistake,
   Task,
   Source,
@@ -179,5 +180,44 @@ test("session kit includes linked or weak same-class concepts and excludes unrel
       (concept) => concept.id,
     ),
     ["linked-concept", "weak-concept"],
+  );
+});
+
+test("session kit includes recent attempts linked to the assignment", () => {
+  const attempts: Attempt[] = [
+    {
+      id: "linked-attempt",
+      classId: task.classId,
+      taskId: task.id,
+      conceptIds: [],
+      result: "partial",
+      unaided: false,
+      hintCount: 2,
+      notes: "Needed a sign hint.",
+      attemptedAt: "2026-09-05T13:00:00Z",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "other-task-attempt",
+      classId: task.classId,
+      taskId: "other",
+      conceptIds: [],
+      result: "correct",
+      unaided: true,
+      hintCount: 0,
+      notes: "",
+      attemptedAt: "2026-09-05T14:00:00Z",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  assert.deepEqual(
+    sessionKit(task, { sources: [], sessions: [], attempts }).attempts.map(
+      (attempt) => attempt.id,
+    ),
+    ["linked-attempt"],
   );
 });

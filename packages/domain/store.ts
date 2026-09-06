@@ -28,6 +28,7 @@ import {
   type CanvasRecord,
   type Mistake,
   type Concept,
+  type Attempt,
 } from "./contracts";
 export class DeskStore {
   private db: DatabaseSync;
@@ -38,7 +39,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 27) {
+    if (version > 28) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -117,6 +118,10 @@ export class DeskStore {
       this.db.exec(
         "BEGIN; CREATE TABLE IF NOT EXISTS concepts(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=27; COMMIT;",
       );
+    if (version <= 27)
+      this.db.exec(
+        "BEGIN; CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,data TEXT NOT NULL); PRAGMA user_version=28; COMMIT;",
+      );
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -165,6 +170,7 @@ export class DeskStore {
       state.gradeEntries,
       state.mistakes,
       state.concepts,
+      state.attempts,
     ]);
   }
   recordAI(event: LensTelemetryEvent, sessionId: string | null) {
@@ -234,6 +240,10 @@ export class DeskStore {
         .prepare("SELECT data FROM concepts ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as Concept),
+      attempts: this.db
+        .prepare("SELECT data FROM attempts ORDER BY rowid")
+        .all()
+        .map((row) => JSON.parse(row.data as string) as Attempt),
       planChanges: this.db
         .prepare(
           "SELECT data FROM plan_changes ORDER BY appliedAt DESC,rowid DESC LIMIT 50",
@@ -817,6 +827,117 @@ export class DeskStore {
               "INSERT INTO concepts VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
             )
             .run(entityId, JSON.stringify(concept));
+        }
+      }
+      if (
+        c.type === "attempt.create" ||
+        c.type === "attempt.update" ||
+        c.type === "attempt.forget"
+      ) {
+        const previous =
+          c.type === "attempt.create"
+            ? undefined
+            : state.attempts.find((attempt) => attempt.id === c.id);
+        if (
+          c.type !== "attempt.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This attempt changed elsewhere. Reopen it before saving.",
+          );
+        const input = c.type === "attempt.forget" ? undefined : c.input;
+        const classId = input?.classId ?? previous?.classId;
+        if (!classId || !state.classes.some((course) => course.id === classId))
+          throw Error("Choose an existing class for this attempt.");
+        const taskId = input ? input.taskId : (previous?.taskId ?? null);
+        if (
+          taskId &&
+          !state.tasks.some(
+            (task) => task.id === taskId && task.classId === classId,
+          )
+        )
+          throw Error("The linked task must belong to the selected class.");
+        const conceptIds = [
+          ...new Set(input?.conceptIds ?? previous?.conceptIds ?? []),
+        ];
+        if (
+          conceptIds.some(
+            (conceptId) =>
+              !state.concepts.some(
+                (concept) =>
+                  concept.id === conceptId && concept.classId === classId,
+              ),
+          )
+        )
+          throw Error(
+            "Every linked concept must belong to the selected class.",
+          );
+        const conceptEdits = new Map(
+          state.concepts.map((concept) => [concept.id, { ...concept }]),
+        );
+        const dirtyConcepts = new Set<string>();
+        const applyDelta = (attempt: Attempt, direction: 1 | -1) => {
+          const ids = new Set(attempt.conceptIds);
+          for (const conceptId of ids) {
+            const concept = conceptEdits.get(conceptId);
+            if (!concept) continue;
+            concept.attempts = Math.max(0, concept.attempts + direction);
+            if (attempt.unaided) {
+              concept.unaidedTotal = Math.max(
+                0,
+                concept.unaidedTotal + direction,
+              );
+              if (attempt.result === "correct")
+                concept.unaidedCorrect = Math.max(
+                  0,
+                  concept.unaidedCorrect + direction,
+                );
+            }
+            concept.hintCount = Math.max(
+              0,
+              concept.hintCount + direction * attempt.hintCount,
+            );
+            if (direction === 1) {
+              if (
+                !concept.lastReviewedAt ||
+                Date.parse(attempt.attemptedAt) >
+                  Date.parse(concept.lastReviewedAt)
+              )
+                concept.lastReviewedAt = attempt.attemptedAt;
+            } else if (concept.lastReviewedAt === attempt.attemptedAt) {
+              concept.lastReviewedAt = null;
+            }
+            concept.revision += 1;
+            concept.updatedAt = timestamp;
+            dirtyConcepts.add(concept.id);
+          }
+        };
+        if (previous) applyDelta(previous, -1);
+        if (input) {
+          const normalized: Attempt = {
+            ...input,
+            conceptIds,
+            id: previous?.id ?? randomUUID(),
+            revision: (previous?.revision ?? -1) + 1,
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          applyDelta(normalized, 1);
+          this.db
+            .prepare(
+              "INSERT INTO attempts VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(normalized.id, JSON.stringify(normalized));
+          entityId = normalized.id;
+        } else {
+          this.db.prepare("DELETE FROM attempts WHERE id=?").run(previous!.id);
+          entityId = previous!.id;
+        }
+        for (const conceptId of dirtyConcepts) {
+          const concept = conceptEdits.get(conceptId)!;
+          this.db
+            .prepare("UPDATE concepts SET data=? WHERE id=?")
+            .run(JSON.stringify(concept), concept.id);
         }
       }
       if (c.type === "memory.confirm") {

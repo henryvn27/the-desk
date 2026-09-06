@@ -303,6 +303,38 @@ export type Concept = ConceptInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const attemptResult = z.enum([
+  "correct",
+  "incorrect",
+  "partial",
+  "unknown",
+]);
+export const attemptInput = z
+  .object({
+    classId: id,
+    taskId: id.nullable(),
+    conceptIds: z.array(id).max(100),
+    result: attemptResult,
+    unaided: z.boolean(),
+    hintCount: z.number().int().min(0).max(10000),
+    notes: z.string().trim().max(5000),
+    attemptedAt: z.iso.datetime(),
+  })
+  .superRefine((input, ctx) => {
+    if (!input.unaided && input.hintCount === 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["hintCount"],
+        message: "Record at least one hint when an attempt was aided.",
+      });
+  });
+export type AttemptInput = z.infer<typeof attemptInput>;
+export type Attempt = AttemptInput & {
+  id: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
 export type Snapshot = {
   mistakes: Mistake[];
   memories: AcademicMemory[];
@@ -314,6 +346,7 @@ export type Snapshot = {
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
   concepts: Concept[];
+  attempts: Attempt[];
   planChanges: PlanChange[];
   studyBlocks: StudyBlock[];
   canvases: Omit<CanvasRecord, "scene">[];
@@ -485,6 +518,18 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("concept.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("attempt.create"), input: attemptInput }),
+  z.object({
+    type: z.literal("attempt.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: attemptInput,
+  }),
+  z.object({
+    type: z.literal("attempt.forget"),
     id,
     revision: z.number().int().nonnegative(),
   }),

@@ -1,4 +1,10 @@
-import type { Concept, Mistake, Snapshot, Task } from "../domain/contracts";
+import type {
+  Attempt,
+  Concept,
+  Mistake,
+  Snapshot,
+  Task,
+} from "../domain/contracts";
 
 /** Explicit associations only; class-wide notes are distinct from assignment sources. */
 export function sessionKit(
@@ -6,6 +12,7 @@ export function sessionKit(
   state: Pick<Snapshot, "sources" | "sessions"> & {
     mistakes?: Mistake[];
     concepts?: Concept[];
+    attempts?: Attempt[];
   },
 ) {
   const linkedSources = state.sources.filter((source) =>
@@ -53,5 +60,23 @@ export function sessionKit(
           (b.reviewDue ? Date.parse(b.reviewDue) : Infinity) ||
         a.name.localeCompare(b.name),
     );
-  return { linkedSources, classSources, previousReviews, mistakes, concepts };
+  const attempts = [...(state.attempts ?? [])]
+    .filter(
+      (attempt) =>
+        attempt.classId === task.classId && attempt.taskId === task.id,
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(b.attemptedAt) - Date.parse(a.attemptedAt) ||
+        b.createdAt.localeCompare(a.createdAt),
+    )
+    .slice(0, 5);
+  return {
+    linkedSources,
+    classSources,
+    previousReviews,
+    mistakes,
+    concepts,
+    attempts,
+  };
 }
