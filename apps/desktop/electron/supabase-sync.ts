@@ -5,7 +5,9 @@ import {
   SupabaseSyncClient,
   syncPayloadEqual,
 } from "../../../packages/integrations/supabase-sync";
-import { SupabaseAccount } from "./supabase";
+import type { SupabaseAccount } from "./supabase";
+
+type SyncAccountBoundary = Pick<SupabaseAccount, "status" | "syncContext">;
 
 export class SupabaseSyncCoordinator {
   private timer: NodeJS.Timeout | undefined;
@@ -17,7 +19,7 @@ export class SupabaseSyncCoordinator {
 
   constructor(
     private readonly getStore: () => DeskStore,
-    private readonly account: SupabaseAccount,
+    private readonly account: SyncAccountBoundary,
   ) {}
 
   schedule() {
@@ -46,15 +48,21 @@ export class SupabaseSyncCoordinator {
     const account = this.account.status();
     const store = this.getStore();
     const snapshot = store.snapshot();
-    const phase = account.configured && account.authenticated ? this.phase : "disabled";
+    const unresolvedConflicts = snapshot.syncConflicts.filter(
+      (conflict) => conflict.resolution === "unresolved",
+    ).length;
+    const phase =
+      account.configured && account.authenticated
+        ? unresolvedConflicts > 0 && (this.phase === "disabled" || this.phase === "idle")
+          ? "conflict"
+          : this.phase
+        : "disabled";
     return {
       configured: account.configured,
       authenticated: account.authenticated,
       phase,
       queued: store.syncBatch(100).length,
-      unresolvedConflicts: snapshot.syncConflicts.filter(
-        (conflict) => conflict.resolution === "unresolved",
-      ).length,
+      unresolvedConflicts,
       lastSyncedAt: this.lastSyncedAt,
       lastError: this.lastError,
       uploaded: this.uploaded,
@@ -84,6 +92,7 @@ export class SupabaseSyncCoordinator {
     this.phase = "syncing";
     this.lastError = null;
     const client = new SupabaseSyncClient(context);
+    let conflictDetected = false;
     for (const envelope of batch) {
       const attemptedAt = new Date().toISOString();
       store.markSyncAttempt(envelope.id, attemptedAt);
@@ -102,6 +111,7 @@ export class SupabaseSyncCoordinator {
             localData: envelope.payload,
             remoteData: JSON.stringify(remote.payload),
           });
+          conflictDetected = true;
           continue;
         }
         if (!remote || remote.operation_id !== envelope.id) {
@@ -120,6 +130,6 @@ export class SupabaseSyncCoordinator {
         break;
       }
     }
-    if (this.phase === "syncing") this.phase = "synced";
+    if (this.phase === "syncing") this.phase = conflictDetected ? "conflict" : "synced";
   }
 }

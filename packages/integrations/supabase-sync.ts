@@ -23,6 +23,7 @@ export type DeskSyncPhase =
   | "idle"
   | "syncing"
   | "synced"
+  | "conflict"
   | "error";
 
 export type DeskSyncStatus = {

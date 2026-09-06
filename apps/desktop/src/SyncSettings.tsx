@@ -41,16 +41,13 @@ export function SyncSettings({
       setError(userError(caught));
     }
   }
-  const cloudLabel =
-    status.phase === "syncing"
-      ? "Cloud sync: syncing"
-      : status.phase === "synced"
-        ? "Cloud sync: ready"
-        : status.phase === "error"
-          ? "Cloud sync: unavailable"
-          : status.authenticated
-            ? "Cloud sync: connected"
-            : "Cloud sync: not connected";
+  let cloudLabel = status.authenticated
+    ? "Cloud sync: connected"
+    : "Cloud sync: not connected";
+  if (status.phase === "syncing") cloudLabel = "Cloud sync: syncing";
+  if (status.phase === "synced") cloudLabel = "Cloud sync: ready";
+  if (status.phase === "conflict") cloudLabel = "Cloud sync: conflict review";
+  if (status.phase === "error") cloudLabel = "Cloud sync: unavailable";
   return (
     <section>
       <h2>Local sync boundary</h2>
