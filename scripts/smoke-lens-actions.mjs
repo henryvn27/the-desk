@@ -112,6 +112,10 @@ try {
     .getByRole("button", { name: "Save answer as source", exact: true })
     .click();
   await lens.getByText("Lens answer saved as a source.", { exact: true }).waitFor();
+  await lens
+    .getByRole("button", { name: "Create follow-up task", exact: true })
+    .click();
+  await lens.getByText("Lens follow-up task created.", { exact: true }).waitFor();
   await app.evaluate(({ shell }) => {
     globalThis.openedResources = [];
     shell.openExternal = async (url) => {
@@ -123,7 +127,8 @@ try {
     .click();
   const snapshot = await page.evaluate(() => window.desk.snapshot());
   const source = snapshot.sources.at(-1);
-  const task = snapshot.tasks[0];
+  const task = snapshot.tasks.find((item) => item.title === "Review force balance");
+  const followUp = snapshot.tasks.find((item) => item.title === "Review Lens answer");
   const [requests, openedResources] = await app.evaluate(() => [
     globalThis.lensRequests,
     globalThis.openedResources,
@@ -133,6 +138,10 @@ try {
   assert.ok(source);
   assert.equal(source.title, "Lens answer");
   assert.equal(source.text, "Synthetic Lens answer: resolve the forces, then check the sign of each component.");
+  assert.ok(task);
+  assert.ok(followUp);
+  assert.equal(followUp.workKind, "optional-review");
+  assert.equal(followUp.notes, source.text);
   assert.deepEqual(source.classIds, [task.classId]);
   assert.deepEqual(source.taskIds, [task.id]);
   assert.deepEqual(openedResources, ["https://example.edu/force-balance"]);

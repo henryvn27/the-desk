@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { lensAnswerSourceInput } from "./lens-actions";
+import { lensAnswerSourceInput, lensFollowUpTaskInput } from "./lens-actions";
 
 test("Lens answer action creates a user-linked source payload", () => {
   const result = lensAnswerSourceInput(
@@ -12,4 +12,16 @@ test("Lens answer action creates a user-linked source payload", () => {
   assert.deepEqual(result.classIds, ["00000000-0000-4000-8000-000000000001"]);
   assert.deepEqual(result.taskIds, ["00000000-0000-4000-8000-000000000002"]);
   assert.equal(result.title, "Lens answer");
+});
+
+test("Lens follow-up action creates an explicit optional-review task payload", () => {
+  const result = lensFollowUpTaskInput(
+    "Review the sign of each component.",
+    "00000000-0000-4000-8000-000000000001",
+  );
+  assert.equal(result.title, "Review Lens answer");
+  assert.equal(result.workKind, "optional-review");
+  assert.equal(result.minutes, 15);
+  assert.equal(result.dueAt, null);
+  assert.equal(result.notes, "Review the sign of each component.");
 });

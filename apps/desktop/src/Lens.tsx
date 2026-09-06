@@ -6,7 +6,10 @@ import type {
   LensHistoryTurn,
 } from "../../../packages/intelligence/lens-provider";
 import type { Command } from "../../../packages/domain/contracts";
-import { lensAnswerSourceInput } from "../../../packages/intelligence/lens-actions";
+import {
+  lensAnswerSourceInput,
+  lensFollowUpTaskInput,
+} from "../../../packages/intelligence/lens-actions";
 type Point = { x: number; y: number };
 export function Lens({
   title,
@@ -296,6 +299,29 @@ export function Lens({
                   }}
                 >
                   Save answer as source
+                </button>
+              )}
+              {classId && (
+                <button
+                  type="button"
+                  disabled={actionBusy}
+                  onClick={async () => {
+                    setActionBusy(true);
+                    setStatus("");
+                    try {
+                      await save({
+                        type: "task.create",
+                        input: lensFollowUpTaskInput(answer, classId),
+                      });
+                      setStatus("Lens follow-up task created.");
+                    } catch (error) {
+                      setStatus(userError(error));
+                    } finally {
+                      setActionBusy(false);
+                    }
+                  }}
+                >
+                  Create follow-up task
                 </button>
               )}
               {taskId && taskResource && (
