@@ -18,6 +18,8 @@ import {
   type GradeCategory,
   type GradeEntry,
   type Assessment,
+  type AcademicPeriod,
+  type Space,
   type Track,
   type Unit,
   type Teacher,
@@ -46,7 +48,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 33) {
+    if (version > 34) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -152,6 +154,13 @@ export class DeskStore {
       CREATE TABLE IF NOT EXISTS tracks(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS units(id TEXT PRIMARY KEY,class_id TEXT NOT NULL REFERENCES classes(id),track_id TEXT REFERENCES tracks(id) ON DELETE SET NULL,data TEXT NOT NULL);
       PRAGMA user_version=33; COMMIT;`);
+    if (version <= 33)
+      this.db.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS academic_periods(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS period_classes(period_id TEXT NOT NULL REFERENCES academic_periods(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,PRIMARY KEY(period_id,class_id));
+      CREATE TABLE IF NOT EXISTS spaces(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS space_classes(space_id TEXT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,PRIMARY KEY(space_id,class_id));
+      PRAGMA user_version=34; COMMIT;`);
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -271,6 +280,32 @@ export class DeskStore {
         .prepare("SELECT data FROM assessments ORDER BY rowid")
         .all()
         .map((row) => JSON.parse(row.data as string) as Assessment),
+      academicPeriods: this.db
+        .prepare("SELECT data FROM academic_periods ORDER BY rowid")
+        .all()
+        .map((row) => {
+          const period = JSON.parse(row.data as string) as AcademicPeriod;
+          period.classIds = this.db
+            .prepare(
+              "SELECT class_id FROM period_classes WHERE period_id=? ORDER BY rowid",
+            )
+            .all(period.id)
+            .map((link) => link.class_id as string);
+          return period;
+        }),
+      spaces: this.db
+        .prepare("SELECT data FROM spaces ORDER BY rowid")
+        .all()
+        .map((row) => {
+          const space = JSON.parse(row.data as string) as Space;
+          space.classIds = this.db
+            .prepare(
+              "SELECT class_id FROM space_classes WHERE space_id=? ORDER BY rowid",
+            )
+            .all(space.id)
+            .map((link) => link.class_id as string);
+          return space;
+        }),
       tracks: this.db
         .prepare("SELECT data FROM tracks ORDER BY rowid")
         .all()
@@ -594,6 +629,140 @@ export class DeskStore {
             .run(entityId, assessment.classId, JSON.stringify(assessment));
         } else {
           this.db.prepare("DELETE FROM assessments WHERE id=?").run(entityId);
+        }
+      }
+      if (
+        c.type === "period.create" ||
+        c.type === "period.update" ||
+        c.type === "period.forget"
+      ) {
+        const previous =
+          c.type === "period.create"
+            ? undefined
+            : state.academicPeriods.find((period) => period.id === c.id);
+        if (
+          c.type !== "period.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error(
+            "This academic period changed elsewhere. Reopen it before saving.",
+          );
+        const input = c.type === "period.forget" ? undefined : c.input;
+        const classIds = [
+          ...new Set(input?.classIds ?? previous?.classIds ?? []),
+        ];
+        if (
+          input &&
+          classIds.some(
+            (classId) => !state.classes.some((course) => course.id === classId),
+          )
+        )
+          throw Error("Link this academic period only to existing classes.");
+        if (
+          input &&
+          state.academicPeriods.some(
+            (period) =>
+              period.id !== previous?.id &&
+              period.name.toLowerCase() === input.name.toLowerCase(),
+          )
+        )
+          throw Error("An academic period with this name already exists.");
+        if (previous && input === undefined && previous.classIds.length > 0)
+          throw Error(
+            "Unlink this academic period from its classes before forgetting it.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const period: AcademicPeriod = {
+            ...input,
+            classIds,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            authority: "user-entered",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO academic_periods VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(entityId, JSON.stringify(period));
+          this.db
+            .prepare("DELETE FROM period_classes WHERE period_id=?")
+            .run(entityId);
+          for (const classId of classIds)
+            this.db
+              .prepare("INSERT INTO period_classes VALUES(?,?)")
+              .run(entityId, classId);
+        } else {
+          this.db
+            .prepare("DELETE FROM academic_periods WHERE id=?")
+            .run(entityId);
+        }
+      }
+      if (
+        c.type === "space.create" ||
+        c.type === "space.update" ||
+        c.type === "space.forget"
+      ) {
+        const previous =
+          c.type === "space.create"
+            ? undefined
+            : state.spaces.find((space) => space.id === c.id);
+        if (
+          c.type !== "space.create" &&
+          (!previous || previous.revision !== c.revision)
+        )
+          throw Error("This space changed elsewhere. Reopen it before saving.");
+        const input = c.type === "space.forget" ? undefined : c.input;
+        const classIds = [
+          ...new Set(input?.classIds ?? previous?.classIds ?? []),
+        ];
+        if (
+          input &&
+          classIds.some(
+            (classId) => !state.classes.some((course) => course.id === classId),
+          )
+        )
+          throw Error("Link this space only to existing classes.");
+        if (
+          input &&
+          state.spaces.some(
+            (space) =>
+              space.id !== previous?.id &&
+              space.name.toLowerCase() === input.name.toLowerCase(),
+          )
+        )
+          throw Error("A space with this name already exists.");
+        if (previous && input === undefined && previous.classIds.length > 0)
+          throw Error(
+            "Unlink this space from its classes before forgetting it.",
+          );
+        entityId = previous?.id ?? randomUUID();
+        if (input) {
+          const space: Space = {
+            ...input,
+            classIds,
+            id: entityId,
+            revision: (previous?.revision ?? -1) + 1,
+            authority: "user-entered",
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          };
+          this.db
+            .prepare(
+              "INSERT INTO spaces VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+            )
+            .run(entityId, JSON.stringify(space));
+          this.db
+            .prepare("DELETE FROM space_classes WHERE space_id=?")
+            .run(entityId);
+          for (const classId of classIds)
+            this.db
+              .prepare("INSERT INTO space_classes VALUES(?,?)")
+              .run(entityId, classId);
+        } else {
+          this.db.prepare("DELETE FROM spaces WHERE id=?").run(entityId);
         }
       }
       if (

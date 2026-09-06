@@ -1,5 +1,6 @@
 import type {
   Assessment,
+  AcademicPeriod,
   Attempt,
   Concept,
   Mistake,
@@ -7,6 +8,7 @@ import type {
   Task,
   Teacher,
   TeacherEvidence,
+  Space,
   Track,
   Unit,
 } from "../domain/contracts";
@@ -16,6 +18,8 @@ export function sessionKit(
   task: Task,
   state: Pick<Snapshot, "sources" | "sessions"> & {
     assessments?: Assessment[];
+    academicPeriods?: AcademicPeriod[];
+    spaces?: Space[];
     mistakes?: Mistake[];
     concepts?: Concept[];
     attempts?: Attempt[];
@@ -93,6 +97,12 @@ export function sessionKit(
           (b.dueAt ? Date.parse(b.dueAt) : Infinity) ||
         a.title.localeCompare(b.title),
     );
+  const academicPeriods = [...(state.academicPeriods ?? [])].filter((period) =>
+    period.classIds.includes(task.classId),
+  );
+  const spaces = [...(state.spaces ?? [])].filter((space) =>
+    space.classIds.includes(task.classId),
+  );
   const teacherEvidence = [...(state.teacherEvidence ?? [])]
     .filter((evidence) => {
       if (evidence.classId !== task.classId) return false;
@@ -129,6 +139,8 @@ export function sessionKit(
     concepts,
     attempts,
     assessments,
+    academicPeriods,
+    spaces,
     teachers,
     teacherEvidence,
     tracks,

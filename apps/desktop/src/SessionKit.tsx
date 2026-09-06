@@ -192,6 +192,27 @@ export function SessionKit({
           ))}
         </div>
       )}
+      {(kit.academicPeriods.length > 0 || kit.spaces.length > 0) && (
+        <div>
+          <h4>Academic context</h4>
+          <p className="muted">
+            Explicit period and space links for this class.
+          </p>
+          {kit.academicPeriods.map((period) => (
+            <p key={period.id}>
+              {period.name} · {period.kind}
+              {period.startsOn && <> · starts {period.startsOn}</>}
+              {period.endsOn && <> · ends {period.endsOn}</>}
+            </p>
+          ))}
+          {kit.spaces.map((space) => (
+            <p key={space.id}>
+              {space.name} · {space.kind}
+              {space.notes && <> · {space.notes}</>}
+            </p>
+          ))}
+        </div>
+      )}
       {kit.teacherEvidence.length > 0 && (
         <div>
           <h4>Teacher evidence</h4>
@@ -240,6 +261,8 @@ export function SessionKit({
         !kit.assessments.length &&
         !kit.teachers.length &&
         !kit.units.length &&
+        !kit.academicPeriods.length &&
+        !kit.spaces.length &&
         !kit.teacherEvidence.length && (
           <p className="muted">
             No materials saved yet. Add assignment notes or link a saved source

@@ -8,6 +8,7 @@ import { Evidence } from "./Evidence";
 import { Authority } from "./Authority";
 import { Teachers } from "./Teachers";
 import { Units } from "./Units";
+import { AcademicContext } from "./AcademicContext";
 import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
@@ -53,6 +54,8 @@ const empty: Snapshot = {
   gradeCategories: [],
   gradeEntries: [],
   assessments: [],
+  academicPeriods: [],
+  spaces: [],
   tracks: [],
   units: [],
   teachers: [],
@@ -337,6 +340,7 @@ function App() {
             "Authority",
             "Teachers",
             "Units",
+            "Academic context",
           ].map((p) => (
             <button
               key={p}
@@ -549,6 +553,8 @@ function App() {
           <Teachers data={data} save={(c) => act(c, true)} />
         ) : page === "Units" ? (
           <Units data={data} save={(c) => act(c, true)} />
+        ) : page === "Academic context" ? (
+          <AcademicContext data={data} save={(c) => act(c, true)} />
         ) : page === "Plan" ? (
           <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
         ) : page === "Settings" ? (

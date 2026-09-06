@@ -90,6 +90,54 @@ export type Assessment = AssessmentInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const academicPeriodKind = z.enum([
+  "semester",
+  "trimester",
+  "quarter",
+  "year",
+  "summer",
+  "other",
+]);
+export const academicPeriodInput = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    kind: academicPeriodKind,
+    startsOn: z.iso.date().nullable(),
+    endsOn: z.iso.date().nullable(),
+    notes: z.string().trim().max(5000),
+    classIds: z.array(id).max(100),
+  })
+  .superRefine((input, ctx) => {
+    if (input.startsOn && input.endsOn && input.endsOn < input.startsOn)
+      ctx.addIssue({
+        code: "custom",
+        path: ["endsOn"],
+        message: "The academic period must end on or after it starts.",
+      });
+  });
+export type AcademicPeriodInput = z.infer<typeof academicPeriodInput>;
+export type AcademicPeriod = AcademicPeriodInput & {
+  id: string;
+  revision: number;
+  authority: "user-entered";
+  createdAt: string;
+  updatedAt: string;
+};
+export const spaceKind = z.enum(["school", "program", "workspace", "other"]);
+export const spaceInput = z.object({
+  name: z.string().trim().min(1).max(200),
+  kind: spaceKind,
+  notes: z.string().trim().max(5000),
+  classIds: z.array(id).max(100),
+});
+export type SpaceInput = z.infer<typeof spaceInput>;
+export type Space = SpaceInput & {
+  id: string;
+  revision: number;
+  authority: "user-entered";
+  createdAt: string;
+  updatedAt: string;
+};
 export const trackInput = z.object({
   classId: id,
   name: z.string().trim().min(1).max(200),
@@ -502,6 +550,8 @@ export type Snapshot = {
   gradeCategories: GradeCategory[];
   gradeEntries: GradeEntry[];
   assessments: Assessment[];
+  academicPeriods: AcademicPeriod[];
+  spaces: Space[];
   tracks: Track[];
   units: Unit[];
   teachers: Teacher[];
@@ -605,6 +655,30 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("assessment.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("period.create"), input: academicPeriodInput }),
+  z.object({
+    type: z.literal("period.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: academicPeriodInput,
+  }),
+  z.object({
+    type: z.literal("period.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("space.create"), input: spaceInput }),
+  z.object({
+    type: z.literal("space.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: spaceInput,
+  }),
+  z.object({
+    type: z.literal("space.forget"),
     id,
     revision: z.number().int().nonnegative(),
   }),

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
   Assessment,
+  AcademicPeriod,
   Concept,
   Attempt,
   Mistake,
@@ -12,6 +13,7 @@ import type {
   TeacherEvidence,
   Track,
   Unit,
+  Space,
 } from "../domain/contracts";
 import { sessionKit } from "./kit";
 const task: Task = {
@@ -450,5 +452,74 @@ test("session kit includes the explicit unit hierarchy for a linked task", () =>
   assert.deepEqual(
     kit.tracks.map((track) => track.id),
     ["mechanics-track"],
+  );
+});
+
+test("session kit includes class academic period and space context", () => {
+  const academicPeriods: AcademicPeriod[] = [
+    {
+      id: "fall",
+      name: "Fall 2026",
+      kind: "semester",
+      startsOn: "2026-08-24",
+      endsOn: "2026-12-18",
+      notes: "",
+      classIds: [task.classId],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "history-period",
+      name: "History period",
+      kind: "quarter",
+      startsOn: null,
+      endsOn: null,
+      notes: "",
+      classIds: ["history"],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  const spaces: Space[] = [
+    {
+      id: "school",
+      name: "Main school",
+      kind: "school",
+      notes: "",
+      classIds: [task.classId],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+    {
+      id: "other-space",
+      name: "History workspace",
+      kind: "workspace",
+      notes: "",
+      classIds: ["history"],
+      authority: "user-entered",
+      revision: 0,
+      createdAt: task.createdAt,
+      updatedAt: task.createdAt,
+    },
+  ];
+  const kit = sessionKit(task, {
+    sources: [],
+    sessions: [],
+    academicPeriods,
+    spaces,
+  });
+  assert.deepEqual(
+    kit.academicPeriods.map((period) => period.id),
+    ["fall"],
+  );
+  assert.deepEqual(
+    kit.spaces.map((space) => space.id),
+    ["school"],
   );
 });
