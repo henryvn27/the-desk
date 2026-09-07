@@ -21,6 +21,8 @@ import {
   lensFollowUpTaskInput,
 } from "../../../packages/intelligence/lens-actions";
 import { type StudyActivityKind } from "../../../packages/study/activities";
+import { IconButton, Textarea } from "./components/base";
+import { XClose } from "@untitledui/icons";
 
 type Point = { x: number; y: number };
 type SpeechRecognitionLike = {
@@ -441,7 +443,7 @@ export function Lens({
       {selecting && <span className="lens-live-region" role="status" aria-live="polite">{status || "Lens ready"}</span>}
       {inputVisible && (
         <div className="lens-input-popover" style={inputStyle}>
-          <textarea
+          <Textarea
             id="lens-question"
             aria-label="Ask Lens"
             value={question}
@@ -509,7 +511,7 @@ export function Lens({
               <div className="eyebrow">Lens{className ? ` · ${className}` : ""}</div>
               <strong>{error ? "Lens needs attention" : "Answer"}</strong>
             </div>
-            <button type="button" className="lens-close" aria-label="Dismiss Lens" onClick={() => { stopPresentation(); void window.desk.dismiss(); }}>×</button>
+          <IconButton className="lens-close" label="Dismiss Lens" icon={XClose} onPress={() => { stopPresentation(); void window.desk.dismiss(); }} />
           </header>
           <div className="lens-answer-text">{error || answer?.explanation || "Lens could not complete this request."}</div>
           {answer && (

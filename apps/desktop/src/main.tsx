@@ -36,6 +36,7 @@ import { ClassOverview } from "./ClassOverview";
 import { Sources } from "./Sources";
 import SourceReader from "./SourceReader";
 import "./style.css";
+import "./styles/design-system.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
 import { AccountSettings } from "./AccountSettings";
@@ -49,6 +50,16 @@ import { SessionReview } from "./SessionReview";
 import { TestOutPanel } from "./TestOutPanel";
 import { BrowserBridgeSettings } from "./BrowserBridgeSettings";
 import { ChatWorkspace, type ChatThread } from "./ChatWorkspace";
+import { Button, Input } from "./components/base";
+import {
+  BookOpen01,
+  Calendar,
+  FilePlus02,
+  Home01,
+  MessageChatCircle,
+  SearchMd,
+  Settings01,
+} from "@untitledui/icons";
 import type { ChatAction } from "../../../packages/intelligence/chat";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
 import type { TestOutPlan } from "../../../packages/intelligence/learning-loop";
@@ -641,50 +652,60 @@ function App() {
     <div className="shell">
       <aside>
         <div className="brand">The Desk</div>
-        <button
+        <Button
+          variant="primary"
+          size="default"
           className="new-chat-button sidebar-new-chat"
-          type="button"
-          onClick={createChatThread}
+          onPress={createChatThread}
+          icon={MessageChatCircle}
         >
-          <span aria-hidden="true">＋</span> New chat
-        </button>
+          New chat
+        </Button>
         <nav className="primary-nav" aria-label="Main">
-          <button
+          <Button
+            variant="quiet"
+            size="compact"
+            icon={MessageChatCircle}
             aria-current={page === "Chat" ? "page" : undefined}
-            onClick={() => setPage("Chat")}
+            onPress={() => setPage("Chat")}
           >
             Chat
-          </button>
+          </Button>
         </nav>
         <section className="sidebar-group" aria-labelledby="workspace-nav-title">
           <div className="sidebar-group-title" id="workspace-nav-title">Workspace</div>
           <nav className="secondary-nav" aria-label="Workspace">
             {["Home", "Plan", "Notes", "Library"].map((p) => (
-              <button
+              <Button
+                variant="quiet"
+                size="compact"
+                icon={p === "Home" ? Home01 : p === "Plan" ? Calendar : BookOpen01}
                 key={p}
                 aria-current={page === p ? "page" : undefined}
-                onClick={() => setPage(p)}
+                onPress={() => setPage(p)}
               >
                 {p === "Home" ? "Today" : p}
-              </button>
+              </Button>
             ))}
           </nav>
         </section>
-        <button type="button" className="sidebar-capture-button" onClick={() => setCapture(true)}>Capture</button>
-        <button type="button" className="sidebar-settings-button" aria-current={page === "Settings" ? "page" : undefined} onClick={() => setPage("Settings")}>Settings</button>
+        <Button variant="quiet" size="compact" className="sidebar-capture-button" icon={FilePlus02} onPress={() => setCapture(true)}>Capture</Button>
+        <Button variant="quiet" size="compact" className="sidebar-settings-button" icon={Settings01} aria-current={page === "Settings" ? "page" : undefined} onPress={() => setPage("Settings")}>Settings</Button>
         <section className="sidebar-classes" aria-labelledby="classes-nav-title">
           <div className="sidebar-group-title" id="classes-nav-title">Classes</div>
           <div className="class-list">
             {data.classes.map((c) => (
-              <button
+              <Button
+                variant="quiet"
+                size="compact"
                 className="class-link"
                 key={c.id}
                 aria-current={page === c.id ? "page" : undefined}
-                onClick={() => setPage(c.id)}
+                onPress={() => setPage(c.id)}
               >
                 <span className="dot" />
                 {c.name}
-              </button>
+              </Button>
             ))}
           </div>
           <form
@@ -700,29 +721,31 @@ function App() {
             <label className="sr-only" htmlFor="class">
               Class name
             </label>
-            <input
+            <Input
               id="class"
               name="name"
               placeholder="Add a class…"
               required
               maxLength={100}
             />
-            <button disabled={busy} type="submit">
+            <Button size="compact" isDisabled={busy} type="submit">
               Add class
-            </button>
+            </Button>
           </form>
         </section>
         <details className="sidebar-more">
           <summary>More tools</summary>
           <div className="sidebar-more-list">
             {["Memory", "Mistakes", "Concepts", "Attempts", "Assessments", "Evidence", "Authority", "Teachers", "Units", "Academic context", "Capture Inbox"].map((p) => (
-              <button
+              <Button
+                variant="quiet"
+                size="compact"
                 key={p}
                 aria-current={page === p ? "page" : undefined}
-                onClick={() => setPage(p)}
+                onPress={() => setPage(p)}
               >
                 {p}
-              </button>
+              </Button>
             ))}
           </div>
         </details>
@@ -747,18 +770,20 @@ function App() {
             )}
           </div>
           <div className="header-actions">
-            <button
+            <Button
+              variant="secondary"
+              size="compact"
+              icon={SearchMd}
               className="command-trigger"
-              type="button"
-              onClick={() => {
+              onPress={() => {
                 setPage("Library");
                 setFocusSearch(true);
               }}
             >
               <span>Search Library</span>
               <kbd>⌘K</kbd>
-            </button>
-            <button aria-label="Quick capture" onClick={() => setCapture(true)}>Capture</button>
+            </Button>
+            <Button variant="secondary" size="compact" icon={FilePlus02} onPress={() => setCapture(true)}>Capture</Button>
           </div>
         </header>
         {(workspaceError || error) && (

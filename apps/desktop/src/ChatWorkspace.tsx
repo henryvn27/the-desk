@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Snapshot } from "../../../packages/domain/contracts";
 import type { DeskIntelligence } from "../../../packages/intelligence/desk-intelligence";
+import { Button, Textarea } from "./components/base";
+import { WorkspaceHeader } from "./components/desk";
+import { Plus, Send01 } from "@untitledui/icons";
 import {
   deriveChatSuggestions,
   formatUpcoming,
@@ -79,9 +82,9 @@ function Artifact({ artifact, onAction }: { artifact: ChatArtifact; onAction: (a
           {artifact.estimatedMinutes && <span>{artifact.estimatedMinutes} min</span>}
         </div>
         {artifact.action && (
-          <button className="primary chat-artifact-action" type="button" onClick={() => onAction(artifact.action!)}>
+          <Button variant="primary" size="compact" className="chat-artifact-action" onPress={() => onAction(artifact.action!)}>
             {artifact.action.type === "start-session" ? "Start" : artifact.action.type === "resume-session" ? "Resume" : "Open"}
-          </button>
+          </Button>
         )}
       </section>
     );
@@ -91,9 +94,9 @@ function Artifact({ artifact, onAction }: { artifact: ChatArtifact; onAction: (a
         <div className="chat-artifact-label">Continue</div>
         <strong>{artifact.title}</strong>
         <p>{artifact.detail}</p>
-        <button className="primary chat-artifact-action" type="button" onClick={() => onAction(artifact.action)}>
+        <Button variant="primary" size="compact" className="chat-artifact-action" onPress={() => onAction(artifact.action)}>
           {artifact.action.type === "open-notes" ? "Open Note" : "Resume"}
-        </button>
+        </Button>
       </section>
     );
   if (artifact.kind === "upcoming")
@@ -128,7 +131,7 @@ function Artifact({ artifact, onAction }: { artifact: ChatArtifact; onAction: (a
           <strong>{block.title}</strong>
           <span>{block.minutes} min · {block.reason}</span>
           {block.taskId && index === 0 && (
-            <button type="button" onClick={() => onAction({ type: "start-session", taskId: block.taskId! })}>Start</button>
+            <Button size="compact" onPress={() => onAction({ type: "start-session", taskId: block.taskId! })}>Start</Button>
           )}
         </div>
       ))}
@@ -222,31 +225,31 @@ export function ChatWorkspace({
 
   return (
     <div className="chat-workspace">
-      <div className="chat-heading">
-        <div>
-          <div className="eyebrow">Your academic workspace</div>
-          <h1>What are you working on?</h1>
-          <p className="chat-subtitle">Ask The Desk to help you decide, understand, or continue.</p>
-          <div className={`chat-provider-status ${providerConfigured === false ? "chat-provider-status-offline" : ""}`} role="status">
-            <span aria-hidden="true">●</span> {providerConfigured === false ? "AI needs a provider key in Settings" : providerConfigured === true ? "AI connected · Luna" : "Checking AI connection…"}
-          </div>
-        </div>
-        <button type="button" className="chat-new-button" onClick={onNewChat}>New chat</button>
-      </div>
+      <WorkspaceHeader
+        className="chat-heading"
+        eyebrow="Your academic workspace"
+        title="What are you working on?"
+        detail="Ask The Desk to help you decide, understand, or continue."
+        status={{
+          tone: providerConfigured === false ? "warning" : providerConfigured === true ? "positive" : "neutral",
+          label: providerConfigured === false ? "AI needs a provider key in Settings" : providerConfigured === true ? "AI connected · Luna" : "Checking AI connection…",
+        }}
+        actions={<Button variant="secondary" size="compact" className="chat-new-button" icon={Plus} onPress={onNewChat}>New chat</Button>}
+      />
       <div className="chat-layout">
         <aside className="chat-history" aria-label="Recent chats">
           <div className="chat-history-label">Recent</div>
           {threads.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((thread) => (
-            <button
-              type="button"
+            <Button
+              size="compact"
               className="chat-thread"
               key={thread.id}
               aria-current={thread.id === current?.id ? "page" : undefined}
-              onClick={() => setActiveThreadId(thread.id)}
+              onPress={() => setActiveThreadId(thread.id)}
             >
               <strong>{thread.title}</strong>
               <span>{thread.messages.length ? `${thread.messages.length} messages` : "New conversation"}</span>
-            </button>
+            </Button>
           ))}
         </aside>
         <section className="chat-main" aria-label="Desk conversation">
@@ -258,7 +261,7 @@ export function ChatWorkspace({
                 <p>{initialAssistant(data)}</p>
                   <div className="chat-suggestions" aria-label="Suggested questions">
                     {suggestions.map((suggestion) => (
-                      <button type="button" key={suggestion} onClick={() => void submit(suggestion)}>{suggestion}</button>
+                      <Button size="compact" key={suggestion} onPress={() => void submit(suggestion)}>{suggestion}</Button>
                     ))}
                   </div>
                 </div>
@@ -270,11 +273,11 @@ export function ChatWorkspace({
                   <p>{message.content}</p>
                   {message.artifact && <Artifact artifact={message.artifact} onAction={onAction} />}
                   {message.action && !message.artifact && (
-                    <button className="primary chat-artifact-action" type="button" onClick={() => onAction(message.action!)}>Open</button>
+                    <Button variant="primary" size="compact" className="chat-artifact-action" onPress={() => onAction(message.action!)}>Open</Button>
                   )}
                   {message.suggestions && (
                     <div className="chat-suggestions">
-                      {message.suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => void submit(suggestion)}>{suggestion}</button>)}
+                        {message.suggestions.map((suggestion) => <Button size="compact" key={suggestion} onPress={() => void submit(suggestion)}>{suggestion}</Button>)}
                     </div>
                   )}
                   {message.model && <small className="chat-model">{message.model}</small>}
@@ -285,7 +288,7 @@ export function ChatWorkspace({
           </div>
           <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
             <label className="sr-only" htmlFor="chat-input">Ask The Desk</label>
-            <textarea
+              <Textarea
               id="chat-input"
               ref={inputRef}
               value={draft}
@@ -300,7 +303,7 @@ export function ChatWorkspace({
             />
             <div className="chat-composer-footer">
               <span>⌘↵ to send · Esc to clear</span>
-              <button className="primary" type="submit" disabled={!draft.trim() || sending || busy}>Send</button>
+              <Button variant="primary" size="compact" type="submit" isDisabled={!draft.trim() || sending || busy} icon={Send01}>Send</Button>
             </div>
           </form>
         </section>
