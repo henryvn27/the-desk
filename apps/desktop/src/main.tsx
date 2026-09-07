@@ -46,8 +46,11 @@ import { SessionCorrection } from "./SessionCorrection";
 import { TaskChecklist } from "./TaskChecklist";
 import { SessionKit } from "./SessionKit";
 import { SessionReview } from "./SessionReview";
+import { TestOutPanel } from "./TestOutPanel";
 import { BrowserBridgeSettings } from "./BrowserBridgeSettings";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
+import type { TestOutPlan } from "../../../packages/intelligence/learning-loop";
+import { learningOverrideText } from "../../../packages/intelligence/learning-loop";
 type CanvasTarget = CanvasRecord & { initialBlockId?: string };
 declare global {
   interface Window {
@@ -109,6 +112,7 @@ function App() {
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
   const [intelligence, setIntelligence] = useState<DeskIntelligence>();
+  const [testOutPlan, setTestOutPlan] = useState<TestOutPlan>();
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
@@ -330,6 +334,7 @@ function App() {
   const plannedNext = home.next ? data.tasks.find((t) => t.id === home.next!.taskId) : undefined;
   const sharedNextAction = intelligence?.nextAction.kind === "start-task" ? intelligence.nextAction : undefined;
   const sharedObjective = intelligence?.nextAction.kind === "study-objective" ? intelligence.nextAction : undefined;
+  const bestAction = intelligence?.nextBestAction;
   const next = sharedNextAction?.taskId
     ? data.tasks.find((task) => task.id === sharedNextAction.taskId) ?? plannedNext
     : plannedNext;
@@ -740,6 +745,14 @@ function App() {
               </div>
               {active && <span className="home-live-state">Study session active</span>}
             </div>
+            {testOutPlan && (
+              <TestOutPanel
+                plan={testOutPlan}
+                classId={data.concepts.find((concept) => concept.id === testOutPlan.conceptId)?.classId ?? bestAction?.classId ?? data.classes[0]?.id ?? ""}
+                save={(command) => act(command, true)}
+                onDone={() => setTestOutPlan(undefined)}
+              />
+            )}
             {active ? activeHomeSummary : next ? (
               <section className="next">
                 <div className="eyebrow">
@@ -747,17 +760,22 @@ function App() {
                 </div>
                 <h2>{next.title}</h2>
                 <p>
-                  {sharedNextAction?.estimatedMinutes ?? home.next?.minutes} minutes
+                  {bestAction?.estimatedMinutes ?? sharedNextAction?.estimatedMinutes ?? home.next?.minutes} minutes
                   {next.resource ? " · Resource ready" : ""}
                 </p>
                 <details>
                   <summary>Why Desk thinks this</summary>
-                  <p>{sharedNextAction?.reason ?? home.next?.why}</p>
-                  {sharedNextAction?.evidence.length ? (
+                  <p>{bestAction?.reason.primary ?? sharedNextAction?.reason ?? home.next?.why}</p>
+                  {bestAction?.reason.factors.length ? (
+                    <ul className="next-evidence">
+                      {bestAction.reason.factors.slice(0, 5).map((factor) => <li key={factor.id}><strong>{factor.label}:</strong> {factor.detail}</li>)}
+                    </ul>
+                  ) : sharedNextAction?.evidence.length ? (
                     <ul className="next-evidence">
                       {sharedNextAction.evidence.map((item) => <li key={item}>{item}</li>)}
                     </ul>
                   ) : null}
+                  {bestAction?.completionCriteria.length ? <p className="muted"><strong>Done means:</strong> {bestAction.completionCriteria.map((criterion) => criterion.label).join(" ")}</p> : null}
                 </details>
                 <details>
                   <summary>Preview study materials</summary>
@@ -777,6 +795,16 @@ function App() {
                   Start session → <span className="shortcut-hint" aria-hidden="true">⌘/Ctrl+Enter</span>
                 </button>
                 <div className="actions">
+                  {bestAction?.testOut && (
+                    <button type="button" disabled={busy} onClick={() => setTestOutPlan(bestAction.testOut)}>
+                      Test out instead
+                    </button>
+                  )}
+                  {bestAction?.conceptIds[0] && (
+                    <button type="button" disabled={busy} onClick={() => void act({ type: "memory.create", input: { text: learningOverrideText("skip-concept", bestAction.conceptIds[0]!, "not relevant right now"), category: "planning", classId: bestAction.classId ?? null } })}>
+                      Not relevant
+                    </button>
+                  )}
                   <button
                     disabled={busy}
                     onClick={() => void act({ type: "session.start", taskId: next.id, mode: "quiz" })}
@@ -789,6 +817,23 @@ function App() {
                   >
                     Start fixed exam
                   </button>
+                </div>
+              </section>
+            ) : bestAction && bestAction.kind !== "done" && bestAction.kind !== "notes" ? (
+              <section className="next next-objective">
+                <div className="eyebrow">Next learning move</div>
+                <h2>{bestAction.title}</h2>
+                <p>{bestAction.estimatedMinutes} minutes · {bestAction.reason.primary}</p>
+                <details open>
+                  <summary>Why Desk thinks this</summary>
+                  <ul className="next-evidence">
+                    {bestAction.reason.factors.map((factor) => <li key={factor.id}><strong>{factor.label}:</strong> {factor.detail}</li>)}
+                  </ul>
+                </details>
+                <div className="actions">
+                  {bestAction.testOut && <button className="primary" type="button" onClick={() => setTestOutPlan(bestAction.testOut)}>Test out</button>}
+                  {bestAction.conceptIds[0] && <button type="button" onClick={() => void act({ type: "memory.create", input: { text: learningOverrideText("skip-concept", bestAction.conceptIds[0]!, "not relevant right now"), category: "planning", classId: bestAction.classId ?? null } })}>Not relevant</button>}
+                  {bestAction.classId && <button type="button" onClick={() => setPage(bestAction.classId!)}>Open class workspace</button>}
                 </div>
               </section>
             ) : sharedObjective ? (
@@ -807,6 +852,7 @@ function App() {
                     Open class workspace
                   </button>
                 )}
+                {bestAction?.testOut && <button type="button" onClick={() => setTestOutPlan(bestAction.testOut)}>Test out instead</button>}
               </section>
             ) : (
               <section className="next">
@@ -829,6 +875,14 @@ function App() {
               <p className="plan-change-note" role="status">
                 <strong>Plan updated.</strong> {home.planChange.text}
               </p>
+            )}
+            {intelligence?.learningLoop && (intelligence.learningLoop.effectiveLearning.trackedMinutes > 0 || intelligence.learningLoop.incompleteLoops.length > 0) && (
+              <details className="learning-signal">
+                <summary>What the last study work established</summary>
+                <p>{intelligence.learningLoop.effectiveLearning.trackedMinutes} tracked min · {intelligence.learningLoop.effectiveLearning.evidenceMinutes} min with checked evidence</p>
+                <p className="muted">{intelligence.learningLoop.effectiveLearning.explanation}</p>
+                {intelligence.learningLoop.incompleteLoops.slice(0, 3).map((loop) => <p key={loop.id}><strong>{loop.title}:</strong> {loop.detail}</p>)}
+              </details>
             )}
             <h2 className="section-title">Today</h2>
             {home.today.map((b) => (

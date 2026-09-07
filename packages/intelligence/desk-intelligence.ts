@@ -3,10 +3,12 @@ import type { Snapshot } from "../domain/contracts";
 import { deriveHome, type HomeAttention } from "../planner/home";
 import { deriveNextAction, type NextAction } from "../planner/next-action";
 import { createStudentModel, type ConceptState } from "./student-model";
+import { deriveLearningLoop, type LearningLoopProjection, type NextBestAction } from "./learning-loop";
 
 export const DESK_INTELLIGENCE_VERSION = "desk-intelligence-v1" as const;
 
 export type IntelligenceNextAction = NextAction;
+export type IntelligenceNextBestAction = NextBestAction;
 
 export type ClassIntelligence = {
   classId: string;
@@ -36,6 +38,8 @@ export type DeskIntelligence = {
   generatedAt: string;
   sourceFingerprint: string;
   nextAction: IntelligenceNextAction;
+  nextBestAction: IntelligenceNextBestAction;
+  learningLoop: LearningLoopProjection;
   attention: HomeAttention[];
   classes: ClassIntelligence[];
   evidence: {
@@ -131,12 +135,15 @@ function classIntelligence(
 export function deriveDeskIntelligence(snapshot: Snapshot, now = new Date()): DeskIntelligence {
   const home = deriveHome(snapshot, now);
   const model = createStudentModel(snapshot, now);
+  const learningLoop = deriveLearningLoop(snapshot, now, home);
   const classes = snapshot.classes.map((course) => classIntelligence(snapshot, course.id, model));
   return {
     version: DESK_INTELLIGENCE_VERSION,
     generatedAt: now.toISOString(),
     sourceFingerprint: sourceFingerprint(snapshot),
     nextAction: deriveNextAction(snapshot, now, home),
+    nextBestAction: learningLoop.nextBestAction,
+    learningLoop,
     attention: home.attention,
     classes,
     evidence: {

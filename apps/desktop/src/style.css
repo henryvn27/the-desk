@@ -1500,6 +1500,24 @@ dialog.capture-dialog[open] .capture-shell {
   }
 }
 
+.test-out-panel {
+  margin: 18px 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+}
+.test-out-panel h3 { margin: 4px 0 8px; }
+.test-out-prompts { display: grid; gap: 14px; margin: 16px 0; padding-left: 22px; }
+.test-out-prompts li { padding-left: 4px; }
+.test-out-prompts strong, .test-out-prompts small { display: block; }
+.test-out-prompts small { margin: 6px 0 10px; color: var(--muted); line-height: 1.45; }
+.test-out-prompts label { margin-top: 8px; }
+.test-out-prompts textarea { min-height: 54px; }
+.learning-signal { margin: 16px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.learning-signal summary { cursor: pointer; font-weight: 650; }
+.learning-signal p { margin: 8px 0 0; }
+
 /* Shared Next Action evidence stays quiet until the student asks why. */
 .next-evidence {
   margin: 10px 0 0;

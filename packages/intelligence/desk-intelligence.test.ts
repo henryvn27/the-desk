@@ -17,6 +17,10 @@ test("desk intelligence connects canonical evidence to an executable next action
     assert.equal(projection.nextAction.actions[0]?.id, "start");
     assert.ok(projection.nextAction.evidence.length > 0);
     assert.equal(projection.nextAction.estimatedMinutes, 45);
+    assert.equal(projection.nextBestAction.taskId, taskId);
+    assert.equal(projection.nextBestAction.kind, "assignment");
+    assert.ok(projection.nextBestAction.reason.factors.length > 0);
+    assert.ok(projection.learningLoop.effectiveLearning);
     assert.equal(projection.classes[0]?.learningObjective?.conceptId, conceptId);
     assert.equal(projection.evidence.attempts, 1);
     assert.equal(projection.sourceFingerprint.length, 64);
