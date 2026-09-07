@@ -654,7 +654,11 @@ export function Lens({
             </button>
           </div>
         </form>
-        {status && <p role="status">{status}</p>}
+        {status && (
+          <p className="lens-status" role="status" aria-live="polite">
+            {status}
+          </p>
+        )}
       </section>
     </div>
   );

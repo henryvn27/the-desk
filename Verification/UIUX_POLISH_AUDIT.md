@@ -63,3 +63,16 @@ Verification evidence:
 - A packaged 820×620 viewport has no horizontal overflow and keeps the primary navigation and Capture/Search actions visible.
 
 The packaged smoke still reports its existing limitation that AI, voice, and captured-screen interpretation are outside the deterministic fixture. Lens visual inspection is therefore backed by the installed UI screenshot and the deterministic selection-state assertions, while provider quality remains covered by the existing intelligence tests.
+
+## Lens follow-up: transparent-window compositing
+
+The follow-up screenshot exposed a concrete rendering defect in the shipped Lens window: its transparent BrowserWindow combined a translucent, blurred panel with the large shared shadow, producing a multicolor contour around the panel on desktop backgrounds. The provider failure message was also rendered as unstyled body text beneath the action row.
+
+The smallest fix was presentation-only. Lens stage and panel surfaces are now opaque and border-led with no blur or shadow, which removes the transparent-window compositing halo without changing selection, grounding, provider, or save behavior. Provider/status text uses a compact accessible banner with `role="status"` and `aria-live="polite"`.
+
+Follow-up visual evidence:
+
+- `artifacts/lens-flat-surface.png` — waiting state with a flat panel and no colored contour.
+- `artifacts/lens-provider-error.png` — provider error presented as a compact status banner with the same flat surface.
+
+The fix was validated in the dev window and then in the installed arm64 bundle. `typecheck`, `lint`, production build, desktop smoke, Lens action smoke, and tutoring smoke all pass after the change.
