@@ -64,6 +64,23 @@ Verification evidence:
 
 The packaged smoke still reports its existing limitation that AI, voice, and captured-screen interpretation are outside the deterministic fixture. Lens visual inspection is therefore backed by the installed UI screenshot and the deterministic selection-state assertions, while provider quality remains covered by the existing intelligence tests.
 
+## Shared-system refinement · 2026-09-07
+
+The follow-up pass stayed inside the shipped shell and projection architecture. It made the semantic tokens explicit in OKLCH, removed decorative page/header treatment, replaced repeated accent stripes with tonal selection and neutral evidence callouts, and added the platform reduced-transparency fallback. Chat suggestions now read as compact actions instead of pills. Long rows/messages use `content-visibility`, Home/Chat projections are memoized, and refresh polling is bounded without changing the one-second study clock.
+
+One small workflow correction came out of the exact-executable smoke: when the compact controller ends a session while the main window is on Chat, the main renderer now returns to Home as soon as the shared snapshot exposes the canonical session review. The smoke selector was also scoped to the header/sidebar duplicate Capture actions so the verification path matches the shipped shell.
+
+Verification for this refinement:
+
+- `npm run check` — Electron-only guard, TypeScript, lint, 277 domain tests, 10 extension tests, and production build all pass.
+- `npm run test:release-boundaries` — build inventory, secret scan, package archive, and bounded provider failure handling pass.
+- `DESK_EXECUTABLE=/Users/henry/Applications/The Desk V1.app/Contents/MacOS/The Desk V1 node scripts/smoke-desktop.mjs` — exact installed executable passes the complete desktop flow, including session review after controller completion and restart persistence.
+- `npm run package` — signed arm64 directory bundle completes; notarization is skipped because no notarization options are configured.
+- Installed bundle `/Users/henry/Applications/The Desk V1.app` matches the release `app.asar` SHA-256 (`68f72434377600fffa19583210fc792ff06e697ea01d5aea94385641452b9336`), passes `codesign --verify --deep --strict`, and remains the Dock target.
+- Foreground CUA inspection of the installed build shows the revised Chat surface, live OpenRouter Luna response, and Home selection state. An isolated packaged class fixture confirms the neutral “What’s next” callout and preserves the current-unit indicator.
+
+No Swift files, parallel domain model, provider integration, or Canvas/Lens business logic was introduced by this pass. The requested `slop.md` guidance was intentionally not applied.
+
 ## Lens follow-up: transparent-window compositing
 
 The follow-up screenshot exposed a concrete rendering defect in the shipped Lens window: its transparent BrowserWindow combined a translucent, blurred panel with the large shared shadow, producing a multicolor contour around the panel on desktop backgrounds. The provider failure message was also rendered as unstyled body text beneath the action row.

@@ -161,6 +161,10 @@ export function ChatWorkspace({
     () => (intelligence ? deriveChatSuggestions(data, intelligence) : []),
     [data, intelligence],
   );
+  const sortedThreads = useMemo(
+    () => threads.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [threads],
+  );
 
   useEffect(() => {
     if (threads.length) {
@@ -239,7 +243,7 @@ export function ChatWorkspace({
       <div className="chat-layout">
         <aside className="chat-history" aria-label="Recent chats">
           <div className="chat-history-label">Recent</div>
-          {threads.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((thread) => (
+          {sortedThreads.map((thread) => (
             <Button
               size="compact"
               className="chat-thread"

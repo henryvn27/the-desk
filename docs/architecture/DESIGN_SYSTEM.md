@@ -21,6 +21,12 @@ The current Untitled UI React approach is copy-in infrastructure built on React 
 
 The primary target is a precise macOS desktop: compact 30/36/40px controls, quiet separators, modest radii, restrained shadows, and visible keyboard focus. Hover, pressed, selected, disabled, loading, offline, warning, error, and reduced-motion behavior are defined in the semantic layer.
 
+## Refinement pass · 2026-09-07
+
+The shared semantic palette now uses explicit OKLCH values for predictable tonal steps while preserving the warm Desk identity. Selection is carried by surface tone and weight instead of colored side stripes; the same rule applies to Home, class, Chat, and source callouts. Decorative page gradients and default header blur were removed so the work surface reads as a stable native desktop plane. Reduced-transparency overrides keep Lens surfaces legible when the platform asks for less translucency.
+
+The renderer also keeps the existing domain projections intact while reducing avoidable work: workspace refresh and sync-status polling are bounded, the visible study clock remains one-second accurate, Home and Chat projections are memoized, and long rows/messages opt into browser content-visibility. These are presentation/performance changes only; persistence, routing, AI boundaries, and canonical academic state are unchanged.
+
 ## Verification boundary
 
 Build, typecheck, lint, unit, Electron-only, release-boundary, and packaging checks are required for changes to this layer. Foreground screenshots or interactive smoke runs are only performed when they will not interrupt the active user's work.

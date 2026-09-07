@@ -14,7 +14,7 @@ import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 const Canvas = React.lazy(() => import("./Canvas"));
 import { createRoot } from "react-dom/client";
 import type {
@@ -164,7 +164,7 @@ function App() {
         })
         .catch(() => undefined);
     refresh();
-    const timer = window.setInterval(refresh, 1000);
+    const timer = window.setInterval(refresh, 5000);
     return () => {
       active = false;
       window.clearInterval(timer);
@@ -279,15 +279,25 @@ function App() {
       }
     };
     void refresh();
-    const timer = setInterval(() => {
-      setTick(Date.now());
+    const refreshTimer = setInterval(() => {
       void refresh();
     }, 2000);
+    const clockTimer = setInterval(() => {
+      setTick(Date.now());
+    }, 1000);
     return () => {
       active = false;
-      clearInterval(timer);
+      clearInterval(refreshTimer);
+      clearInterval(clockTimer);
     };
   }, [workspaceAttempt]);
+  useEffect(() => {
+    // A compact controller can end a session while the main window is on Chat.
+    // Surface the canonical review on Home once the shared snapshot reports it.
+    if (page === "Chat" && !active && unreviewed && reviewTask) {
+      setPage("Home");
+    }
+  }, [page, active?.id, unreviewed?.id, reviewTask?.id]);
   useEffect(() => {
     let active = true;
     void window.desk
@@ -359,7 +369,7 @@ function App() {
       setError(userError(e));
     }
   }
-  const home = deriveHome(data, new Date(tick));
+  const home = useMemo(() => deriveHome(data, new Date(tick)), [data, tick]);
   const week = home.plan;
   const plannedNext = home.next ? data.tasks.find((t) => t.id === home.next!.taskId) : undefined;
   const sharedNextAction = intelligence?.nextAction.kind === "start-task" ? intelligence.nextAction : undefined;
@@ -371,13 +381,13 @@ function App() {
   const learningTask = bestAction?.taskId
     ? data.tasks.find((task) => task.id === bestAction.taskId)
     : undefined;
-  const homeClassRows = data.classes.map((course) => {
+  const homeClassRows = useMemo(() => data.classes.map((course) => {
     const openTasks = data.tasks
       .filter((task) => task.classId === course.id && !task.completed)
       .sort((a, b) => (Date.parse(a.dueAt ?? "") || Infinity) - (Date.parse(b.dueAt ?? "") || Infinity));
     const first = openTasks[0];
     return { course, first, count: openTasks.length };
-  });
+  }), [data.classes, data.tasks]);
   const startNext = React.useCallback(() => {
     if (!next || active || busy) return;
     void act({ type: "session.start", taskId: next.id }).then((state) => {

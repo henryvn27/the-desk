@@ -127,7 +127,7 @@ try {
   await launch();
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.tasks[0].completed, true);
-  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  await page.getByRole("button", { name: "Capture", exact: true }).last().click();
   const futureDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
   const original = `AP Physics C: Friction review due ${futureDate}, 30 minutes`;
   await page
@@ -293,7 +293,7 @@ try {
     .getByRole("button", { name: "Save study preferences", exact: true })
     .click();
   await page.getByText("Study preferences saved.", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Capture", exact: true }).click();
+  await page.getByRole("button", { name: "Capture", exact: true }).last().click();
   await page
     .getByRole("button", { name: "Enter manually", exact: true })
     .click();
