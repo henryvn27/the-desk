@@ -135,7 +135,7 @@ function classIntelligence(
 export function deriveDeskIntelligence(snapshot: Snapshot, now = new Date()): DeskIntelligence {
   const home = deriveHome(snapshot, now);
   const model = createStudentModel(snapshot, now);
-  const learningLoop = deriveLearningLoop(snapshot, now, home);
+  const learningLoop = deriveLearningLoop(snapshot, now, home, model);
   const classes = snapshot.classes.map((course) => classIntelligence(snapshot, course.id, model));
   return {
     version: DESK_INTELLIGENCE_VERSION,

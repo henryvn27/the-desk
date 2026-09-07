@@ -158,6 +158,8 @@ export type LearningOverride = {
   reason: string;
 };
 
+type StudentModel = ReturnType<typeof createStudentModel>;
+
 const DAY = 86_400_000;
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 
@@ -220,10 +222,11 @@ export function buildTestOutPlan(
   conceptId: string,
   now = new Date(),
   taskId?: string,
+  suppliedModel?: StudentModel,
 ): TestOutPlan | null {
   const concept = conceptFor(snapshot, conceptId);
   if (!concept) return null;
-  const model = createStudentModel(snapshot, now);
+  const model = suppliedModel ?? createStudentModel(snapshot, now);
   const state = model.getConceptState(concept.id);
   if (!state) return null;
   const task = taskFor(snapshot, taskId) ?? snapshot.tasks.find((candidate) => candidate.classId === concept.classId && concept.taskIds.includes(candidate.id));
@@ -291,8 +294,7 @@ function failedAttempts(snapshot: Snapshot, conceptId: string, now: Date) {
   });
 }
 
-export function deriveRemediations(snapshot: Snapshot, now = new Date()): RemediationCandidate[] {
-  const model = createStudentModel(snapshot, now);
+function deriveRemediationsWithModel(snapshot: Snapshot, now: Date, model: StudentModel): RemediationCandidate[] {
   const skipped = new Set(learningOverrides(snapshot).map((override) => override.conceptId));
   const candidates: RemediationCandidate[] = [];
   for (const concept of snapshot.concepts) {
@@ -305,7 +307,6 @@ export function deriveRemediations(snapshot: Snapshot, now = new Date()): Remedi
     const gap = state.prerequisiteGaps[0];
     const target = gap && !skipped.has(gap.conceptId) ? conceptFor(snapshot, gap.conceptId) : concept;
     if (!target) continue;
-    const targetState = model.getConceptState(target.id);
     const mistakeIds = state.mistakePatterns.flatMap((pattern) => pattern.mistakeIds).slice(0, 8);
     const evidenceIds = [...new Set([...failures.map((attempt) => attempt.id), ...mistakeIds])].slice(0, 20);
     const score = failures.length * 14 + state.unresolvedMistakes * 8 + (gap ? 24 : 0) + repeated.length * 7;
@@ -323,15 +324,15 @@ export function deriveRemediations(snapshot: Snapshot, now = new Date()): Remedi
       evidenceIds,
       mistakeIds,
     });
-    // Keep the derived state in the loop even when the candidate is only used
-    // for inspection; it makes the intent explicit and avoids future callers
-    // treating a prerequisite name as a fact without evidence.
-    void targetState;
   }
   return candidates.sort((a, b) => b.score - a.score || a.conceptName.localeCompare(b.conceptName)).slice(0, 8);
 }
 
-function actionForTask(snapshot: Snapshot, task: Task, now: Date, home: HomeProjection, model: ReturnType<typeof createStudentModel>): NextBestAction {
+export function deriveRemediations(snapshot: Snapshot, now = new Date()): RemediationCandidate[] {
+  return deriveRemediationsWithModel(snapshot, now, createStudentModel(snapshot, now));
+}
+
+function actionForTask(snapshot: Snapshot, task: Task, now: Date, home: HomeProjection, model: StudentModel): NextBestAction {
   const skipped = new Set(learningOverrides(snapshot).map((override) => override.conceptId));
   const linkedConcepts = snapshot.concepts.filter((concept) => concept.classId === task.classId && concept.taskIds.includes(task.id) && !skipped.has(concept.id));
   const states = linkedConcepts.map((concept) => model.getConceptState(concept.id)).filter((state): state is ConceptState => Boolean(state));
@@ -346,7 +347,7 @@ function actionForTask(snapshot: Snapshot, task: Task, now: Date, home: HomeProj
   if (Number.isFinite(due)) factors.push({ id: "deadline", label: "Deadline", detail: `Confirmed deadline ${new Date(due).toLocaleString()}.`, weight: deadlineWeight });
   if (weak) factors.push({ id: "learning", label: "Learning", detail: `${weak.name} is ${weak.preparedness.replace("-", " ")} with ${scoreLabel(weak.evidenceConfidence.value ?? 0)} evidence confidence.`, weight: 0.55 });
   const testOut = weak && (weak.preparedness === "ready" || weak.preparedness === "strong" || (weak.competence.value ?? 0) >= 0.55)
-    ? buildTestOutPlan(snapshot, weak.conceptId, now, task.id)
+    ? buildTestOutPlan(snapshot, weak.conceptId, now, task.id, model)
     : undefined;
   return {
     id: `next-best:assignment:${task.id}`,
@@ -374,9 +375,10 @@ function actionForTask(snapshot: Snapshot, task: Task, now: Date, home: HomeProj
   };
 }
 
-function actionForRemediation(snapshot: Snapshot, candidate: RemediationCandidate, now: Date, model: ReturnType<typeof createStudentModel>): NextBestAction {
+function actionForRemediation(snapshot: Snapshot, candidate: RemediationCandidate, now: Date, model: StudentModel): NextBestAction {
   const state = model.getConceptState(candidate.conceptId);
   const sourceIds = linkedSourceIds(snapshot, conceptFor(snapshot, candidate.conceptId)?.classId);
+  const testOut = buildTestOutPlan(snapshot, candidate.conceptId, now, undefined, model);
   return {
     id: `next-best:remediation:${candidate.id}`,
     kind: "remediation",
@@ -398,14 +400,14 @@ function actionForRemediation(snapshot: Snapshot, candidate: RemediationCandidat
     sourceIds,
     completionCriteria: [{ type: "checked-attempt", label: `Demonstrate ${candidate.conceptName} in one checked attempt.`, conceptIds: [candidate.conceptId] }],
     createdAt: now.toISOString(),
-    ...(buildTestOutPlan(snapshot, candidate.conceptId, now) ? { testOut: buildTestOutPlan(snapshot, candidate.conceptId, now)! } : {}),
+    ...(testOut ? { testOut } : {}),
   };
 }
 
-function actionForConcept(snapshot: Snapshot, state: ConceptState, now: Date, kind: "review" | "practice" | "test_out"): NextBestAction {
+function actionForConcept(snapshot: Snapshot, state: ConceptState, now: Date, kind: "review" | "practice" | "test_out", model: StudentModel): NextBestAction {
   const concept = conceptFor(snapshot, state.conceptId)!;
   const sourceIds = linkedSourceIds(snapshot, concept.classId);
-  const testOut = buildTestOutPlan(snapshot, state.conceptId, now);
+  const testOut = buildTestOutPlan(snapshot, state.conceptId, now, undefined, model);
   const due = state.memory.reviewDue && finiteDate(state.memory.reviewDue) && +finiteDate(state.memory.reviewDue)! <= +now;
   const title = kind === "test_out" ? `Test out of ${state.name}` : due ? `Retrieve ${state.name} before it fades` : `Practice ${state.name} unaided`;
   return {
@@ -461,7 +463,7 @@ function assessmentReadiness(snapshot: Snapshot, model: ReturnType<typeof create
     .slice(0, 12);
 }
 
-function deriveNextBestAction(snapshot: Snapshot, now: Date, home: HomeProjection, remediations: RemediationCandidate[], model: ReturnType<typeof createStudentModel>): NextBestAction {
+function deriveNextBestAction(snapshot: Snapshot, now: Date, home: HomeProjection, remediations: RemediationCandidate[], readiness: AssessmentLearningReadiness[], model: StudentModel): NextBestAction {
   const skipped = new Set(learningOverrides(snapshot).map((override) => override.conceptId));
   const active = snapshot.sessions.find((session) => !session.endedAt);
   if (active) {
@@ -488,12 +490,12 @@ function deriveNextBestAction(snapshot: Snapshot, now: Date, home: HomeProjectio
   if (deadline && deadline.dueAt && Date.parse(deadline.dueAt) - +now <= 48 * 3_600_000) return actionForTask(snapshot, deadline, now, home, model);
   const remediation = remediations[0];
   if (remediation && (!home.next || remediation.score >= 45)) return actionForRemediation(snapshot, remediation, now, model);
-  const readiness = assessmentReadiness(snapshot, model, now).find((item) => item.dueAt && Date.parse(item.dueAt) - +now <= 7 * DAY && item.weakestConceptId && !skipped.has(item.weakestConceptId));
-  if (readiness?.weakestConceptId) {
-    const state = model.getConceptState(readiness.weakestConceptId);
-    const assessment = snapshot.assessments.find((item) => item.id === readiness.assessmentId);
+  const upcomingReadiness = readiness.find((item) => item.dueAt && Date.parse(item.dueAt) - +now <= 7 * DAY && item.weakestConceptId && !skipped.has(item.weakestConceptId));
+  if (upcomingReadiness?.weakestConceptId) {
+    const state = model.getConceptState(upcomingReadiness.weakestConceptId);
+    const assessment = snapshot.assessments.find((item) => item.id === upcomingReadiness.assessmentId);
     if (state && assessment) {
-      const action = actionForConcept(snapshot, state, now, state.preparedness === "ready" || state.preparedness === "strong" ? "test_out" : "review");
+      const action = actionForConcept(snapshot, state, now, state.preparedness === "ready" || state.preparedness === "strong" ? "test_out" : "review", model);
       return {
         ...action,
         id: `next-best:assessment:${assessment.id}:${state.conceptId}`,
@@ -511,13 +513,13 @@ function deriveNextBestAction(snapshot: Snapshot, now: Date, home: HomeProjectio
     .filter((state): state is ConceptState => state !== null && !skipped.has(state.conceptId))
     .filter((state) => state.memory.reviewDue && finiteDate(state.memory.reviewDue) && +finiteDate(state.memory.reviewDue)! <= +now && state.preparedness !== "strong")
     .sort((a, b) => (a.retrievability.value ?? 0) - (b.retrievability.value ?? 0) || a.name.localeCompare(b.name))[0];
-  if (dueConcept) return actionForConcept(snapshot, dueConcept, now, dueConcept.preparedness === "ready" || dueConcept.preparedness === "strong" ? "test_out" : "review");
+  if (dueConcept) return actionForConcept(snapshot, dueConcept, now, dueConcept.preparedness === "ready" || dueConcept.preparedness === "strong" ? "test_out" : "review", model);
   const nextTask = home.next ? taskFor(snapshot, home.next.taskId) : null;
   if (nextTask) return actionForTask(snapshot, nextTask, now, home, model);
   const objective = snapshot.classes.map((course) => model.recommendLearningObjective({ classId: course.id })).find((candidate) => candidate && !skipped.has(candidate.conceptId));
   if (objective) {
     const state = model.getConceptState(objective.conceptId);
-    if (state) return actionForConcept(snapshot, state, now, state.preparedness === "ready" || state.preparedness === "strong" ? "test_out" : "practice");
+    if (state) return actionForConcept(snapshot, state, now, state.preparedness === "ready" || state.preparedness === "strong" ? "test_out" : "practice", model);
   }
   return {
     id: "next-best:done",
@@ -536,7 +538,7 @@ function deriveNextBestAction(snapshot: Snapshot, now: Date, home: HomeProjectio
   };
 }
 
-function deriveIncompleteLoops(snapshot: Snapshot, model: ReturnType<typeof createStudentModel>, now: Date): IncompleteLearningLoop[] {
+function deriveIncompleteLoops(snapshot: Snapshot, now: Date, remediations: RemediationCandidate[], readiness: AssessmentLearningReadiness[]): IncompleteLearningLoop[] {
   const loops: IncompleteLearningLoop[] = [];
   for (const session of snapshot.sessions.filter((item) => item.endedAt).slice(-20)) {
     if (!session.review) {
@@ -545,10 +547,10 @@ function deriveIncompleteLoops(snapshot: Snapshot, model: ReturnType<typeof crea
       loops.push({ id: `session-evidence:${session.id}`, kind: "session-evidence", title: "Add one checked outcome", detail: "Time was recorded, but no checked attempt changed the Student Model.", taskId: session.taskId });
     }
   }
-  for (const remediation of deriveRemediations(snapshot, now).slice(0, 4)) {
+  for (const remediation of remediations.slice(0, 4)) {
     loops.push({ id: `mistake-correction:${remediation.blockedConceptId}`, kind: "mistake-correction", title: `Repair ${remediation.conceptName}`, detail: remediation.reason, conceptId: remediation.conceptId });
   }
-  for (const item of assessmentReadiness(snapshot, model, now).filter((assessment) => assessment.dueAt && Date.parse(assessment.dueAt) - +now <= 7 * DAY && assessment.state !== "strong")) {
+  for (const item of readiness.filter((assessment) => assessment.dueAt && Date.parse(assessment.dueAt) - +now <= 7 * DAY && assessment.state !== "strong")) {
     loops.push({ id: `assessment-coverage:${item.assessmentId}`, kind: "assessment-coverage", title: `${item.title} still has a learning gap`, detail: item.why[0] ?? "Record checked evidence for the assessment concepts.", conceptId: item.weakestConceptId ?? undefined });
   }
   return loops.slice(0, 12);
@@ -579,15 +581,16 @@ function deriveEffectiveLearning(snapshot: Snapshot, now: Date, windowDays = 14)
   };
 }
 
-export function deriveLearningLoop(snapshot: Snapshot, now = new Date(), home = deriveHome(snapshot, now)): LearningLoopProjection {
-  const model = createStudentModel(snapshot, now);
-  const remediations = deriveRemediations(snapshot, now);
+export function deriveLearningLoop(snapshot: Snapshot, now = new Date(), home = deriveHome(snapshot, now), suppliedModel?: StudentModel): LearningLoopProjection {
+  const model = suppliedModel ?? createStudentModel(snapshot, now);
+  const remediations = deriveRemediationsWithModel(snapshot, now, model);
+  const readiness = assessmentReadiness(snapshot, model, now);
   return {
-    nextBestAction: deriveNextBestAction(snapshot, now, home, remediations, model),
+    nextBestAction: deriveNextBestAction(snapshot, now, home, remediations, readiness, model),
     remediations,
-    incompleteLoops: deriveIncompleteLoops(snapshot, model, now),
+    incompleteLoops: deriveIncompleteLoops(snapshot, now, remediations, readiness),
     effectiveLearning: deriveEffectiveLearning(snapshot, now),
-    assessmentReadiness: assessmentReadiness(snapshot, model, now),
+    assessmentReadiness: readiness,
   };
 }
 

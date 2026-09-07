@@ -70,7 +70,7 @@ export function TestOutPanel({
         {plan.prompts.map((prompt) => (
           <li key={prompt.id}>
             <strong>{prompt.prompt}</strong>
-            <small>{prompt.rationale}{prompt.sourceIds.length ? " Grounded in linked class material." : ""}</small>
+            <small>{prompt.rationale}{prompt.sourceIds.length ? " Linked class material is available for context." : ""}</small>
             <label>
               Result
               <select
@@ -115,4 +115,3 @@ export function TestOutPanel({
     </section>
   );
 }
-

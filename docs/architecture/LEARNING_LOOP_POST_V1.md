@@ -24,6 +24,11 @@ The existing `NextAction` projection remains for compatibility with V1 Home;
 Home and class views can consume the richer projection without changing task or
 session authority.
 
+The Desk intelligence projection shares one Student Model instance across the
+learning loop and class projection. Remediations, assessment readiness, and
+incomplete loops are derived once per snapshot; test-out plans reuse that same
+model instead of rebuilding it for each action card.
+
 ## Evidence boundaries
 
 Elapsed time, opening Notes, reading a source, and completing a planner block
