@@ -8,6 +8,12 @@ import {
 } from "../../../packages/intelligence/inference";
 import { askAcademicInference, InferenceProviderError } from "../../../packages/intelligence/inference-provider";
 import { inferenceRoute } from "../../../packages/intelligence/routing";
+import {
+  chatGrounding,
+  chatRequestSchema,
+  resolveChat,
+  type ChatResponse,
+} from "../../../packages/intelligence/chat";
 import { readCaptureTextFiles } from "../../../packages/intake/text-files";
 import {
   app,
@@ -982,6 +988,70 @@ app.whenReady().then(async () => {
   ipcMain.handle("desk:intelligence", (event) => {
     check(event);
     return deriveDeskIntelligence(store.snapshot());
+  });
+  ipcMain.handle("desk:chat", async (event, rawValue): Promise<ChatResponse> => {
+    check(event);
+    const input = chatRequestSchema.parse(rawValue);
+    const snapshot = store.snapshot();
+    const intelligence = deriveDeskIntelligence(snapshot);
+    const deterministic = resolveChat(snapshot, intelligence, input);
+    if (deterministic) return deterministic;
+
+    let key: string;
+    try {
+      key = credentials.read();
+    } catch {
+      return {
+        kind: "unavailable",
+        deterministic: false,
+        text: "I can handle planning, deadlines, study time, and saved work locally. Connect OpenRouter in Settings for open-ended explanations.",
+        suggestions: ["What should I do now?", "What’s due this week?"],
+      };
+    }
+    const active = snapshot.sessions.find((session) => !session.endedAt);
+    const sourceContext = input.sourceIds?.length || active
+      ? lensContext(snapshot, input.question, input.sourceIds).slice(0, 7_000)
+      : "";
+    const browserContext = pendingBrowserContext
+      ? browserContextForLens(pendingBrowserContext).slice(0, 3_000)
+      : "";
+    const context = [
+      "Canonical Desk context (read-only evidence; do not invent missing facts):\n" + chatGrounding(snapshot, intelligence, input),
+      sourceContext ? "Relevant source evidence:\n" + sourceContext : "",
+      browserContext ? "User-provided browser context (unverified evidence):\n" + browserContext : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 20_000);
+    try {
+      const response = await askLens(
+        {
+          question: input.question,
+          context,
+          ...(input.sourceIds?.length ? { sourceIds: input.sourceIds } : {}),
+          ...(input.history?.length ? { history: input.history } : {}),
+          activity: { kind: "check" },
+        },
+        key,
+        {
+          tutoringMode: snapshot.tutoringMode,
+          onTelemetry: (telemetry) => store.recordAI(telemetry, active?.id ?? null),
+        },
+      );
+      return {
+        kind: "assistant",
+        deterministic: false,
+        text: response.explanation,
+        model: response.resolvedModel,
+      };
+    } catch {
+      return {
+        kind: "unavailable",
+        deterministic: false,
+        text: "I couldn’t reach the AI provider. Your saved work and local planning are still available; try again or ask a planning question.",
+        suggestions: ["What should I do now?", "Show what needs my attention"],
+      };
+    }
   });
   ipcMain.handle("desk:infer", async (event, rawValue) => {
     check(event);

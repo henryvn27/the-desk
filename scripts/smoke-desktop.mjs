@@ -37,7 +37,7 @@ async function launch() {
   }
   assert.ok(page, "Main Desk window opened");
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.getByText("Make room for focus.").waitFor();
+  await page.getByText("What are you working on?").waitFor();
 }
 try {
   await launch();
@@ -50,6 +50,7 @@ try {
   await page
     .getByRole("button", { name: "AP Physics C", exact: true })
     .waitFor();
+  await page.getByRole("button", { name: "Today", exact: true }).click();
   await page
     .getByRole("button", { name: "Capture assignment", exact: true })
     .click();
@@ -162,7 +163,7 @@ try {
   await page.locator("dialog").waitFor({ state: "detached" });
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.tasks.at(-1).captureEvidence.originalText, original);
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Today", exact: true }).click();
   await page
     .getByRole("button", { name: "Start session →", exact: true })
     .click();

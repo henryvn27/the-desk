@@ -17,6 +17,7 @@ const api: DeskAPI = {
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   search: (query) => ipcRenderer.invoke("desk:search", query),
   intelligence: () => ipcRenderer.invoke("desk:intelligence"),
+  chat: (input) => ipcRenderer.invoke("desk:chat", input),
   infer: (input) => ipcRenderer.invoke("desk:infer", input),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
   lensSubmit: (input) => ipcRenderer.invoke("desk:lens-submit", input),

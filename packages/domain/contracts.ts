@@ -26,6 +26,7 @@ import {
 } from "../sources/provenance";
 import type { DeskIntelligence } from "../intelligence/desk-intelligence";
 import type { AcademicInference, InferenceRequest } from "../intelligence/inference";
+import type { ChatRequest, ChatResponse } from "../intelligence/chat";
 export type CanvasRecord = {
   id: string;
   taskId: string;
@@ -1162,6 +1163,7 @@ export interface DeskAPI {
   canvas(id: string): Promise<CanvasRecord>;
   search(query: string): Promise<SearchResult[]>;
   intelligence(): Promise<DeskIntelligence>;
+  chat(input: ChatRequest): Promise<ChatResponse>;
   infer(input: InferenceRequest): Promise<AcademicInference>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   lensSubmit(input: LensSubmitInput): Promise<LensSubmitResult>;

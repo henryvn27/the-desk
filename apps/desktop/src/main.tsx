@@ -48,6 +48,8 @@ import { SessionKit } from "./SessionKit";
 import { SessionReview } from "./SessionReview";
 import { TestOutPanel } from "./TestOutPanel";
 import { BrowserBridgeSettings } from "./BrowserBridgeSettings";
+import { ChatWorkspace, type ChatThread } from "./ChatWorkspace";
+import type { ChatAction } from "../../../packages/intelligence/chat";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
 import type { TestOutPlan } from "../../../packages/intelligence/learning-loop";
 import { learningOverrideText } from "../../../packages/intelligence/learning-loop";
@@ -105,7 +107,7 @@ const emptySync: DeskSyncStatus = {
 };
 function App() {
   const [data, setData] = useState(empty),
-    [page, setPage] = useState("Home"),
+    [page, setPage] = useState("Chat"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [capture, setCapture] = useState(false),
@@ -126,6 +128,8 @@ function App() {
   const [canvas, setCanvas] = useState<CanvasTarget>();
   const [browserContext, setBrowserContext] =
     useState<BrowserBridgeMessage | null>(null);
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
+  const [activeChatThreadId, setActiveChatThreadId] = useState<string | null>(null);
   const [lensHotkeyStatus, setLensHotkeyStatus] = useState<LensHotkeyStatus>({
     available: false,
     source: "unavailable",
@@ -366,6 +370,41 @@ function App() {
       }
     });
   }, [active, busy, learningTask]);
+  function runChatAction(action: ChatAction) {
+    if (action.type === "resume-session") {
+      void window.desk.focusController();
+      return;
+    }
+    if (action.type === "start-session") {
+      if (active || busy) {
+        if (active) void window.desk.focusController();
+        return;
+      }
+      const task = data.tasks.find((candidate) => candidate.id === action.taskId);
+      void act({ type: "session.start", taskId: action.taskId }).then((state) => {
+        if (state && task?.resource) void open(task.id);
+      });
+      return;
+    }
+    if (action.type === "open-notes") {
+      void openCanvas(action.taskId);
+      return;
+    }
+    if (action.page === "Capture") {
+      setCapture(true);
+      return;
+    }
+    setPage(action.page);
+  }
+  function createChatThread() {
+    const id = crypto.randomUUID();
+    setChatThreads((threads) => [
+      ...threads,
+      { id, title: "New chat", messages: [], updatedAt: new Date().toISOString() },
+    ]);
+    setActiveChatThreadId(id);
+    setPage("Chat");
+  }
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (page !== "Home" || (!next && !learningTask) || active || busy) return;
@@ -587,19 +626,37 @@ function App() {
     <div className="shell">
       <aside>
         <div className="brand">The Desk</div>
+        <button
+          className="new-chat-button sidebar-new-chat"
+          type="button"
+          onClick={createChatThread}
+        >
+          <span aria-hidden="true">＋</span> New chat
+        </button>
         <nav className="primary-nav" aria-label="Main">
-          {["Home", "Plan", "Notes", "Library"].map((p) => (
-            <button
-              key={p}
-              aria-current={page === p ? "page" : undefined}
-              onClick={() => setPage(p)}
-            >
-              {p}
-            </button>
-          ))}
-          <button type="button" onClick={() => setCapture(true)}>Capture</button>
-          <button type="button" aria-current={page === "Settings" ? "page" : undefined} onClick={() => setPage("Settings")}>Settings</button>
+          <button
+            aria-current={page === "Chat" ? "page" : undefined}
+            onClick={() => setPage("Chat")}
+          >
+            Chat
+          </button>
         </nav>
+        <section className="sidebar-group" aria-labelledby="workspace-nav-title">
+          <div className="sidebar-group-title" id="workspace-nav-title">Workspace</div>
+          <nav className="secondary-nav" aria-label="Workspace">
+            {["Home", "Plan", "Notes", "Library"].map((p) => (
+              <button
+                key={p}
+                aria-current={page === p ? "page" : undefined}
+                onClick={() => setPage(p)}
+              >
+                {p === "Home" ? "Today" : p}
+              </button>
+            ))}
+          </nav>
+        </section>
+        <button type="button" className="sidebar-capture-button" onClick={() => setCapture(true)}>Capture</button>
+        <button type="button" className="sidebar-settings-button" aria-current={page === "Settings" ? "page" : undefined} onClick={() => setPage("Settings")}>Settings</button>
         <section className="sidebar-classes" aria-labelledby="classes-nav-title">
           <div className="sidebar-group-title" id="classes-nav-title">Classes</div>
           <div className="class-list">
@@ -748,7 +805,21 @@ function App() {
             </button>
           </p>
         )}
-        {page === "Home" ? (
+        {page === "Chat" ? (
+          <ChatWorkspace
+            data={data}
+            intelligence={intelligence}
+            busy={busy}
+            page={page}
+            threads={chatThreads}
+            activeThreadId={activeChatThreadId}
+            setThreads={setChatThreads}
+            setActiveThreadId={setActiveChatThreadId}
+            ask={(input) => window.desk.chat(input)}
+            onAction={runChatAction}
+            onNewChat={createChatThread}
+          />
+        ) : page === "Home" ? (
           <>
             <div className="home-heading">
               <div>
