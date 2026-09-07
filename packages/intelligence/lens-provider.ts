@@ -12,7 +12,7 @@ import {
 } from "./routing";
 import { activityInstruction, studyActivityKind } from "../study/activities";
 
-export const LENS_MODEL = "openai/gpt-5.6-terra" as const;
+export const LENS_MODEL = "openai/gpt-5.6-luna" as const;
 export const LENS_TIMEOUT_MS = 45_000;
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -235,7 +235,7 @@ export async function askLens(
 
   const teachingMode = tutoringMode.parse(options.tutoringMode ?? "balanced");
   const route = inferenceRoute(
-    options.tier ?? (input.imageDataUrl ? "MULTIMODAL" : "STANDARD"),
+    options.tier ?? (input.imageDataUrl ? "MULTIMODAL" : "FAST"),
   );
   const timeoutMs = options.timeoutMs ?? LENS_TIMEOUT_MS;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)

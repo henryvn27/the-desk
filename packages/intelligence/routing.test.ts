@@ -17,7 +17,7 @@ test("Desk owns each approved tier with privacy constraints and no fallback", ()
   assert.deepEqual(models, APPROVED_MODELS);
   assert.throws(() => inferenceRoute("openrouter/auto" as never));
 });
-test("normal text uses one Terra request, rejects model substitution and never invents cost", async () => {
+test("normal text uses one Luna request, rejects model substitution and never invents cost", async () => {
   let calls = 0;
   const fetcher: typeof fetch = async (_url, init) => {
     calls++;

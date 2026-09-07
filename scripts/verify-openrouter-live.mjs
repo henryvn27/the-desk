@@ -64,7 +64,7 @@ try {
   ]) {
     const expected = input.imageDataUrl
       ? "google/gemini-3.8-flash"
-      : "openai/gpt-5.6-terra";
+      : "openai/gpt-5.6-luna";
     try {
       const reply = await lens.evaluate(
         (input) => window.desk.askLens(input),
