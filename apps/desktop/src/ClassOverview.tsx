@@ -1,4 +1,5 @@
 import type { Command, Snapshot, Task } from "../../../packages/domain/contracts";
+import { useState } from "react";
 import {
   deriveClassExperience,
   type ClassAssessmentView,
@@ -6,6 +7,7 @@ import {
   type ClassUnitView,
 } from "../../../packages/domain/class-experience";
 import { sourceKindLabels } from "../../../packages/intelligence/source-kind";
+import type { NextAction } from "../../../packages/planner/next-action";
 import { Gradebook } from "./Gradebook";
 
 const assessmentLabels: Record<ClassAssessmentView["kind"], string> = {
@@ -84,6 +86,7 @@ export function ClassOverview({
   startTask,
   navigate,
   saveGrade,
+  nextAction,
 }: {
   data: Snapshot;
   classId: string;
@@ -93,7 +96,9 @@ export function ClassOverview({
   startTask: (taskId: string) => void;
   navigate: (page: string) => void;
   saveGrade: (command: Command) => Promise<unknown>;
+  nextAction?: NextAction;
 }) {
+  const [section, setSection] = useState<"overview" | "work" | "notes" | "progress" | "materials">("overview");
   const projection = deriveClassExperience(data, classId);
   if (!projection) return null;
   const teacherNames = projection.teachers.map((teacher) => teacher.name);
@@ -101,6 +106,7 @@ export function ClassOverview({
   const learning = projection.learning.slice(0, 6);
   const sources = projection.sources.slice(0, 4);
   const notes = projection.notes.slice(0, 4);
+  const sharedNextForClass = nextAction?.classId === classId ? nextAction : undefined;
   return (
     <section className="class-overview" aria-labelledby="class-overview-title">
       <section className="class-hero">
@@ -122,6 +128,56 @@ export function ClassOverview({
           <button type="button" onClick={() => navigate("Teachers")}>Teacher details</button>
         </div>
       </section>
+
+      <nav className="class-tabs" aria-label={`${projection.classRecord.name} workspace`}>
+        {(["overview", "work", "notes", "progress", "materials"] as const).map((item) => (
+          <button key={item} type="button" className={section === item ? "is-active" : undefined} aria-current={section === item ? "page" : undefined} onClick={() => setSection(item)}>
+            {item[0]!.toUpperCase() + item.slice(1)}
+          </button>
+        ))}
+      </nav>
+
+      {section !== "overview" && (
+        <section className="class-context-view" aria-live="polite">
+          {section === "work" && (
+            <>
+              <div className="eyebrow">Work</div>
+              <h2>Assignments for {projection.classRecord.name}</h2>
+              {projection.tasks.length ? projection.tasks.map((task) => (
+                <div className="context-row" key={task.id}>
+                  <div><strong>{task.title}</strong><small>{task.completed ? "Complete" : task.dueAt ? `Due ${dateLabel(task.dueAt)}` : "No due date"}</small></div>
+                  <div className="actions"><button type="button" onClick={() => editTask(task)}>Open</button>{!task.completed && <button type="button" className="primary" onClick={() => startTask(task.id)}>Start</button>}</div>
+                </div>
+              )) : <p className="muted">No assignments are connected to this class yet.</p>}
+            </>
+          )}
+          {section === "notes" && (
+            <>
+              <div className="eyebrow">Notes</div>
+              <h2>Notes from this class</h2>
+              {notes.length ? notes.map((note) => (
+                <div className="context-row" key={note.id}><div><strong>{note.title}</strong><small>{note.taskTitle} · updated {dateTimeLabel(note.updatedAt)}</small></div><button type="button" className="primary" onClick={() => void openCanvas(note.taskId, note.id, note.blockId)}>Open note</button></div>
+              )) : <p className="muted">No notes yet. Open an assignment to start one.</p>}
+            </>
+          )}
+          {section === "progress" && (
+            <>
+              <div className="eyebrow">Progress</div>
+              <h2>What is sticking</h2>
+              <div className="class-overview-grid context-grid"><section className="class-panel"><div className="eyebrow">Learning evidence</div>{learning.length ? learning.map((concept) => <div className="class-learning-row" key={concept.id}><div><strong>{concept.name}</strong><p>{preparednessLabels[concept.preparedness]} · {concept.unresolvedMistakes ? `${concept.unresolvedMistakes} open mistake${concept.unresolvedMistakes === 1 ? "" : "s"}` : "No open mistakes"}</p></div><span className={`status-pill status-${concept.preparedness}`}>{statusLabels[concept.recordedStatus]}</span></div>) : <p className="muted">No checked concept evidence yet.</p>}</section><section className="class-panel class-grade-panel"><div className="eyebrow">Grade evidence</div>{projection.grade.scoredWeight ? <><h2>{projection.grade.lower.toFixed(1)}{projection.grade.scoredWeight < 100 ? `–${projection.grade.upper.toFixed(1)}` : ""}%</h2><p>{projection.grade.scoredWeight.toFixed(0)}% of configured weight is represented by scores.</p></> : <p className="muted">No scored grade evidence yet.</p>}<Gradebook data={data} classId={classId} save={saveGrade} /></section></div>
+            </>
+          )}
+          {section === "materials" && (
+            <>
+              <div className="eyebrow">Materials</div>
+              <h2>Sources connected to this class</h2>
+              {sources.length ? sources.map((source) => <div className="context-row" key={source.id}><div><strong>{source.title}</strong><small>{formatLabels[source.format] ?? source.format} · revision {source.revision}</small></div><button type="button" className="primary" onClick={() => openSource(source.id)}>Read</button></div>) : <p className="muted">No class sources are linked yet.</p>}
+            </>
+          )}
+        </section>
+      )}
+
+      <div className="class-overview-core" hidden={section !== "overview"}>
 
       {!!projection.attention.length && (
         <section className="class-attention" aria-labelledby="class-attention-title">
@@ -163,7 +219,12 @@ export function ClassOverview({
             )}
             <details>
               <summary>Why this is next</summary>
-              <p>{projection.next.why}</p>
+              <p>{sharedNextForClass?.taskId === projection.next.taskId ? sharedNextForClass.reason : projection.next.why}</p>
+              {sharedNextForClass?.taskId === projection.next.taskId && (
+                <ul className="next-evidence">
+                  {sharedNextForClass.evidence.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              )}
             </details>
             <div className="actions">
               {projection.next.kind === "planned" ? (
@@ -303,6 +364,7 @@ export function ClassOverview({
             ))}
           </>}
         </section>
+      </div>
       </div>
     </section>
   );

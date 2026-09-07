@@ -1,19 +1,12 @@
 import { createHash } from "node:crypto";
 import type { Snapshot } from "../domain/contracts";
 import { deriveHome, type HomeAttention } from "../planner/home";
+import { deriveNextAction, type NextAction } from "../planner/next-action";
 import { createStudentModel, type ConceptState } from "./student-model";
 
 export const DESK_INTELLIGENCE_VERSION = "desk-intelligence-v1" as const;
 
-export type IntelligenceNextAction = {
-  kind: "active-session" | "start-task" | "resolve-attention" | "study-objective" | "capture";
-  title: string;
-  reason: string;
-  taskId?: string;
-  classId?: string;
-  attentionId?: string;
-  conceptId?: string;
-};
+export type IntelligenceNextAction = NextAction;
 
 export type ClassIntelligence = {
   classId: string;
@@ -64,6 +57,10 @@ function sourceFingerprint(snapshot: Snapshot) {
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
       sessions: snapshot.sessions,
+      studyBlocks: snapshot.studyBlocks,
+      planChanges: snapshot.planChanges,
+      authorityClaims: snapshot.authorityClaims,
+      captureInbox: snapshot.captureInbox.map((item) => ({ id: item.id, revision: item.revision, status: item.status })),
       sources: snapshot.sources.map((source) => ({ id: source.id, revision: source.revision, title: source.title })),
       planning: snapshot.planning,
     }))
@@ -130,35 +127,6 @@ function classIntelligence(
   };
 }
 
-function nextAction(snapshot: Snapshot, home: ReturnType<typeof deriveHome>, classes: ClassIntelligence[]): IntelligenceNextAction {
-  const active = snapshot.sessions.find((session) => !session.endedAt);
-  if (active) {
-    const task = snapshot.tasks.find((candidate) => candidate.id === active.taskId);
-    return {
-      kind: "active-session",
-      title: task ? `Continue ${task.title}` : "Continue the active study session",
-      reason: "An active session already owns the study controls; Home should return you to it.",
-      taskId: active.taskId,
-      classId: task?.classId,
-    };
-  }
-  if (home.next) {
-    const task = snapshot.tasks.find((candidate) => candidate.id === home.next!.taskId);
-    return {
-      kind: "start-task",
-      title: task?.title ?? "Start the next planned block",
-      reason: home.next.why,
-      taskId: home.next.taskId,
-      classId: task?.classId,
-    };
-  }
-  const attention = home.attention[0];
-  if (attention) return { kind: "resolve-attention", title: attention.title, reason: attention.detail, ...(attention.taskId ? { taskId: attention.taskId } : {}), attentionId: attention.id };
-  const objective = classes.find((course) => course.learningObjective);
-  if (objective?.learningObjective) return { kind: "study-objective", title: objective.learningObjective.title, reason: objective.learningObjective.reason, classId: objective.classId, conceptId: objective.learningObjective.conceptId };
-  return { kind: "capture", title: "Capture the next piece of schoolwork", reason: "There is no executable task or evidence-backed study objective yet." };
-}
-
 /** Read-only intelligence projection. Canonical tasks, concepts, attempts and sessions remain authoritative. */
 export function deriveDeskIntelligence(snapshot: Snapshot, now = new Date()): DeskIntelligence {
   const home = deriveHome(snapshot, now);
@@ -168,7 +136,7 @@ export function deriveDeskIntelligence(snapshot: Snapshot, now = new Date()): De
     version: DESK_INTELLIGENCE_VERSION,
     generatedAt: now.toISOString(),
     sourceFingerprint: sourceFingerprint(snapshot),
-    nextAction: nextAction(snapshot, home, classes),
+    nextAction: deriveNextAction(snapshot, now, home),
     attention: home.attention,
     classes,
     evidence: {

@@ -14,6 +14,9 @@ test("desk intelligence connects canonical evidence to an executable next action
     assert.equal(projection.version, "desk-intelligence-v1");
     assert.equal(projection.nextAction.kind, "start-task");
     assert.equal(projection.nextAction.taskId, taskId);
+    assert.equal(projection.nextAction.actions[0]?.id, "start");
+    assert.ok(projection.nextAction.evidence.length > 0);
+    assert.equal(projection.nextAction.estimatedMinutes, 45);
     assert.equal(projection.classes[0]?.learningObjective?.conceptId, conceptId);
     assert.equal(projection.evidence.attempts, 1);
     assert.equal(projection.sourceFingerprint.length, 64);

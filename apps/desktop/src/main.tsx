@@ -26,6 +26,7 @@ import type {
   CanvasRecord,
   LensHotkeyStatus,
 } from "../../../packages/domain/contracts";
+import type { DeskIntelligence } from "../../../packages/intelligence/desk-intelligence";
 import type { DeskSyncStatus } from "../../../packages/integrations/supabase-sync";
 import { deriveHome } from "../../../packages/planner/home";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
@@ -107,6 +108,7 @@ function App() {
     [capture, setCapture] = useState(false),
     [lastId, setLastId] = useState(""),
     [tick, setTick] = useState(Date.now());
+  const [intelligence, setIntelligence] = useState<DeskIntelligence>();
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
@@ -225,8 +227,16 @@ function App() {
       const current = ++request;
       try {
         const next = await window.desk.snapshot();
+        let interpretation: DeskIntelligence | undefined;
+        try {
+          interpretation = await window.desk.intelligence();
+        } catch {
+          // The workspace stays usable if the derived interpretation is
+          // temporarily unavailable; Home falls back to its planner projection.
+        }
         if (!active || current !== request) return;
         setData(next);
+        if (interpretation) setIntelligence(interpretation);
         setWorkspaceReady(true);
         setWorkspaceError("");
       } catch (e) {
@@ -299,6 +309,7 @@ function App() {
     try {
       const next = await window.desk.command(c);
       setData(next);
+      void window.desk.intelligence().then(setIntelligence).catch(() => undefined);
       return next;
     } catch (e) {
       if (reportToCaller) throw e;
@@ -316,7 +327,19 @@ function App() {
   }
   const home = deriveHome(data, new Date(tick));
   const week = home.plan;
-  const next = home.next ? data.tasks.find((t) => t.id === home.next!.taskId) : undefined;
+  const plannedNext = home.next ? data.tasks.find((t) => t.id === home.next!.taskId) : undefined;
+  const sharedNextAction = intelligence?.nextAction.kind === "start-task" ? intelligence.nextAction : undefined;
+  const sharedObjective = intelligence?.nextAction.kind === "study-objective" ? intelligence.nextAction : undefined;
+  const next = sharedNextAction?.taskId
+    ? data.tasks.find((task) => task.id === sharedNextAction.taskId) ?? plannedNext
+    : plannedNext;
+  const homeClassRows = data.classes.map((course) => {
+    const openTasks = data.tasks
+      .filter((task) => task.classId === course.id && !task.completed)
+      .sort((a, b) => (Date.parse(a.dueAt ?? "") || Infinity) - (Date.parse(b.dueAt ?? "") || Infinity));
+    const first = openTasks[0];
+    return { course, first, count: openTasks.length };
+  });
   const startNext = React.useCallback(() => {
     if (!next || active || busy) return;
     void act({ type: "session.start", taskId: next.id }).then((state) => {
@@ -477,6 +500,15 @@ function App() {
       <p>{Math.floor(elapsed)} min · {active.pausedAt ? "Paused" : "Working"}{active.activityState ? ` · ${active.activityState.mode === "standard" ? "Adaptive study" : active.activityState.mode === "quiz" ? "Quiz" : "Exam"}` : ""}</p>
       <p className="muted">The compact Study controller has the session controls.</p>
       <button type="button" onClick={() => void window.desk.focusController()}>Open study controller</button>
+      <details className="home-work-context">
+        <summary>Open work context</summary>
+        <SessionKit
+          task={activeTask}
+          data={data}
+          openResource={open}
+          save={(c) => act(c, true)}
+        />
+      </details>
     </section>
   ) : null;
   if (!workspaceReady)
@@ -538,7 +570,7 @@ function App() {
       <aside>
         <div className="brand">The Desk</div>
         <nav className="primary-nav" aria-label="Main">
-          {["Home", "Plan", "Library", "Capture Inbox"].map((p) => (
+          {["Home", "Plan", "Notes", "Library"].map((p) => (
             <button
               key={p}
               aria-current={page === p ? "page" : undefined}
@@ -547,35 +579,9 @@ function App() {
               {p}
             </button>
           ))}
+          <button type="button" onClick={() => setCapture(true)}>Capture</button>
+          <button type="button" aria-current={page === "Settings" ? "page" : undefined} onClick={() => setPage("Settings")}>Settings</button>
         </nav>
-        <section className="sidebar-group" aria-labelledby="study-nav-title">
-          <div className="sidebar-group-title" id="study-nav-title">Study</div>
-          <nav className="secondary-nav" aria-label="Study">
-            {["Memory", "Mistakes", "Concepts", "Attempts", "Assessments"].map((p) => (
-              <button
-                key={p}
-                aria-current={page === p ? "page" : undefined}
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </button>
-            ))}
-          </nav>
-        </section>
-        <section className="sidebar-group" aria-labelledby="academic-nav-title">
-          <div className="sidebar-group-title" id="academic-nav-title">Academic details</div>
-          <nav className="secondary-nav" aria-label="Academic details">
-            {["Evidence", "Authority", "Teachers", "Units", "Academic context"].map((p) => (
-              <button
-                key={p}
-                aria-current={page === p ? "page" : undefined}
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </button>
-            ))}
-          </nav>
-        </section>
         <section className="sidebar-classes" aria-labelledby="classes-nav-title">
           <div className="sidebar-group-title" id="classes-nav-title">Classes</div>
           <div className="class-list">
@@ -616,9 +622,21 @@ function App() {
             </button>
           </form>
         </section>
+        <details className="sidebar-more">
+          <summary>More tools</summary>
+          <div className="sidebar-more-list">
+            {["Memory", "Mistakes", "Concepts", "Attempts", "Assessments", "Evidence", "Authority", "Teachers", "Units", "Academic context", "Capture Inbox"].map((p) => (
+              <button
+                key={p}
+                aria-current={page === p ? "page" : undefined}
+                onClick={() => setPage(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </details>
         <div className="sidebar-bottom">
-          <button onClick={() => setCapture(true)}>＋ Capture</button>
-          <button onClick={() => setPage("Settings")}>Settings</button>
           <small>Saved on this Mac</small>
         </div>
       </aside>
@@ -650,7 +668,7 @@ function App() {
               <span>Search Library</span>
               <kbd>⌘K</kbd>
             </button>
-            <button onClick={() => setCapture(true)}>Capture</button>
+            <button aria-label="Quick capture" onClick={() => setCapture(true)}>Capture</button>
           </div>
         </header>
         {(workspaceError || error) && (
@@ -714,7 +732,14 @@ function App() {
         )}
         {page === "Home" ? (
           <>
-            <h1>Make room for focus.</h1>
+            <div className="home-heading">
+              <div>
+                <div className="eyebrow">Today</div>
+                <h1>Home</h1>
+                <p className="home-motto">Make room for focus.</p>
+              </div>
+              {active && <span className="home-live-state">Study session active</span>}
+            </div>
             {active ? activeHomeSummary : next ? (
               <section className="next">
                 <div className="eyebrow">
@@ -722,12 +747,17 @@ function App() {
                 </div>
                 <h2>{next.title}</h2>
                 <p>
-                  {home.next?.minutes} minutes
+                  {sharedNextAction?.estimatedMinutes ?? home.next?.minutes} minutes
                   {next.resource ? " · Resource ready" : ""}
                 </p>
                 <details>
-                  <summary>Why this?</summary>
-                  <p>{home.next?.why}</p>
+                  <summary>Why Desk thinks this</summary>
+                  <p>{sharedNextAction?.reason ?? home.next?.why}</p>
+                  {sharedNextAction?.evidence.length ? (
+                    <ul className="next-evidence">
+                      {sharedNextAction.evidence.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  ) : null}
                 </details>
                 <details>
                   <summary>Preview study materials</summary>
@@ -761,17 +791,34 @@ function App() {
                   </button>
                 </div>
               </section>
+            ) : sharedObjective ? (
+              <section className="next next-objective">
+                <div className="eyebrow">Suggested review</div>
+                <h2>{sharedObjective.title}</h2>
+                <p>{sharedObjective.reason}</p>
+                <details>
+                  <summary>Why Desk thinks this</summary>
+                  <ul className="next-evidence">
+                    {sharedObjective.evidence.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </details>
+                {sharedObjective.classId && (
+                  <button className="primary" type="button" onClick={() => setPage(sharedObjective.classId!)}>
+                    Open class workspace
+                  </button>
+                )}
+              </section>
             ) : (
               <section className="next">
                 <h2>
                   {data.classes.length
                     ? home.schedule.length ? "Nothing else needs starting today." : "Ready when you are."
-                    : "A place for your schoolwork."}
+                    : "Start with one class."}
                 </h2>
                 <p>
                   {data.classes.length
                     ? home.schedule.length ? "Your next planned block is shown in Upcoming." : "Capture an assignment to plan your next session."
-                    : "Add your first class, then capture an assignment."}
+                    : "Add a class, then capture your first assignment."}
                 </p>
                 <button onClick={() => setCapture(true)}>
                   Capture assignment
@@ -792,6 +839,20 @@ function App() {
             ))}
             {!home.today.length && (
               <p className="muted">No remaining study blocks planned today.</p>
+            )}
+            {!!homeClassRows.length && (
+              <section aria-labelledby="home-classes-title" className="home-class-status">
+                <h2 className="section-title" id="home-classes-title">Classes</h2>
+                {homeClassRows.map(({ course, first, count }) => (
+                  <button className="home-class-row" type="button" key={course.id} onClick={() => setPage(course.id)}>
+                    <span className="home-class-name"><span className="dot" />{course.name}</span>
+                    <span className="home-class-detail">
+                      {first ? <><strong>{first.title}</strong><small>{first.dueAt ? `Due ${new Date(first.dueAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}` : "No due date"}{count > 1 ? ` · ${count} open` : ""}</small></> : <><strong>All clear</strong><small>No unfinished work</small></>}
+                    </span>
+                    <span className="home-class-arrow" aria-hidden="true">›</span>
+                  </button>
+                ))}
+              </section>
             )}
             {!active && (home.attention.length > 0 || (unreviewed && reviewTask)) && (
               <section aria-labelledby="home-attention-title">
@@ -856,6 +917,8 @@ function App() {
               </section>
             )}
           </>
+        ) : page === "Notes" ? (
+          <NotesHub data={data} openCanvas={openCanvas} newNotebook={newNotebook} />
         ) : page === "Memory" ? (
           <Memory data={data} save={(c) => act(c, true)} />
         ) : page === "Mistakes" ? (
@@ -940,6 +1003,7 @@ function App() {
         ) : (
           <Library
             data={data}
+            nextAction={intelligence?.nextAction}
             classId={data.classes.some((c) => c.id === page) ? page : undefined}
             open={open}
             edit={setEditing}
@@ -1083,8 +1147,68 @@ function App() {
     </div>
   );
 }
+
+function NotesHub({
+  data,
+  openCanvas,
+  newNotebook,
+}: {
+  data: Snapshot;
+  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
+  newNotebook: (taskId: string) => Promise<void>;
+}) {
+  const notes = data.canvases
+    .map((note) => ({
+      note,
+      task: data.tasks.find((task) => task.id === note.taskId),
+    }))
+    .sort((a, b) => Date.parse(b.note.updatedAt) - Date.parse(a.note.updatedAt));
+  return (
+    <section className="notes-hub" aria-labelledby="notes-title">
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">Workspace</div>
+          <h1 id="notes-title">Notes</h1>
+          <p className="page-lede">Your typed notes and freeform thinking, together.</p>
+        </div>
+        <span className="muted">{notes.length} {notes.length === 1 ? "note" : "notes"}</span>
+      </div>
+      {notes.length ? (
+        <div className="notes-list">
+          {notes.map(({ note, task }) => (
+            <article className="notes-list-row" key={note.id}>
+              <div>
+                <div className="eyebrow">{task ? data.classes.find((item) => item.id === task.classId)?.name ?? "Class note" : "Note"}</div>
+                <h2>{note.title || task?.title || "Untitled note"}</h2>
+                <p className="muted">Updated {new Date(note.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
+              </div>
+              <button type="button" className="primary" onClick={() => void openCanvas(note.taskId, note.id)}>Open note</button>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <section className="empty-state">
+          <div className="empty-state-mark">N</div>
+          <h2>Start with a note</h2>
+          <p>Open a task from a class to create a note that stays connected to your work.</p>
+          {data.tasks.length > 0 ? (
+            <div className="empty-state-actions">
+              {data.tasks.slice(0, 3).map((task) => (
+                <button key={task.id} type="button" onClick={() => void newNotebook(task.id)}>
+                  New note · {task.title}
+                </button>
+              ))}
+            </div>
+          ) : <p className="muted">Capture an assignment first, then your note will have a place to live.</p>}
+        </section>
+      )}
+    </section>
+  );
+}
+
 function Library({
   data,
+  nextAction,
   classId,
   open,
   edit,
@@ -1098,6 +1222,7 @@ function Library({
   startTask,
 }: {
   data: Snapshot;
+  nextAction?: DeskIntelligence["nextAction"];
   classId?: string;
   open: (id: string) => Promise<void>;
   edit: (task: Task) => void;
@@ -1142,6 +1267,7 @@ function Library({
       {classId ? (
         <ClassOverview
           data={data}
+          nextAction={nextAction}
           classId={classId}
           openCanvas={openCanvas}
           openSource={(sourceId) => setReaderTarget({ sourceId })}
@@ -1151,6 +1277,7 @@ function Library({
           saveGrade={saveGrade}
         />
       ) : <h1>Library</h1>}
+      {!classId && <>
       <label htmlFor="search">Search tasks, Notes, sources and math</label>
       <input
         id="search"
@@ -1187,6 +1314,7 @@ function Library({
           })
         }
       />
+      </>}
       {readerSource && (
         <SourceReader
           source={readerSource}
@@ -1197,6 +1325,7 @@ function Library({
           openCanvas={openCanvas}
         />
       )}
+      {!classId && <>
       {data.tasks
         .filter(
           (t) =>
@@ -1352,6 +1481,7 @@ function Library({
             <span>{t.minutes} min</span>
           </article>
         ))}
+      </>}
     </>
   );
 }
