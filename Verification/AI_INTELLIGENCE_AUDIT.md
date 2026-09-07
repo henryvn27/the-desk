@@ -37,6 +37,7 @@ This is a post-V1 closure pass for missing intelligence boundaries. It extends t
 - Strict TypeScript and targeted ESLint pass.
 - The deterministic benchmark passes with the current fixture: 20 orchestration runs averaged 13.019 ms each; 100 inference inputs averaged 1.812 ms each with a 24.781 ms maximum. The benchmark does not call a provider or use a credential.
 - Existing V1 tests remain the regression floor; full `npm test`, `npm run check`, packaging and installed-app smoke must pass before this audit is called release-ready.
+- A bounded live probe passed on 2026-09-07 for one synthetic text request on Luna and one synthetic image request on Gemini Flash. Both returned HTTP 200, schema-valid answers and usage/cost telemetry. This verifies the configured transport and current key for those two routes; it does not establish general teaching quality or account-level provider retention settings.
 
 ## Integrity and scope limits
 
