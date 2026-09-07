@@ -518,6 +518,30 @@ export class DeskStore {
       .prepare("INSERT INTO ai_runs VALUES(?,?,?,?,?)")
       .run(randomUUID(), userId, sessionId, "lens", JSON.stringify(event));
   }
+  recordInference(
+    event: {
+      model: string;
+      resolvedModel?: string;
+      startedAt: string;
+      latencyMs: number;
+      success: boolean;
+      httpStatus: number | null;
+      errorCode: string | null;
+      usage: {
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+      } | null;
+    },
+    sessionId: string | null = null,
+  ) {
+    const userId =
+      this.db.prepare("SELECT id FROM users ORDER BY rowid LIMIT 1").get()
+        ?.id ?? "local";
+    this.db
+      .prepare("INSERT INTO ai_runs VALUES(?,?,?,?,?)")
+      .run(randomUUID(), userId, sessionId, "inference", JSON.stringify(event));
+  }
   snapshot(): Snapshot {
     const mode = this.db
       .prepare("SELECT data FROM settings WHERE id='planning-mode'")

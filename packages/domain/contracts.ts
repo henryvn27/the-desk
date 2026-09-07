@@ -24,6 +24,8 @@ import {
   type SourceAnnotation,
   type SourceRevisionSummary,
 } from "../sources/provenance";
+import type { DeskIntelligence } from "../intelligence/desk-intelligence";
+import type { AcademicInference, InferenceRequest } from "../intelligence/inference";
 export type CanvasRecord = {
   id: string;
   taskId: string;
@@ -1159,6 +1161,8 @@ export interface DeskAPI {
   deleteLocalData(): Promise<Snapshot>;
   canvas(id: string): Promise<CanvasRecord>;
   search(query: string): Promise<SearchResult[]>;
+  intelligence(): Promise<DeskIntelligence>;
+  infer(input: InferenceRequest): Promise<AcademicInference>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   lensSubmit(input: LensSubmitInput): Promise<LensSubmitResult>;
   lensDraft(selection: LensSelection, transcript?: string): Promise<void>;

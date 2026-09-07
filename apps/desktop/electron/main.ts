@@ -1,4 +1,13 @@
 import { lensContext } from "../../../packages/intelligence/grounding";
+import { deriveDeskIntelligence } from "../../../packages/intelligence/desk-intelligence";
+import {
+  applyProviderPatch,
+  inferAcademic,
+  inferenceRequestSchema,
+  shouldEscalateInference,
+} from "../../../packages/intelligence/inference";
+import { askAcademicInference, InferenceProviderError } from "../../../packages/intelligence/inference-provider";
+import { inferenceRoute } from "../../../packages/intelligence/routing";
 import { readCaptureTextFiles } from "../../../packages/intake/text-files";
 import {
   app,
@@ -969,6 +978,86 @@ app.whenReady().then(async () => {
   ipcMain.handle("desk:search", (event, value) => {
     check(event);
     return store.search(z.string().trim().max(200).parse(value));
+  });
+  ipcMain.handle("desk:intelligence", (event) => {
+    check(event);
+    return deriveDeskIntelligence(store.snapshot());
+  });
+  ipcMain.handle("desk:infer", async (event, rawValue) => {
+    check(event);
+    const input = inferenceRequestSchema.parse(rawValue);
+    const startedAt = new Date().toISOString();
+    const startedMs = Date.now();
+    const route = inferenceRoute("FAST");
+    const record = (eventData: {
+      resolvedModel?: string;
+      success: boolean;
+      httpStatus: number | null;
+      errorCode: string | null;
+      usage: {
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+      } | null;
+    }) => {
+      store.recordInference({
+        model: route.model,
+        ...eventData,
+        startedAt,
+        latencyMs: Math.max(0, Date.now() - startedMs),
+      });
+    };
+    const snapshot = store.snapshot();
+    const deterministic = inferAcademic(input, {
+      classes: snapshot.classes,
+      now: new Date(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+    if (!shouldEscalateInference(deterministic)) return deterministic;
+    let key: string;
+    try {
+      key = credentials.read();
+    } catch {
+      record({ success: false, httpStatus: null, errorCode: "provider-unavailable", usage: null });
+      return {
+        ...deterministic,
+        provider: { attempted: false, applied: false, reason: "provider-unavailable" },
+      };
+    }
+    try {
+      const provider = await askAcademicInference(
+        input,
+        snapshot.classes.map((course) => course.name),
+        key,
+        { tier: "FAST" },
+      );
+      record({
+        resolvedModel: provider.resolvedModel,
+        success: true,
+        httpStatus: 200,
+        errorCode: null,
+        usage: provider.usage,
+      });
+      return applyProviderPatch(
+        deterministic,
+        provider.patch,
+        input,
+        snapshot.classes,
+        provider.model,
+      );
+    } catch (error) {
+      const reason = error instanceof InferenceProviderError ? error.code : "provider-failed";
+      record({
+        success: false,
+        httpStatus: error instanceof InferenceProviderError ? error.status : null,
+        errorCode: reason,
+        usage: null,
+      });
+      return {
+        ...deterministic,
+        provider: { attempted: true, applied: false, reason },
+      };
+    }
   });
   ipcMain.handle("desk:canvas-export", async (event, id, raw) => {
     check(event);

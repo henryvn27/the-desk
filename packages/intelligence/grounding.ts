@@ -3,6 +3,7 @@ import { sourcePassage } from "./passages";
 import { sourcePriority } from "./source-kind";
 import { authorityClaimsConflict, authorityPriority } from "./authority";
 import type { Snapshot } from "../domain/contracts";
+import { createStudentModel } from "./student-model";
 
 /** Bounded, local evidence only. No URL fetching or inferred source authority. */
 export function lensContext(
@@ -54,6 +55,32 @@ export function lensContext(
       )
     : undefined;
   const selectedClassId = task?.classId ?? eligible.flatMap((source) => source.classIds)[0];
+  const studentModel = createStudentModel(state);
+  const studentConcepts = selectedClassId
+    ? (state.concepts ?? [])
+        .filter((concept) => concept.classId === selectedClassId)
+        .map((concept) => studentModel.getConceptState(concept.id))
+        .filter((concept): concept is NonNullable<ReturnType<typeof studentModel.getConceptState>> => Boolean(concept))
+        .sort((a, b) => a.preparedness.localeCompare(b.preparedness) || a.name.localeCompare(b.name))
+        .slice(0, 8)
+    : [];
+  const studentObjective = selectedClassId
+    ? studentModel.recommendLearningObjective({ classId: selectedClassId })
+    : null;
+  const studentAssessments = selectedClassId
+    ? (state.assessments ?? [])
+        .filter((assessment) => assessment.classId === selectedClassId)
+        .slice(0, 6)
+        .map((assessment) => {
+          const readiness = studentModel.getAssessmentReadiness(assessment.id);
+          return {
+            id: assessment.id,
+            title: assessment.title,
+            state: readiness?.state ?? "not-ready",
+            evidenceGaps: readiness?.evidenceGaps.slice(0, 4) ?? [],
+          };
+        })
+    : [];
   const context = {
     scope: requested ? "selected-sources" : "active-task",
     selectedSourceIds: requested ? [...requested] : undefined,
@@ -64,6 +91,27 @@ export function lensContext(
     resource: task?.resource ?? null,
     resourceFetched: false,
     resourceOmitted: false,
+    studentModel: {
+      objective: studentObjective
+        ? {
+            conceptId: studentObjective.conceptId,
+            title: studentObjective.title,
+            reason: studentObjective.reason,
+          }
+        : null,
+      concepts: studentConcepts.map((concept) => ({
+        id: concept.conceptId,
+        name: concept.name,
+        preparedness: concept.preparedness,
+        competence: concept.competence.label,
+        retrievability: concept.retrievability.label,
+        evidenceConfidence: concept.evidenceConfidence.label,
+        unresolvedMistakes: concept.unresolvedMistakes,
+        why: concept.why.slice(0, 2),
+      })),
+      assessments: studentAssessments,
+      evidenceIsCheckedWorkOnly: true,
+    },
     memories: [] as {
       id: string;
       text: string;

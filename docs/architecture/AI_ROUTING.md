@@ -10,11 +10,17 @@ Deterministic capture and scheduling remain TypeScript. Normal inference uses a 
 | MULTIMODAL | google/gemini-3.8-flash | google-vertex/global |
 | VERIFY | anthropic/claude-sonnet-5 | amazon-bedrock/global |
 
-Text Lens uses STANDARD; explicit image input uses MULTIMODAL. The other tiers are registered, with workload escalation still unimplemented. Requested and returned model identities are checked against the small alias/canonical-ID registry in `packages/intelligence/routing.ts`. Unknown substitutions fail closed. These model IDs and provider ZDR listings were checked against the public catalog on 2026-09-06; availability remains external state.
+Text Lens uses FAST (`openai/gpt-5.6-luna`); explicit image input uses MULTIMODAL. The other tiers are registered. Generic academic inference also starts on FAST and is called only after the deterministic pass marks a critical field ambiguous or incomplete. Requested and returned model identities are checked against the small alias/canonical-ID registry in `packages/intelligence/routing.ts`. Unknown substitutions fail closed. These model IDs and provider ZDR listings were checked against the public catalog on 2026-09-06; availability remains external state.
 
 Every request specifies `only`, `order`, `allow_fallbacks: false`, `require_parameters: true`, `data_collection: deny`, and `zdr: true`. No route silently relaxes privacy when unavailable. Provider retention constraints do not prove OpenRouter account-level input/output logging is disabled. Those account settings remain unverified.
 
 Requests use strict JSON-schema output, bounded input/history/output, a 45-second timeout and cancellation. No model tool actions are enabled. Questions and active task excerpts are included on Ask. Captured images are included only after explicit sharing. History is bounded and discarded with the Lens window.
+
+## Academic inference boundary
+
+`packages/intelligence/inference.ts` is the shared deterministic first pass for Capture, browser context, Sources, Notes and future session inputs. It emits per-field confidence, source/revision/location provenance, conflicts and a review requirement without creating academic objects or writing a second store. The trusted main-process `desk:infer` handler may call the structured OpenRouter inference helper only when the deterministic pass cannot resolve a critical field. The renderer can request an inference, but cannot choose the model, tier, endpoint or credential.
+
+Provider suggestions are bounded patches. They can fill an unresolved field at medium confidence, never overwrite a high-confidence or user-confirmed value, and remain marked `desk-inference` until the student confirms them. A provider failure returns the deterministic result with a sanitized reason; there is no retry loop, silent fallback, background autonomy or provider-side arithmetic. Capture continues to preserve the original evidence and route uncertain work through the existing Inbox.
 
 ## Credentials
 

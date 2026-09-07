@@ -974,6 +974,7 @@ function App() {
           tasks={data.tasks}
           sessions={learningSessions(data)}
           busy={busy}
+          onInfer={(input) => window.desk.infer(input)}
           existing={editing}
           onClose={() => setEditing(undefined)}
           onSave={async (input, deadlineChangeApproved) =>
@@ -1000,6 +1001,7 @@ function App() {
           tasks={data.tasks}
           sessions={learningSessions(data)}
           busy={busy}
+          onInfer={(input) => window.desk.infer(input)}
           initialDraft={reviewingCapture.draft}
           onClose={() => setReviewingCapture(undefined)}
           onSave={async (input) => {
@@ -1028,6 +1030,7 @@ function App() {
           tasks={data.tasks}
           sessions={learningSessions(data)}
           busy={busy}
+          onInfer={(input) => window.desk.infer(input)}
           onImport={async () => {
             setBusy(true);
             try {

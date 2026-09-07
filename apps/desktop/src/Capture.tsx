@@ -13,6 +13,11 @@ import {
   interpretCapture,
   type CaptureDraft,
 } from "../../../packages/intelligence/capture";
+import {
+  mergeInferenceIntoCaptureDraft,
+  type AcademicInference,
+  type InferenceRequest,
+} from "../../../packages/intelligence/inference";
 export function Capture({
   classes,
   gradeCategories,
@@ -28,6 +33,7 @@ export function Capture({
   contextClassId,
   onQueue,
   onImport,
+  onInfer,
 }: {
   policy?: CapturePolicy;
   initialDraft?: CaptureDraft;
@@ -35,6 +41,7 @@ export function Capture({
   contextClassId?: string;
   onQueue?: (text: string, contextClassId?: string) => Promise<void>;
   onImport?: () => Promise<void>;
+  onInfer?: (input: InferenceRequest) => Promise<AcademicInference>;
   classes: Class[];
   gradeCategories: GradeCategory[];
   tasks: Task[];
@@ -55,6 +62,7 @@ export function Capture({
   );
   const [index, setIndex] = useState(0);
   const [error, setError] = useState("");
+  const [inferenceBusy, setInferenceBusy] = useState(false);
   const draft = drafts[index];
   const formKey = index + ":" + (draft?.title ?? "manual");
   const [estimateInput, setEstimateInput] = useState<{
@@ -109,6 +117,28 @@ export function Capture({
       setIndex(0);
     } catch (e) {
       setError(userError(e));
+    }
+  }
+  async function enrichWithDesk() {
+    if (!draft || !onInfer) return;
+    setInferenceBusy(true);
+    setError("");
+    try {
+      const result = await onInfer({
+        sourceKind: "capture",
+        ...(draft.title ? { title: draft.title } : {}),
+        text: draft.provenance.sourceText,
+        capturedAt: draft.provenance.capturedAt,
+      });
+      setDrafts((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index ? mergeInferenceIntoCaptureDraft(item, result) : item,
+        ),
+      );
+    } catch (value) {
+      setError(userError(value));
+    } finally {
+      setInferenceBusy(false);
     }
   }
   const contextClass = contextClassId
@@ -227,6 +257,11 @@ export function Capture({
                 ))}
               </ul>
             </details>
+          )}
+          {onInfer && (draft.uncertainties.length > 0 || Object.values(draft.confidence).some((value) => value !== "high")) && (
+            <button type="button" disabled={busy || inferenceBusy} onClick={() => void enrichWithDesk()}>
+              {inferenceBusy ? "Resolving with Desk AI…" : "Resolve ambiguous fields with Desk AI"}
+            </button>
           )}
         </>
       )}

@@ -121,7 +121,7 @@ function providerFailureChecks() {
         expectedCode: "malformed_response",
         expectedStatus: 200,
         response: () =>
-          new Response(JSON.stringify({ model: "openai/gpt-5.6-terra", choices: [] }), {
+          new Response(JSON.stringify({ model: "openai/gpt-5.6-luna", choices: [] }), {
             status: 200,
             headers: jsonHeaders,
           }),
@@ -181,10 +181,12 @@ assert.deepEqual(packageJson.build?.files, [
   "dist/**",
   "dist-electron/**",
   "dist-extension/**",
+  "assets/**",
   "package.json",
 ]);
 assert.deepEqual(packageJson.build?.extraResources, [
   { from: "licenses", to: "licenses" },
+  { from: "dist-electron/lens-hotkey", to: "lens-hotkey" },
 ]);
 
 const outputRoots = ["dist", "dist-electron", "dist-extension"];
