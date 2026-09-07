@@ -73,6 +73,7 @@ export function Lens({
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [marks, setMarks] = useState<LensOverlayMark[]>([]);
+  const [visibleMarks, setVisibleMarks] = useState<LensOverlayMark[]>([]);
   const [history, setHistory] = useState<LensHistoryTurn[]>([]);
   const [scopeIds, setScopeIds] = useState<string[]>([]);
   const [activity, setActivity] = useState<StudyActivityKind>(initialActivity ?? "check");
@@ -80,12 +81,37 @@ export function Lens({
   const [showMistake, setShowMistake] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const speechTextRef = useRef("");
+  const speechFinalTextRef = useRef("");
+  const questionRef = useRef("");
+  const submittedQuestionRef = useRef("");
+  const activeModeRef = useRef<LensInteractionState["mode"]>(null);
+  const previousPhaseRef = useRef<LensInteractionState["phase"] | null>(null);
   const hasSentFallbackKeyUp = useRef(false);
   const scopedSources = sources.filter((source) => scopeIds.includes(source.id));
   const selecting = interaction.phase === "voice-selecting" || interaction.phase === "typed-selecting";
   const inputVisible = interaction.phase === "typed-input";
   const answerVisible = interaction.phase === "answer";
   const hasSelection = paths.some((path) => path.length > 0);
+
+  useEffect(() => {
+    questionRef.current = question;
+  }, [question]);
+
+  function stopPresentation() {
+    if (typeof window.speechSynthesis !== "undefined") window.speechSynthesis.cancel();
+    setVisibleMarks([]);
+    setMarks([]);
+  }
+
+  function speakExplanation(explanation: string) {
+    if (activeModeRef.current !== "voice" || typeof window.speechSynthesis === "undefined") return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(explanation.slice(0, 1_200));
+    utterance.rate = 1.04;
+    utterance.pitch = 1;
+    utterance.volume = 0.86;
+    window.speechSynthesis.speak(utterance);
+  }
 
   useEffect(() => {
     const applyContext = (context: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] } | null) => {
@@ -102,12 +128,29 @@ export function Lens({
   useEffect(() => {
     void window.desk.lensInteractionState().then(setInteraction).catch(() => undefined);
     const unsubscribe = window.desk.onLensInteraction((next) => {
+      const previousPhase = previousPhaseRef.current;
+      previousPhaseRef.current = next.phase;
+      activeModeRef.current = next.mode;
+      if (
+        (next.phase === "arming" || next.phase === "voice-selecting" || next.phase === "typed-selecting") &&
+        (previousPhase === "answer" || previousPhase === "submitting")
+      ) {
+        stopPresentation();
+        setPaths([]);
+        setAnswer(null);
+        setQuestion("");
+        setTranscript("");
+        speechTextRef.current = "";
+        speechFinalTextRef.current = "";
+        setError("");
+        setStatus("");
+      }
       setInteraction(next);
       if (next.phase === "voice-selecting") {
-        setStatus("Listening · draw around what you want help with");
+        setStatus("Listening");
         setError("");
       } else if (next.phase === "typed-selecting") {
-        setStatus("Circle anything on screen");
+        setStatus("Select");
         setError("");
       } else if (next.phase === "typed-input") {
         setStatus("");
@@ -125,12 +168,17 @@ export function Lens({
       setBusy(false);
       setQuestion("");
       setTranscript("");
+      speechTextRef.current = "";
+      speechFinalTextRef.current = "";
       setMarks(response.overlays);
+      speakExplanation(response.explanation);
+      const submittedQuestion = submittedQuestionRef.current || questionRef.current;
       setHistory((turns) => [
         ...turns,
-        ...(question.trim() ? [{ role: "user" as const, content: question.trim() }] : []),
+        ...(submittedQuestion.trim() ? [{ role: "user" as const, content: submittedQuestion.trim() }] : []),
         { role: "assistant" as const, content: response.explanation.slice(0, 4_000) },
       ].slice(-8));
+      submittedQuestionRef.current = "";
     });
     const errorUnsubscribe = window.desk.onLensError((message) => {
       setError(message);
@@ -141,7 +189,31 @@ export function Lens({
       answerUnsubscribe();
       errorUnsubscribe();
     };
-  }, [question]);
+  }, []);
+
+  useEffect(() => {
+    if (!answerVisible || marks.length === 0) {
+      setVisibleMarks([]);
+      return;
+    }
+    const ordered = marks
+      .map((mark, index) => ({ mark, index }))
+      .filter(({ mark }) => mark.confidence == null || mark.confidence >= 0.45)
+      .sort((left, right) => (left.mark.sequence ?? left.index) - (right.mark.sequence ?? right.index));
+    setVisibleMarks([]);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const [index, item] of ordered.entries()) {
+      const delay = Math.min(3_000, index * 320);
+      timers.push(setTimeout(() => {
+        setVisibleMarks((current) => [...current, item.mark]);
+      }, delay));
+      const duration = Math.max(300, Math.min(12_000, item.mark.durationMs ?? 4_800));
+      timers.push(setTimeout(() => {
+        setVisibleMarks((current) => current.filter((mark) => mark !== item.mark));
+      }, delay + duration));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [answerVisible, marks]);
 
   useEffect(() => {
     if (!selecting && !inputVisible) return;
@@ -184,14 +256,16 @@ export function Lens({
         recognition.interimResults = true;
         recognition.lang = navigator.language || "en-US";
         recognition.onresult = (event) => {
-          let text = speechTextRef.current;
+          let finalText = speechFinalTextRef.current;
+          let interimText = "";
           for (let index = event.resultIndex; index < event.results.length; index += 1) {
             const result = event.results[index];
             const value = result?.[0]?.transcript?.trim() ?? "";
-            if (result?.isFinal && value) text = `${text} ${value}`.trim();
-            else if (value) text = `${text} ${value}`.trim();
+            if (result?.isFinal && value) finalText = `${finalText} ${value}`.trim();
+            else if (value) interimText = `${interimText} ${value}`.trim();
           }
-          speechTextRef.current = text.slice(0, 4_000);
+          speechFinalTextRef.current = finalText.slice(0, 4_000);
+          speechTextRef.current = `${speechFinalTextRef.current} ${interimText}`.trim().slice(0, 4_000);
           setTranscript(speechTextRef.current);
         };
         recognition.onerror = (event) => {
@@ -210,6 +284,7 @@ export function Lens({
         setStatus("Microphone permission is unavailable. Release to type a question instead.");
       }
     };
+    speechFinalTextRef.current = transcript;
     speechTextRef.current = transcript;
     void start();
     return () => {
@@ -221,9 +296,17 @@ export function Lens({
   }, [interaction.phase]);
 
   useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+      if (typeof window.speechSynthesis !== "undefined") window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        stopPresentation();
         void window.desk.dismiss();
         return;
       }
@@ -256,6 +339,7 @@ export function Lens({
   async function submit() {
     const value = question.trim() || transcript.trim();
     if (!value || busy) return;
+    submittedQuestionRef.current = value;
     setBusy(true);
     setError("");
     try {
@@ -306,16 +390,55 @@ export function Lens({
   const inputStyle = bounds
     ? { left: `${Math.min(70, Math.max(2, bounds.x * 100))}%`, top: `${Math.min(78, Math.max(2, (bounds.y + bounds.height) * 100 + 2))}%` }
     : { right: "24px", bottom: "24px" };
+  const answerToRight = bounds ? bounds.x + bounds.width <= 0.64 : true;
+  const answerAbove = bounds ? bounds.y > 0.58 : false;
+  const answerStyle = bounds
+    ? {
+        left: `${Math.min(96, Math.max(4, (answerToRight ? bounds.x + bounds.width + 0.015 : bounds.x - 0.015) * 100))}%`,
+        top: `${Math.min(96, Math.max(4, bounds.y * 100))}%`,
+        transform: `${answerToRight ? "" : "translateX(-100%)"}${answerAbove ? " translateY(-100%)" : ""}`.trim() || undefined,
+      }
+    : { right: "24px", top: "24px" };
+  const viewportWidth = Math.max(1, window.innerWidth);
+  const viewportHeight = Math.max(1, window.innerHeight);
+
+  function renderMark(mark: LensOverlayMark, index: number) {
+    const x = mark.x * viewportWidth;
+    const y = mark.y * viewportHeight;
+    const x2 = (mark.x2 ?? mark.x) * viewportWidth;
+    const y2 = (mark.y2 ?? mark.y) * viewportHeight;
+    const key = `${mark.type}-${index}-${mark.sequence ?? 0}`;
+    if (mark.type === "point")
+      return <circle key={key} className="lens-mark lens-mark-point" cx={x} cy={y} r={5} />;
+    if (mark.type === "arrow")
+      return <line key={key} className="lens-mark lens-mark-arrow" x1={x} y1={y} x2={x2} y2={y2} markerEnd="url(#lens-arrowhead)" />;
+    if (mark.type === "underline")
+      return <line key={key} className="lens-mark lens-mark-underline" x1={x} y1={y} x2={x2} y2={y2} />;
+    if (mark.type === "circle") {
+      const rx = Math.max(14, Math.abs(x2 - x) / 2);
+      const ry = Math.max(14, Math.abs(y2 - y) / 2);
+      return <ellipse key={key} className="lens-mark lens-mark-circle" cx={(x + x2) / 2} cy={(y + y2) / 2} rx={rx} ry={ry} />;
+    }
+    if (mark.type === "highlight") {
+      const left = Math.min(x, x2);
+      const top = Math.min(y, y2);
+      return <rect key={key} className="lens-mark lens-mark-highlight" x={left} y={top} width={Math.max(18, Math.abs(x2 - x))} height={Math.max(14, Math.abs(y2 - y))} rx={5} />;
+    }
+    const label = mark.text?.slice(0, 160) ?? "";
+    if (!label) return null;
+    const labelX = Math.min(Math.max(8, x), Math.max(8, viewportWidth - 188));
+    const labelY = Math.min(Math.max(22, y), Math.max(22, viewportHeight - 12));
+    return (
+      <g key={key} className="lens-mark lens-mark-label">
+        <rect x={labelX - 7} y={labelY - 19} width={Math.min(188, Math.max(44, label.length * 6.5 + 16))} height={25} rx={8} />
+        <text x={labelX} y={labelY - 2}>{label}</text>
+      </g>
+    );
+  }
 
   return (
     <main className={`lens lens-${interaction.phase}`} data-selection={hasSelection ? "ready" : "waiting"}>
-      {selecting && (
-        <div className="lens-listening-chip" role="status" aria-live="polite">
-          <span className={interaction.mode === "voice" ? "lens-listening-dot is-live" : "lens-listening-dot"} />
-          {interaction.mode === "voice" ? (transcript ? "Listening" : "Talk to Lens") : "Select"}
-          <kbd>Esc</kbd>
-        </div>
-      )}
+      {selecting && <span className="lens-live-region" role="status" aria-live="polite">{status || "Lens ready"}</span>}
       {inputVisible && (
         <div className="lens-input-popover" style={inputStyle}>
           <textarea
@@ -339,10 +462,13 @@ export function Lens({
           <div className="lens-input-hint">Enter to ask · Shift+Enter for a new line · Esc to cancel</div>
         </div>
       )}
-      {(selecting || inputVisible) && (
+      {(selecting || inputVisible || answerVisible) && (
         <svg
-          className="lens-selection-surface"
-          aria-label="Draw a freeform Lens selection"
+          className={`lens-selection-surface${answerVisible ? " lens-answer-overlay" : ""}`}
+          aria-label={answerVisible ? "Lens visual explanation" : "Draw a freeform Lens selection"}
+          aria-hidden={answerVisible ? true : undefined}
+          viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
+          preserveAspectRatio="none"
           onPointerDown={(event) => {
             if (!selecting || paths.length >= 8) return;
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -368,27 +494,22 @@ export function Lens({
               strokeLinejoin="round"
             />
           ))}
-          {marks.map((mark, index) => {
-            const x = mark.x * window.innerWidth;
-            const y = mark.y * window.innerHeight;
-            const x2 = (mark.x2 ?? mark.x) * window.innerWidth;
-            const y2 = (mark.y2 ?? mark.y) * window.innerHeight;
-            return mark.type === "highlight" ? (
-              <rect key={index} x={Math.min(x, x2)} y={Math.min(y, y2)} width={Math.abs(x2 - x)} height={Math.abs(y2 - y)} fill="#E8C66A" fillOpacity=".28" />
-            ) : (
-              <circle key={index} cx={x} cy={y} r={Math.max(6, Math.abs(x2 - x) / 2)} fill="none" stroke="#77A887" strokeWidth="2" />
-            );
-          })}
+          <defs>
+            <marker id="lens-arrowhead" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M 0 0 L 9 4.5 L 0 9 z" />
+            </marker>
+          </defs>
+          {(answerVisible ? visibleMarks : []).map(renderMark)}
         </svg>
       )}
       {answerVisible && (
-        <section className="lens-answer-surface" aria-live="polite">
+        <section className="lens-answer-surface" style={answerStyle} aria-live="polite">
           <header className="lens-answer-header">
             <div>
               <div className="eyebrow">Lens{className ? ` · ${className}` : ""}</div>
               <strong>{error ? "Lens needs attention" : "Answer"}</strong>
             </div>
-            <button type="button" className="lens-close" aria-label="Dismiss Lens" onClick={() => void window.desk.dismiss()}>×</button>
+            <button type="button" className="lens-close" aria-label="Dismiss Lens" onClick={() => { stopPresentation(); void window.desk.dismiss(); }}>×</button>
           </header>
           <div className="lens-answer-text">{error || answer?.explanation || "Lens could not complete this request."}</div>
           {answer && (

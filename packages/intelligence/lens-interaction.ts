@@ -66,6 +66,16 @@ export function reduceLensInteraction(
         mode: "typed",
       };
     case "key-down":
+      // While an answer is visible (or a request is still in flight), a new
+      // invocation is a fresh Lens question. The Electron boundary aborts the
+      // request; the reducer immediately arms the next hold without waiting
+      // for the previous response to settle.
+      if (state.phase === "answer" || state.phase === "submitting")
+        return {
+          ...initialLensInteractionState(),
+          phase: "arming",
+          tapStartedAt: event.at,
+        };
       if (state.phase === "idle")
         return { ...state, phase: "arming", tapStartedAt: event.at, lastError: null };
       if (

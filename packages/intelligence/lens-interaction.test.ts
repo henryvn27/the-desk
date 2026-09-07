@@ -85,3 +85,19 @@ test("Escape cancels every pre-submit phase", () => {
     assert.deepEqual(state, initialLensInteractionState());
   }
 });
+
+test("a new invocation interrupts an answer and arms the next Lens question", () => {
+  const state = reduceLensInteraction(
+    {
+      ...initialLensInteractionState(),
+      phase: "answer",
+      mode: "voice",
+      requestCount: 1,
+    },
+    { type: "key-down", at: 1_000 },
+  );
+
+  assert.equal(state.phase, "arming");
+  assert.equal(state.mode, null);
+  assert.equal(state.tapStartedAt, 1_000);
+});

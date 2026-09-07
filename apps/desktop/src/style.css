@@ -2033,8 +2033,22 @@ body:has(.lens),
   pointer-events: auto;
 }
 
-/* Lens is intentionally a selection-first surface. The only visible chrome
-   during capture is a tiny status chip; the stroke remains the focus. */
+.lens-answer-overlay {
+  pointer-events: none;
+  z-index: 2;
+}
+
+.lens-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Lens is intentionally a selection-first surface. Capture stays visually
+   quiet; the stroke remains the focus and status is announced accessibly. */
 .lens-listening-chip {
   position: fixed;
   top: 18px;
@@ -2106,11 +2120,14 @@ body:has(.lens),
 
 .lens-answer-surface {
   position: fixed;
-  inset: 0;
+  left: 0;
+  top: 0;
   z-index: 6;
   display: grid;
   align-content: start;
   gap: 10px;
+  width: min(420px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
   max-height: 100%;
   overflow: auto;
   padding: 15px 16px 16px;
@@ -2119,6 +2136,66 @@ body:has(.lens),
   background: #fffdf9;
   color: var(--ink);
   pointer-events: auto;
+  box-shadow: 0 18px 44px rgba(35, 31, 27, 0.2), 0 2px 8px rgba(35, 31, 27, 0.08);
+  animation: lens-answer-in 220ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+@keyframes lens-answer-in {
+  from { opacity: 0; transform: translateY(6px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.lens-mark {
+  vector-effect: non-scaling-stroke;
+  animation: lens-mark-in 180ms ease-out both;
+}
+
+.lens-mark-arrow,
+.lens-mark-underline {
+  fill: none;
+  stroke: #4c8e74;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.lens-answer-overlay marker path {
+  fill: #4c8e74;
+}
+
+.lens-mark-circle {
+  fill: none;
+  stroke: #4c8e74;
+  stroke-width: 2.5;
+}
+
+.lens-mark-point {
+  fill: #4c8e74;
+  stroke: #fffdf9;
+  stroke-width: 2;
+}
+
+.lens-mark-highlight {
+  fill: #e8c66a;
+  fill-opacity: .28;
+  stroke: #cfaa48;
+  stroke-width: 1.5;
+}
+
+.lens-mark-label rect {
+  fill: #202725;
+  fill-opacity: .94;
+  stroke: rgba(255, 253, 249, .54);
+  stroke-width: 1;
+}
+
+.lens-mark-label text {
+  fill: #fffaf3;
+  font: 600 12px system-ui, sans-serif;
+}
+
+@keyframes lens-mark-in {
+  from { opacity: 0; stroke-dashoffset: 12; }
+  to { opacity: 1; stroke-dashoffset: 0; }
 }
 
 .lens-answer-header {

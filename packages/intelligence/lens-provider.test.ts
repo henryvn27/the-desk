@@ -374,4 +374,23 @@ test("validates all returned overlay coordinates and mark count", () => {
     }).success,
     false,
   );
+  assert.equal(
+    lensModelOutputSchema.safeParse({
+      explanation: "Underline the force component.",
+      overlays: [
+        {
+          type: "underline",
+          x: 0.1,
+          y: 0.8,
+          x2: 0.9,
+          y2: 0.8,
+          text: null,
+          sequence: 0,
+          durationMs: 2_500,
+          confidence: 0.96,
+        },
+      ],
+    }).success,
+    true,
+  );
 });

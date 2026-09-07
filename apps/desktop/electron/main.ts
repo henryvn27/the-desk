@@ -45,8 +45,11 @@ import { SupabaseAccount } from "./supabase";
 import { SupabaseSyncCoordinator } from "./supabase-sync";
 import {
   askLens,
+  LensProviderError,
+  LENS_MODEL,
   lensInputSchema,
   lensSelectionSchema,
+  type LensResponse,
   type LensSelection,
 } from "../../../packages/intelligence/lens-provider";
 import {
@@ -61,6 +64,7 @@ import {
   selectionBounds,
   selectionHasContent,
 } from "../../../packages/intelligence/lens-selection";
+import { mapLensResponseToViewport } from "../../../packages/intelligence/lens-overlay";
 import {
   browserContextForLens,
   type BrowserBridgeMessage,
@@ -262,20 +266,13 @@ function showLens(
   });
 }
 
-function showLensAnswer(bounds?: { x: number; y: number; width: number; height: number }) {
+function showLensAnswer() {
   if (!lens || lens.isDestroyed()) return;
   const screenBounds = virtualScreenBounds();
-  const width = Math.min(440, Math.max(320, screenBounds.width - 32));
-  const height = Math.min(420, Math.max(260, screenBounds.height - 32));
-  const source = bounds
-    ? {
-        x: Math.round(screenBounds.x + bounds.x * screenBounds.width),
-        y: Math.round(screenBounds.y + bounds.y * screenBounds.height),
-      }
-    : { x: screenBounds.x + screenBounds.width - width - 24, y: screenBounds.y + 24 };
-  const x = Math.max(screenBounds.x + 12, Math.min(source.x, screenBounds.x + screenBounds.width - width - 12));
-  const y = Math.max(screenBounds.y + 12, Math.min(source.y, screenBounds.y + screenBounds.height - height - 12));
-  lens.setBounds({ x, y, width, height });
+  // Keep the transparent window over the whole virtual desktop while Lens
+  // answers. The renderer can draw semantic marks back over the exact source
+  // content and place the small answer card beside the selection.
+  lens.setBounds(screenBounds);
   lens.setIgnoreMouseEvents(false);
   lens.show();
   lens.focus();
@@ -284,6 +281,13 @@ function showLensAnswer(bounds?: { x: number; y: number; width: number; height: 
 
 function handleLensKeyDown() {
   const at = Date.now();
+  if (lensInteraction.phase === "submitting") {
+    // A new invocation is an explicit interruption. Abort the in-flight
+    // provider request before arming the next hold gesture.
+    lensRequest?.abort();
+    pendingLensCapture = null;
+    pendingLensDraft = {};
+  }
   const next = transitionLens({ type: "key-down", at });
   if (next.phase === "arming") {
     clearLensTimers();
@@ -758,6 +762,26 @@ app.whenReady().then(async () => {
         signal: lensRequest.signal,
         onTelemetry: (event) => store.recordAI(event, active?.id ?? null),
       });
+    } catch (error) {
+      // Keep the selection/question useful when the network is unavailable.
+      // This response is deliberately explicit and has no marks: the offline
+      // path must never invent a visual answer from stale or partial data.
+      if (
+        error instanceof LensProviderError &&
+        (error.code === "network_error" || error.code === "timeout")
+      ) {
+        const offline: LensResponse = {
+          explanation:
+            "Lens is offline right now. Your selection is preserved; reconnect and release again to get a grounded explanation.",
+          overlays: [],
+          model: LENS_MODEL,
+          resolvedModel: "offline",
+          usage: null,
+          cost: null,
+        };
+        return offline;
+      }
+      throw error;
     } finally {
       lensRequest = null;
     }
@@ -789,12 +813,15 @@ app.whenReady().then(async () => {
       ...(value.history?.length ? { history: value.history } : {}),
       activity: { kind: value.activityKind ?? pendingLensContext?.activityKind ?? "check" },
     });
+    if (lensInteraction.phase !== "submitting")
+      throw Error("Lens request was interrupted.");
+    const mappedResponse = mapLensResponseToViewport(response, bounds);
     pendingLensCapture = null;
     pendingLensDraft = {};
     transitionLens({ type: "request-succeeded" });
-    showLensAnswer(bounds);
-    if (lens && !lens.isDestroyed()) lens.webContents.send("desk:lens-answer", response);
-    return response;
+    showLensAnswer();
+    if (lens && !lens.isDestroyed()) lens.webContents.send("desk:lens-answer", mappedResponse);
+    return mappedResponse;
   }
 
   submitLensInteraction = async (question) => {
@@ -808,8 +835,11 @@ app.whenReady().then(async () => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Lens could not complete this request.";
+      // Dismiss and a new invocation both intentionally abort the request. Do
+      // not resurrect a closed Lens window with a stale error surface.
+      if (lensInteraction.phase !== "submitting") return;
       transitionLens({ type: "request-failed", message });
-      showLensAnswer(selectionBounds(pendingLensDraft.selection) ?? undefined);
+      showLensAnswer();
       if (lens && !lens.isDestroyed()) lens.webContents.send("desk:lens-error", message);
     }
   };
@@ -840,8 +870,9 @@ app.whenReady().then(async () => {
       return await executeLensInteraction(value);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Lens could not complete this request.";
+      if (lensInteraction.phase !== "submitting") throw error;
       transitionLens({ type: "request-failed", message });
-      showLensAnswer(selectionBounds(value.selection) ?? undefined);
+      showLensAnswer();
       if (lens && !lens.isDestroyed()) lens.webContents.send("desk:lens-error", message);
       throw error;
     }
@@ -1328,6 +1359,7 @@ app.whenReady().then(async () => {
     check(event);
     if (lens?.webContents === event.sender) {
       clearLensTimers();
+      lensRequest?.abort();
       transitionLens({ type: "dismiss" });
       pendingLensDraft = {};
       pendingLensCapture = null;

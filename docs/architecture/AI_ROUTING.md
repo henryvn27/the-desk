@@ -1,6 +1,6 @@
 # AI routing
 
-Deterministic capture and scheduling remain TypeScript. Normal inference uses a single OpenRouter chat/completions request from Electron main. Desk selects the model; the renderer cannot supply a tier, model, endpoint or credential. No direct provider integration or automatic retry/fallback is enabled.
+Deterministic capture and scheduling remain TypeScript. Normal inference uses a single OpenRouter chat/completions request from Electron main. Desk selects the model; the renderer cannot supply a tier, model, endpoint or credential. No direct provider integration, provider-route fallback or automatic retry is enabled; Lens has an explicit offline response with no visual marks when transport fails.
 
 | Tier | Approved model | Approved OpenRouter endpoint |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ Text Lens uses FAST (`openai/gpt-5.6-luna`); explicit image input uses MULTIMODA
 
 Every request specifies `only`, `order`, `allow_fallbacks: false`, `require_parameters: true`, `data_collection: deny`, and `zdr: true`. No route silently relaxes privacy when unavailable. Provider retention constraints do not prove OpenRouter account-level input/output logging is disabled. Those account settings remain unverified.
 
-Requests use strict JSON-schema output, bounded input/history/output, a 45-second timeout and cancellation. No model tool actions are enabled. Questions and active task excerpts are included on Ask. Captured images are included only after explicit sharing. History is bounded and discarded with the Lens window.
+Requests use strict JSON-schema output, bounded input/history/output, a 45-second timeout and cancellation. Lens marks use a validated semantic protocol (`point`, `circle`, `arrow`, `underline`, `highlight`, `label`) with normalized coordinates, optional sequence/duration/confidence, and no provider actions. Questions and active task excerpts are included on Ask. Captured images are included only after explicit sharing. History is bounded and discarded with the Lens window.
 
 ## Academic inference boundary
 
@@ -32,7 +32,7 @@ A packaged user can import their own OpenRouter key through an owned-main-window
 
 SQLite retains content-free model identity, feature/profile/session attribution, latency, success/failure, HTTP status, usage and OpenRouter-reported USD cost. Missing usage or cost remains null. The cost is provider-reported, not an independent invoice reconciliation. Prompts, screenshots, credentials and raw provider errors are not telemetry.
 
-77 automated tests plus typecheck/lint/build pass. The synthetic Electron smoke covers native import, encrypted storage, no renderer key entry, request routing, restart and disconnect. Bounded live text and synthetic-image requests on 2026-09-06 both returned HTTP 401 authentication errors. No successful live answer, grounding, usage charge or provider privacy behavior has been proven. Stop retries until credential/account state changes. No personal screen or academic context was sent in these isolated checks.
+The unit suite, typecheck and lint pass. The synthetic Electron smoke covers native import, encrypted storage, no renderer key entry, request routing, restart and disconnect. An isolated live OpenRouter text probe on 2026-09-07 returned an approved Luna response; no personal screen or academic context was sent. Provider privacy behavior and production account-level logging settings remain external configuration.
 
 Hard STEM escalation, quality/grounding acceptance, voice/media, fair-use limits, hosted provisioning, account logging confirmation and end-to-end billing reconciliation remain open. Canvas/PDF work remains paused.
 
@@ -44,7 +44,7 @@ Primary references:
 - https://openrouter.ai/docs/guides/features/input-output-logging
 
 
-Lens now applies saved Guide me, Balanced (default), or Explain directly teaching instructions in the trusted main process. Explicit full-method requests remain allowed in every mode. Provider tool_calls/function_call payloads and extraneous output actions are rejected; no tools are offered. These are request and response boundaries, not proof that a model follows the pedagogy. Class-source retrieval and teaching-quality evaluation remain open; live OpenRouter authentication still returns HTTP 401 and was not retried.
+Lens now applies saved Guide me, Balanced (default), or Explain directly teaching instructions in the trusted main process. Explicit full-method requests remain allowed in every mode. Provider tool_calls/function_call payloads and extraneous output actions are rejected; no tools are offered. Voice capture, typed double-tap mode, interruptible speech output and ephemeral semantic overlay marks stay in the Lens renderer while the request, grounding and coordinate remapping remain in the trusted main process. These are request and response boundaries, not proof that a model follows the pedagogy. Class-source retrieval and teaching-quality evaluation remain open.
 
 
 Local Lens grounding now selects sources linked explicitly to the active task, then class-wide sources without other task links. It excludes unlinked/other-task material, preserves user-provided-text authority, and sends bounded excerpts with truncation and omitted-source counts. The serialized context is capped at 20,000 characters; no linked URL is fetched. Instructions distinguish source statements from supporting explanation and disclose conflicts. This is deterministic association-based context, not relevance retrieval, verified teacher authority, textbook/web search or validated citations.
