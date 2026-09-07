@@ -51,16 +51,18 @@ try{
     try { await window.desk.importProviderKey(); return false; }
     catch { return true; }
   }), true);
-  await lens.getByLabel("Ask The Desk",{exact:true}).fill("Explain addition.");
-  await lens.getByRole("button",{name:"Ask",exact:true}).click();
+  await lens.getByLabel("Draw a freeform Lens selection",{exact:true}).waitFor();
+  await lens.mouse.move(150,150);await lens.mouse.down();await lens.mouse.move(360,150);await lens.mouse.move(360,300);await lens.mouse.move(150,300);await lens.mouse.up();
+  await lens.getByLabel("Ask Lens",{exact:true}).fill("Explain addition.");
+  await lens.getByLabel("Ask Lens",{exact:true}).press("Enter");
   await lens.getByText("Synthetic provider reply: combine the two groups.",{exact:true}).waitFor();
   const requests=await app.evaluate(()=>globalThis.deskRequests);
   assert.equal(requests.length,1);
   assert.equal(requests[0].url,"https://openrouter.ai/api/v1/chat/completions");
-  assert.equal(requests[0].model,"openai/gpt-5.6-terra");
-  assert.deepEqual(requests[0].provider,{only:["azure"],order:["azure"],allow_fallbacks:false,require_parameters:true,data_collection:"deny",zdr:true});
+  assert.equal(requests[0].model,"google/gemini-3.8-flash");
+  assert.deepEqual(requests[0].provider,{only:["google-vertex/global"],order:["google-vertex/global"],allow_fallbacks:false,require_parameters:true,data_collection:"deny",zdr:true});
   assert.equal(requests[0].authMatches,true);
-  await lens.getByRole("button",{name:"Dismiss · Esc",exact:true}).click();
+  await lens.getByRole("button",{name:"Dismiss Lens",exact:true}).click();
   const video=page.video();
   await app.close();app=undefined;
   if(video)await copyFile(await video.path(),join(output,"openrouter-settings-operated.webm"));

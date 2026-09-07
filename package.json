@@ -89,6 +89,10 @@
       {
         "from": "licenses",
         "to": "licenses"
+      },
+      {
+        "from": "dist-electron/lens-hotkey",
+        "to": "lens-hotkey"
       }
     ]
   },

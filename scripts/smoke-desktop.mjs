@@ -85,12 +85,8 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.ok(lens, "Lens window opened");
-  await lens.getByLabel("Draw a freehand selection", { exact: true }).waitFor();
+  await lens.getByLabel("Draw a freeform Lens selection", { exact: true }).waitFor();
   await lens.locator(".lens[data-selection=\"waiting\"]").waitFor();
-  assert.match(
-    (await lens.locator(".lens-stage-hint").innerText()).trim(),
-    /Select the part of your screen you want help with/,
-  );
   await lens.mouse.move(200, 200);
   await lens.mouse.down();
   for (let angle = 0; angle <= Math.PI * 2; angle += 0.2)
@@ -99,7 +95,7 @@ try {
       250 + 60 * Math.sin(angle),
     );
   await lens.mouse.up();
-  const drawnPaths = lens.locator("svg > path");
+  const drawnPaths = lens.locator("[data-lens-selection-path=\"true\"]");
   if ((await drawnPaths.count()) !== 1) {
     console.log(
       await drawnPaths.evaluateAll((xs) =>
@@ -113,19 +109,13 @@ try {
   }
   assert.equal(await drawnPaths.count(), 1);
   await lens.locator(".lens[data-selection=\"ready\"]").waitFor();
-  assert.match(
-    (await lens.locator(".lens-stage-hint").innerText()).trim(),
-    /Selection ready · ask Lens when you are ready/,
-  );
-  await lens
-    .getByLabel("Ask The Desk", { exact: true })
-    .fill("Why does friction point this way?");
-  await lens.getByRole("button", { name: "Ask", exact: true }).click();
+  await lens.getByLabel("Ask Lens", { exact: true }).fill("Why does friction point this way?");
+  await lens.getByLabel("Ask Lens", { exact: true }).press("Enter");
   await lens
     .getByText("Connect an AI provider in Settings first.", { exact: true })
     .waitFor();
   await lens.screenshot({ path: join(output, "lens-selection.png") });
-  await lens.getByRole("button", { name: "Dismiss · Esc" }).click();
+  await lens.getByRole("button", { name: "Dismiss Lens" }).click();
   await controllerPage.getByRole("button", { name: "Finish task", exact: true }).click();
   await page.getByRole("button", { name: "Looks right", exact: true }).click();
   await page.getByText("Ready when you are.", { exact: true }).waitFor();

@@ -100,12 +100,15 @@ try {
     "Lens window missing",
   );
   lens.on("pageerror", (error) => errors.push(error.message));
-  await lens.getByLabel("Tutoring mode", { exact: true }).waitFor();
-  await lens.getByText("Review force balance", { exact: true }).waitFor();
-  await lens
-    .getByLabel("Ask The Desk", { exact: true })
-    .fill("How should I begin?");
-  await lens.getByRole("button", { name: "Ask", exact: true }).click();
+  await lens.getByLabel("Draw a freeform Lens selection", { exact: true }).waitFor();
+  await lens.mouse.move(150, 150);
+  await lens.mouse.down();
+  await lens.mouse.move(360, 150);
+  await lens.mouse.move(360, 300);
+  await lens.mouse.move(150, 300);
+  await lens.mouse.up();
+  await lens.getByLabel("Ask Lens", { exact: true }).fill("How should I begin?");
+  await lens.getByLabel("Ask Lens", { exact: true }).press("Enter");
   await lens
     .getByText(
       "Synthetic Lens answer: resolve the forces, then check the sign of each component.",
@@ -114,19 +117,19 @@ try {
     .waitFor();
 
   await lens
-    .getByRole("button", { name: "Save answer as source", exact: true })
+    .getByRole("button", { name: "Save as source", exact: true })
     .click();
   await lens
     .getByText("Lens answer saved as a source.", { exact: true })
     .waitFor();
   await lens
-    .getByRole("button", { name: "Save answer as note", exact: true })
+    .getByRole("button", { name: "Save as note", exact: true })
     .click();
   await lens
     .getByText("Lens answer saved as a note.", { exact: true })
     .waitFor();
   await lens
-    .getByRole("button", { name: "Save answer to Notes", exact: true })
+    .getByRole("button", { name: "Save to Notes", exact: true })
     .click();
   await lens
     .getByText("Lens answer saved to Notes with its source.", { exact: true })
@@ -143,10 +146,10 @@ try {
     .fill("I mixed horizontal and vertical components.");
   await lens.getByRole("button", { name: "Save mistake", exact: true }).click();
   await lens
-    .getByText("Mistake saved at low confidence for review.", { exact: true })
+    .getByText("Mistake saved for review.", { exact: true })
     .waitFor();
   await lens
-    .getByRole("button", { name: "Prepare resource review", exact: true })
+    .getByRole("button", { name: "Prepare review", exact: true })
     .click();
   await lens
     .getByText("Lens resource review prepared.", { exact: true })
@@ -162,7 +165,7 @@ try {
     "Lens must not open an external resource before the explicit open action",
   );
   await lens
-    .getByRole("button", { name: "Open task resource", exact: true })
+    .getByRole("button", { name: "Open resource", exact: true })
     .click();
   await waitFor(
     async () =>
@@ -228,7 +231,7 @@ try {
   assert.deepEqual(source.classIds, [task.classId]);
   assert.deepEqual(source.taskIds, [task.id]);
   assert.deepEqual(openedResources, ["https://example.edu/force-balance"]);
-  await lens.locator(".lens-panel").screenshot({
+  await lens.locator(".lens-answer-surface").screenshot({
     path: join(output, "lens-actions.png"),
   });
   await page.getByRole("button", { name: "Library", exact: true }).click();

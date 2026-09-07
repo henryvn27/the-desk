@@ -21,7 +21,11 @@ async function openLens(){
  await page.evaluate(()=>window.desk.lens());
  await waitFor(()=>Boolean(lens=app.windows().find(p=>p.url().endsWith("#lens"))),"Lens missing");
  lens.on("pageerror",e=>errors.push(e.message));
- await lens.getByLabel("Tutoring mode",{exact:true}).waitFor();
+ await lens.getByLabel("Draw a freeform Lens selection",{exact:true}).waitFor();
+}
+async function askTyped(text){
+ await lens.mouse.move(150,150);await lens.mouse.down();await lens.mouse.move(360,150);await lens.mouse.move(360,300);await lens.mouse.move(150,300);await lens.mouse.up();
+ await lens.getByLabel("Ask Lens",{exact:true}).fill(text);await lens.getByLabel("Ask Lens",{exact:true}).press("Enter");
 }
 try{
  await launch();
@@ -36,17 +40,16 @@ try{
    };
  });
  await openLens();
- await lens.getByLabel("Tutoring mode",{exact:true}).selectOption("guide");
+ await page.evaluate(()=>window.desk.command({type:"tutor.mode",mode:"guide"}));
  await waitFor(async()=>(await page.evaluate(()=>window.desk.snapshot())).tutoringMode==="guide","Guide mode not persisted");
- await lens.getByLabel("Ask The Desk",{exact:true}).fill("Help me start this problem.");
- await lens.getByRole("button",{name:"Ask",exact:true}).click();
+ await askTyped("Help me start this problem.");
  await lens.getByText("Synthetic teaching response: resolve each force into horizontal and vertical components, then add the components.",{exact:true}).waitFor();
- await lens.locator(".lens-panel").screenshot({path:join(output,"tutoring-mode.png")});
- await lens.getByLabel("Tutoring mode",{exact:true}).selectOption("direct");
+ await lens.locator(".lens-answer-surface").screenshot({path:join(output,"tutoring-mode.png")});
+ await lens.getByRole("button",{name:"Dismiss Lens",exact:true}).click(); await openLens();
+ await page.evaluate(()=>window.desk.command({type:"tutor.mode",mode:"direct"}));
  await waitFor(async()=>(await page.evaluate(()=>window.desk.snapshot())).tutoringMode==="direct","Direct mode not persisted");
  await app.evaluate(()=>{globalThis.providerAttack=true;});
- await lens.getByLabel("Ask The Desk",{exact:true}).fill("Explain the full method.");
- await lens.getByRole("button",{name:"Ask",exact:true}).click();
+ await askTyped("Explain the full method.");
  await lens.getByText("Lens does not accept provider actions.",{exact:true}).waitFor();
  const requests=await app.evaluate(()=>globalThis.tutorRequests);
  assert.equal(requests.length,2);
@@ -58,7 +61,7 @@ try{
  await app.close();app=undefined;
  if(video)await copyFile(await video.path(),join(output,"tutoring-operated.webm"));
  await launch();await openLens();
- await waitFor(async()=>(await lens.getByLabel("Tutoring mode",{exact:true}).inputValue())==="direct","Mode missing after restart");
+ await waitFor(async()=>(await page.evaluate(()=>window.desk.snapshot())).tutoringMode==="direct","Mode missing after restart");
  assert.deepEqual(errors,[]);
  console.log("PASS: persisted Guide/Direct modes control main-process request; provider action payload rejected; no task created; Lens mode survives restart. Responses are synthetic, not teaching-quality proof.");
 }finally{if(app)await app.close();await rm(data,{recursive:true,force:true});}

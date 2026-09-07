@@ -34,7 +34,7 @@ This is the baseline for the post-V1 product-polish pass. It describes the shipp
 
 ## Scope for this pass
 
-1. Make Lens selection-first with a lightweight contextual popover while keeping existing grounding, tutoring, and save actions.
+1. Make Lens selection-first with no pre-selection panel while keeping existing grounding, tutoring, and save actions.
 2. Group navigation without deleting deep access to V1 screens.
 3. Add a visible search affordance and clearer active/context states.
 4. Tighten Home/Class surfaces and dialog affordances without changing planner or domain behavior.
@@ -48,14 +48,14 @@ The pass keeps the V1 visual language and domain surface, while removing the hig
 - Home and class navigation now separate daily destinations from Study and Academic details. All existing deep links remain available.
 - The header exposes Library search and the current class/page context without adding another dashboard surface.
 - Capture has an explicit, keyboard-accessible close path and keeps the existing immediate-save/inbox behavior.
-- Lens is selection-first: the underlying screen remains the interaction surface, a compact contextual panel sits at the lower edge, and the panel only expands when attached context or advanced screen capture is needed.
+- Lens is selection-first: invocation exposes the underlying screen for drawing immediately, and only the post-request answer uses a compact contextual surface.
 - The native macOS menu is branded with the Desk product identity (`The Desk V1`, replacing the Electron placeholder), the packaged bundle has a generated Desk icon, and secondary windows carry Desk titles.
 
 The implementation deliberately leaves the store, planner, capture pipeline, Lens provider boundary, Notes/Canvas model, and academic routes intact. The only behavioral additions are presentation state and navigation affordances.
 
 Verification evidence:
 
-- `npm run check` — Electron-only guard, TypeScript, lint, 238 unit tests, 10 extension tests, and production build all pass.
+- `npm run check` — Electron-only guard, TypeScript, lint, 247 unit tests, 10 extension tests, and production build all pass.
 - `node scripts/smoke-desktop.mjs` — Home, assignment capture, Study Session, Lens selection/ask/dismiss, completion, restart, capture review, Plan, and Library persistence pass.
 - Lens action, tutoring, grounding, retrieval, and source-priority smokes pass.
 - `npm run package` produces a signed arm64 bundle with `Contents/Resources/icon.icns`.
@@ -76,3 +76,16 @@ Follow-up visual evidence:
 - `artifacts/lens-provider-error.png` — provider error presented as a compact status banner with the same flat surface.
 
 The fix was validated in the dev window and then in the installed arm64 bundle. `typecheck`, `lint`, production build, desktop smoke, Lens action smoke, and tutoring smoke all pass after the change.
+
+## Lens interaction overhaul: Clicky-style selection
+
+The pre-selection Lens panel is retired from the normal invocation path. Lens now uses a deterministic interaction state machine (`packages/intelligence/lens-interaction.ts`) with a 260 ms hold threshold and a 300 ms double-tap window:
+
+- Hold Option/Alt + Space, draw a freeform enclosure while the microphone listens, and release to submit once. The overlay is transparent and spans the virtual multi-display bounds; the trusted main process captures the padded/clamped region and routes the request through the existing provider and tutoring boundaries.
+- Double-tap the same shortcut, draw a selection, then type in the focused compact field. Enter submits, Shift+Enter inserts a newline, and Escape cancels.
+- A short single tap expires without opening an overlay, so it never flashes the voice flow or submits an empty request.
+- The answer is shown in a compact, selectable, non-blocking Lens surface. Existing source, note, Notes, mistake, follow-up, and explicit resource actions remain available under `Save or continue`.
+
+The macOS shortcut uses the small listen-only CoreGraphics helper `apps/desktop/electron/lens-hotkey.c` for reliable key-down/key-up edges. It never suppresses input. If Input Monitoring is unavailable, the app reports the exact System Settings path and keeps the in-app typed Lens entry point available. Microphone access is granted only to the Lens renderer; all other permission requests remain denied.
+
+Deterministic coverage now includes hold/double-tap arbitration, duplicate-submit prevention, cancellation, bounded selection geometry, tiny selections, and the existing provider action rejection tests. `scripts/smoke-desktop.mjs` and `scripts/smoke-lens-actions.mjs` exercise the new typed flow against the built Electron app. Synthetic provider fixtures prove interaction and security behavior only; live model quality and microphone transcription remain external/device-dependent.

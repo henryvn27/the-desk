@@ -1551,6 +1551,8 @@ body:has(.lens),
   height: 100dvh;
   overflow: hidden;
   color: var(--ink);
+  pointer-events: none;
+  background: transparent;
 }
 
 .lens-selection-surface {
@@ -1560,6 +1562,205 @@ body:has(.lens),
   height: 100%;
   cursor: crosshair;
   touch-action: none;
+  pointer-events: auto;
+}
+
+/* Lens is intentionally a selection-first surface. The only visible chrome
+   during capture is a tiny status chip; the stroke remains the focus. */
+.lens-listening-chip {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 253, 249, 0.62);
+  border-radius: 999px;
+  background: #202725;
+  color: #fffaf3;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.lens-listening-chip kbd {
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 253, 249, 0.3);
+  color: #e8d9cc;
+  font-size: 10px;
+}
+
+.lens-listening-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e8a47c;
+}
+
+.lens-listening-dot.is-live {
+  background: #8ec39b;
+}
+
+.lens-input-popover {
+  position: fixed;
+  z-index: 5;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: #fffdf9;
+  pointer-events: auto;
+}
+
+.lens-input-popover textarea {
+  width: 100%;
+  min-height: 46px;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lens-input-hint {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.lens-answer-surface {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  max-height: 100%;
+  overflow: auto;
+  padding: 15px 16px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: #fffdf9;
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+.lens-answer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.lens-answer-header strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.lens-close {
+  width: 28px;
+  height: 28px;
+  margin: -3px -4px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.lens-answer-text {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  user-select: text;
+  font-size: 13px;
+  line-height: 1.52;
+}
+
+.lens-answer-details {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.lens-answer-details > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.lens-answer-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lens-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lens-actions button,
+.lens-mistake button {
+  min-height: 29px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.lens-mistake {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.lens-mistake label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lens-mistake input,
+.lens-mistake textarea {
+  min-height: 30px;
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.lens-status {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 8;
+  max-width: min(420px, calc(100vw - 36px));
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(169, 84, 54, 0.24);
+  border-radius: 9px;
+  background: #fff5eb;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: auto;
 }
 
 .lens-stage-hint {
@@ -2617,6 +2818,18 @@ button[aria-pressed="true"] {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Keep the small selection/answer status surface above the legacy Canvas
+   panel rules; Lens no longer renders the pre-selection panel. */
+main.lens .lens-status {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 8;
+  max-width: min(420px, calc(100vw - 36px));
+  margin: 0;
+  pointer-events: auto;
 }
 
 /* Notes document flow sits on top of the existing Canvas engine. */

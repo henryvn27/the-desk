@@ -87,11 +87,12 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.ok(lens, "Lens opened");
-  await lens.getByLabel("Ask The Desk", { exact: true }).waitFor();
-  assert.equal(await lens.getByLabel("Ask The Desk", { exact: true }).inputValue(), "Check my derivative setup.");
-  assert.equal(await lens.getByLabel("Study action", { exact: true }).inputValue(), "check");
+  await lens.getByLabel("Draw a freeform Lens selection", { exact: true }).waitFor();
+  await lens.mouse.move(150, 150); await lens.mouse.down(); await lens.mouse.move(360, 150); await lens.mouse.move(360, 300); await lens.mouse.move(150, 300); await lens.mouse.up();
+  await lens.getByLabel("Ask Lens", { exact: true }).waitFor();
+  assert.equal(await lens.getByLabel("Ask Lens", { exact: true }).inputValue(), "Check my derivative setup.");
   await lens.screenshot({ path: join(output, "lens-check-contract.png") });
-  await lens.getByRole("button", { name: "Dismiss · Esc" }).click();
+  await lens.evaluate(() => window.desk.dismiss()).catch(() => undefined);
   const quality = compareStudyQuality(
     [
       { scenario: "check", answerLeakage: true, hintUseful: false, diagnosticAccurate: false, repeatedQuestion: true, transferQuality: false, citationAccurate: true, evidenceCorrect: false, completed: true },

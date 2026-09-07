@@ -1,18 +1,18 @@
-import type { TutoringMode } from "../../../packages/intelligence/tutoring";
+import { useEffect, useRef, useState } from "react";
 import { userError } from "./errors";
-import { useEffect, useState } from "react";
 import type {
-  LensOverlayMark,
   LensHistoryTurn,
+  LensOverlayMark,
+  LensResponse,
+  LensSelection,
 } from "../../../packages/intelligence/lens-provider";
+import {
+  initialLensInteractionState,
+  type LensInteractionState,
+} from "../../../packages/intelligence/lens-interaction";
+import { selectionBounds } from "../../../packages/intelligence/lens-selection";
 import type { Command, Snapshot, Source } from "../../../packages/domain/contracts";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
-import {
-  activityInstruction,
-  activityLabel,
-  studyActivityKind,
-  type StudyActivityKind,
-} from "../../../packages/study/activities";
 import {
   lensAnswerCanvasScene,
   lensAnswerMemoryInput,
@@ -20,14 +20,29 @@ import {
   lensAnswerSourceInput,
   lensFollowUpTaskInput,
 } from "../../../packages/intelligence/lens-actions";
+import { type StudyActivityKind } from "../../../packages/study/activities";
+
 type Point = { x: number; y: number };
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: {
+    resultIndex: number;
+    results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }>;
+  }) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
 export function Lens({
   title,
   className,
-  tutoringMode,
-  saveTutoringMode,
-  classId,
   taskId,
+  classId,
   taskResource,
   browserContext,
   clearBrowserContext,
@@ -35,8 +50,6 @@ export function Lens({
   initialActivity,
   sources,
 }: {
-  tutoringMode: TutoringMode;
-  saveTutoringMode: (mode: TutoringMode) => Promise<unknown>;
   title: string;
   className: string;
   classId?: string;
@@ -48,618 +61,362 @@ export function Lens({
   initialActivity?: StudyActivityKind;
   sources: Source[];
 }) {
-  const [savingMode, setSavingMode] = useState(false);
-  const [paths, setPaths] = useState<Point[][]>([]),
-    [drawing, setDrawing] = useState(false),
-    [mode, setMode] = useState<"freehand" | "box" | "click">("freehand");
-  const [status, setStatus] = useState(""),
-    [image, setImage] = useState<string>(),
-    [share, setShare] = useState(false),
-    [question, setQuestion] = useState(""),
-    [activity, setActivity] = useState<StudyActivityKind>(initialActivity ?? "check"),
-    [answer, setAnswer] = useState(""),
-    [marks, setMarks] = useState<LensOverlayMark[]>([]),
-    [history, setHistory] = useState<LensHistoryTurn[]>([]),
-    [busy, setBusy] = useState(false);
+  const [interaction, setInteraction] = useState<LensInteractionState>(
+    initialLensInteractionState,
+  );
+  const [paths, setPaths] = useState<Point[][]>([]);
+  const [drawing, setDrawing] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [answer, setAnswer] = useState<LensResponse | null>(null);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [marks, setMarks] = useState<LensOverlayMark[]>([]);
+  const [history, setHistory] = useState<LensHistoryTurn[]>([]);
+  const [scopeIds, setScopeIds] = useState<string[]>([]);
+  const [activity, setActivity] = useState<StudyActivityKind>(initialActivity ?? "check");
   const [actionBusy, setActionBusy] = useState(false);
   const [showMistake, setShowMistake] = useState(false);
-  const [scopeIds, setScopeIds] = useState<string[]>([]);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const speechTextRef = useRef("");
+  const hasSentFallbackKeyUp = useRef(false);
   const scopedSources = sources.filter((source) => scopeIds.includes(source.id));
+  const selecting = interaction.phase === "voice-selecting" || interaction.phase === "typed-selecting";
+  const inputVisible = interaction.phase === "typed-input";
+  const answerVisible = interaction.phase === "answer";
   const hasSelection = paths.some((path) => path.length > 0);
+
   useEffect(() => {
     const applyContext = (context: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] } | null) => {
       if (!context) return;
       if (context.question) setQuestion(context.question);
-      if (context.activityKind && studyActivityKind.safeParse(context.activityKind).success)
-        setActivity(context.activityKind);
+      if (context.activityKind) setActivity(context.activityKind);
       if (context.sourceIds) setScopeIds([...new Set(context.sourceIds)]);
     };
     const unsubscribe = window.desk.onLensContext(applyContext);
     void window.desk.lensContext().then(applyContext).catch(() => undefined);
     return unsubscribe;
   }, []);
-  const width = window.innerWidth,
-    height = window.innerHeight;
-  const point = (e: React.PointerEvent): Point => ({
-    x: Math.max(0, Math.min(1, e.clientX / width)),
-    y: Math.max(0, Math.min(1, e.clientY / height)),
-  });
-  function move(e: React.PointerEvent) {
-    if (!drawing) return;
-    const p = point(e);
-    setPaths((all) =>
-      all.map((path, i) => {
-        if (i !== all.length - 1) return path;
-        if (mode === "box") {
-          const first = path[0]!;
-          return [
-            first,
-            { x: p.x, y: first.y },
-            p,
-            { x: first.x, y: p.y },
-            first,
-          ];
-        }
-        if (mode === "click") return [p];
-        return path.length < 1500 ? [...path, p] : path;
-      }),
-    );
-  }
-  async function ask() {
-    setBusy(true);
-    setStatus("");
-    const q = question;
-    try {
-      const result = await window.desk.askLens({
-        question: q,
-        ...(scopeIds.length ? { sourceIds: scopeIds } : {}),
-        ...(share && image ? { imageDataUrl: image } : {}),
-        selection: { paths: paths.map((points) => ({ points })) },
-        history,
-        activity: { kind: activity },
-      });
-      setAnswer(result.explanation);
-      setMarks(share && image ? result.overlays : []);
-      setHistory(
-        (h) =>
-          [
-            ...h,
-            { role: "user", content: q },
-            { role: "assistant", content: result.explanation.slice(0, 4000) },
-          ].slice(-8) as LensHistoryTurn[],
-      );
-      setQuestion("");
-    } catch (e) {
-      setStatus(userError(e));
-    } finally {
+
+  useEffect(() => {
+    void window.desk.lensInteractionState().then(setInteraction).catch(() => undefined);
+    const unsubscribe = window.desk.onLensInteraction((next) => {
+      setInteraction(next);
+      if (next.phase === "voice-selecting") {
+        setStatus("Listening · draw around what you want help with");
+        setError("");
+      } else if (next.phase === "typed-selecting") {
+        setStatus("Circle anything on screen");
+        setError("");
+      } else if (next.phase === "typed-input") {
+        setStatus("");
+        setBusy(false);
+      } else if (next.phase === "submitting") {
+        setBusy(true);
+        setStatus("");
+      } else if (next.phase === "answer") {
+        setBusy(false);
+      }
+    });
+    const answerUnsubscribe = window.desk.onLensAnswer((response) => {
+      setAnswer(response);
+      setError("");
       setBusy(false);
+      setQuestion("");
+      setTranscript("");
+      setMarks(response.overlays);
+      setHistory((turns) => [
+        ...turns,
+        ...(question.trim() ? [{ role: "user" as const, content: question.trim() }] : []),
+        { role: "assistant" as const, content: response.explanation.slice(0, 4_000) },
+      ].slice(-8));
+    });
+    const errorUnsubscribe = window.desk.onLensError((message) => {
+      setError(message);
+      setBusy(false);
+    });
+    return () => {
+      unsubscribe();
+      answerUnsubscribe();
+      errorUnsubscribe();
+    };
+  }, [question]);
+
+  useEffect(() => {
+    if (!selecting && !inputVisible) return;
+    const selection: LensSelection = { paths: paths.map((points) => ({ points })) };
+    void window.desk.lensDraft(selection, transcript).catch(() => undefined);
+  }, [paths, transcript, selecting, inputVisible]);
+
+  useEffect(() => {
+    if (!inputVisible) return;
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>("#lens-question")?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [inputVisible]);
+
+  useEffect(() => {
+    if (interaction.phase !== "voice-selecting") {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      return;
+    }
+    let stream: MediaStream | null = null;
+    let active = true;
+    const browserWindow = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const recognitionConstructor = browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw Error("unavailable");
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!active) return;
+        if (!recognitionConstructor) {
+          setStatus("Listening · microphone ready. Type a question after release if needed.");
+          return;
+        }
+        const recognition = new recognitionConstructor();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = navigator.language || "en-US";
+        recognition.onresult = (event) => {
+          let text = speechTextRef.current;
+          for (let index = event.resultIndex; index < event.results.length; index += 1) {
+            const result = event.results[index];
+            const value = result?.[0]?.transcript?.trim() ?? "";
+            if (result?.isFinal && value) text = `${text} ${value}`.trim();
+            else if (value) text = `${text} ${value}`.trim();
+          }
+          speechTextRef.current = text.slice(0, 4_000);
+          setTranscript(speechTextRef.current);
+        };
+        recognition.onerror = (event) => {
+          if (event.error === "not-allowed" || event.error === "service-not-allowed")
+            setStatus("Microphone permission is off. Release to type a question instead.");
+          else setStatus("Microphone unavailable. Release to type a question instead.");
+        };
+        recognition.onend = () => {
+          if (active && interaction.phase === "voice-selecting") {
+            try { recognition.start(); } catch { /* browser already stopped */ }
+          }
+        };
+        recognitionRef.current = recognition;
+        try { recognition.start(); } catch { setStatus("Microphone unavailable. Release to type a question instead."); }
+      } catch {
+        setStatus("Microphone permission is unavailable. Release to type a question instead.");
+      }
+    };
+    speechTextRef.current = transcript;
+    void start();
+    return () => {
+      active = false;
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, [interaction.phase]);
+
+  useEffect(() => {
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        void window.desk.dismiss();
+        return;
+      }
+      if (event.code === "Space" && event.altKey && interaction.phase === "voice-selecting" && !hasSentFallbackKeyUp.current) {
+        hasSentFallbackKeyUp.current = true;
+        void window.desk.lensKeyUp().catch(() => undefined);
+      }
+    };
+    window.addEventListener("keyup", onKeyUp);
+    return () => window.removeEventListener("keyup", onKeyUp);
+  }, [interaction.phase]);
+
+  useEffect(() => {
+    if (interaction.phase !== "voice-selecting") hasSentFallbackKeyUp.current = false;
+  }, [interaction.phase]);
+
+  function point(event: React.PointerEvent): Point {
+    return {
+      x: Math.max(0, Math.min(1, event.clientX / Math.max(1, window.innerWidth))),
+      y: Math.max(0, Math.min(1, event.clientY / Math.max(1, window.innerHeight))),
+    };
+  }
+
+  function updatePath(event: React.PointerEvent) {
+    if (!drawing) return;
+    const next = point(event);
+    setPaths((all) => all.map((path, index) => index === all.length - 1 && path.length < 1_500 ? [...path, next] : path));
+  }
+
+  async function submit() {
+    const value = question.trim() || transcript.trim();
+    if (!value || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await window.desk.lensSubmit({
+        question: value,
+        transcript,
+        selection: { paths: paths.map((points) => ({ points })) },
+        ...(history.length ? { history } : {}),
+        ...(scopeIds.length ? { sourceIds: scopeIds } : {}),
+        activityKind: activity,
+      });
+      if ("needsQuestion" in result) {
+        setBusy(false);
+        setStatus(result.message);
+        return;
+      }
+      setAnswer(result);
+      setMarks(result.overlays);
+      setQuestion("");
+      setTranscript("");
+    } catch (e) {
+      setBusy(false);
+      setError(userError(e));
     }
   }
+
   async function saveAnswerToNotes(origin: "lens" | "enhanced" = "lens") {
     if (!classId || !taskId || !answer) return;
     setActionBusy(true);
-    setStatus("");
+    setError("");
     try {
-      const withSource = await save({
-        type: "source.create",
-        input: lensAnswerSourceInput(answer, classId, taskId),
-      });
+      const withSource = await save({ type: "source.create", input: lensAnswerSourceInput(answer.explanation, classId, taskId) });
       const source = withSource?.sources.at(-1);
       if (!source) throw Error("Lens source was not saved.");
       const withCanvas = await save({ type: "canvas.create", taskId });
       const canvas = withCanvas?.canvases.at(-1);
       if (!canvas) throw Error("Lens Notes workspace was not created.");
-      await save({
-        type: "canvas.save",
-        id: canvas.id,
-        revision: canvas.revision,
-        scene: lensAnswerCanvasScene(answer, source.id, origin),
-      });
+      await save({ type: "canvas.save", id: canvas.id, revision: canvas.revision, scene: lensAnswerCanvasScene(answer.explanation, source.id, origin) });
       setStatus(origin === "enhanced" ? "Enhanced Notes saved with source provenance." : "Lens answer saved to Notes with its source.");
-    } catch (error) {
-      setStatus(userError(error));
+    } catch (value) {
+      setError(userError(value));
     } finally {
       setActionBusy(false);
     }
   }
+
+  const bounds = selectionBounds({ paths: paths.map((points) => ({ points })) });
+  const inputStyle = bounds
+    ? { left: `${Math.min(70, Math.max(2, bounds.x * 100))}%`, top: `${Math.min(78, Math.max(2, (bounds.y + bounds.height) * 100 + 2))}%` }
+    : { right: "24px", bottom: "24px" };
+
   return (
-    <div
-      className={`lens ${hasSelection ? "lens-has-selection" : "lens-awaiting-selection"}`}
-      data-selection={hasSelection ? "ready" : "waiting"}
-    >
-      <div className="lens-stage-hint" role="status" aria-live="polite">
-        <span className="lens-stage-dot" />
-        {hasSelection
-          ? "Selection ready · ask Lens when you are ready"
-          : "Select the part of your screen you want help with"}
-        <kbd>Esc</kbd>
-      </div>
-      <svg
-        className="lens-selection-surface"
-        aria-label="Draw a freehand selection"
-        onPointerDown={(e) => {
-          if (paths.length >= 8) {
-            setStatus("Clear a selection before adding another.");
-            return;
-          }
-          e.currentTarget.setPointerCapture(e.pointerId);
-          setDrawing(true);
-          setPaths((p) => [...p, [point(e)]]);
-        }}
-        onPointerMove={move}
-        onPointerUp={() => setDrawing(false)}
-        onPointerCancel={() => setDrawing(false)}
-      >
-        <defs>
-          <marker
-            id="arrow-tip"
-            markerWidth="8"
-            markerHeight="8"
-            refX="7"
-            refY="4"
-            orient="auto"
-          >
-            <path d="M0,0 L8,4 L0,8" fill="#50705A" />
-          </marker>
-        </defs>
-        {paths.map((p, i) =>
-          p.length === 1 ? (
-            <circle
-              key={i}
-              cx={p[0]!.x * width}
-              cy={p[0]!.y * height}
-              r="8"
-              fill="none"
-              stroke="#9D4E31"
-              strokeWidth="3"
-            />
-          ) : (
-            <path
-              key={i}
-              d={p
-                .map(
-                  (v, j) => `${j ? "L" : "M"} ${v.x * width} ${v.y * height}`,
-                )
-                .join(" ")}
-              fill="none"
-              stroke="#9D4E31"
-              strokeWidth="3"
-            />
-          ),
-        )}
-        {marks.map((m, i) => {
-          const x = m.x * width,
-            y = m.y * height,
-            x2 = (m.x2 ?? m.x) * width,
-            y2 = (m.y2 ?? m.y) * height;
-          return (
-            <g key={i} stroke="#50705A" strokeWidth="3">
-              {m.type === "arrow" ? (
-                <line
-                  x1={x}
-                  y1={y}
-                  x2={x2}
-                  y2={y2}
-                  markerEnd="url(#arrow-tip)"
-                />
-              ) : m.type === "circle" ? (
-                <ellipse
-                  cx={(x + x2) / 2}
-                  cy={(y + y2) / 2}
-                  rx={Math.abs(x2 - x) / 2}
-                  ry={Math.abs(y2 - y) / 2}
-                  fill="none"
-                />
-              ) : m.type === "highlight" ? (
-                <rect
-                  x={Math.min(x, x2)}
-                  y={Math.min(y, y2)}
-                  width={Math.abs(x2 - x)}
-                  height={Math.abs(y2 - y)}
-                  fill="#E8C66A"
-                  fillOpacity=".35"
-                  stroke="none"
-                />
-              ) : null}
-              {m.text && (
-                <text
-                  x={x}
-                  y={y}
-                  stroke="#FFFDFA"
-                  strokeWidth="4"
-                  paintOrder="stroke"
-                  fill="#1F2326"
-                  fontSize="18"
-                >
-                  {m.text}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-      <section className="lens-panel" data-selection={hasSelection ? "ready" : "waiting"}>
-        <div className="lens-panel-header">
-          <div>
-            <div className="eyebrow">Lens · {className || "Library"}</div>
-            <strong>{hasSelection ? "Selection ready" : "Select, then ask"}</strong>
-          </div>
-          <span className="lens-context-label">{title}</span>
+    <main className={`lens lens-${interaction.phase}`} data-selection={hasSelection ? "ready" : "waiting"}>
+      {selecting && (
+        <div className="lens-listening-chip" role="status" aria-live="polite">
+          <span className={interaction.mode === "voice" ? "lens-listening-dot is-live" : "lens-listening-dot"} />
+          {interaction.mode === "voice" ? (transcript ? "Listening" : "Talk to Lens") : "Select"}
+          <kbd>Esc</kbd>
         </div>
-        <p className="lens-instruction">
-          {hasSelection
-            ? "Your work stays visible. Ask a question or choose a study action."
-            : "Drag a circle, rectangle, or point over the work you want Lens to understand."}
-        </p>
-        {(scopedSources.length > 0 || browserContext) && (
-          <details className="lens-context-details" open>
-            <summary>Attached context</summary>
-            {!!scopedSources.length && (
-              <section className="source-scope" aria-label="Selected Library sources">
-                <strong>Grounded in selected Library sources</strong>
-                <p className="muted">Desk will keep this question scoped to these saved revisions.</p>
-                <ul>
-                  {scopedSources.map((source) => <li key={source.id}>{source.title} <span className="muted">· rev {source.revision ?? 0} · {source.kind ?? "unspecified"}</span></li>)}
-                </ul>
-              </section>
-            )}
-            {browserContext && (
-              <div className="source" role="status">
-                <strong>Browser context attached</strong>
-                <p>
-                  {browserContext.context.title || "Untitled page"}
-                  <br />
-                  <span className="muted">{browserContext.context.url}</span>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void clearBrowserContext()}
-                >
-                  Clear browser context
-                </button>
-              </div>
-            )}
-          </details>
-        )}
-        <div className="actions lens-tools" aria-label="Selection mode">
-          {(["freehand", "box", "click"] as const).map((m) => (
-            <button
-              key={m}
-              aria-pressed={mode === m}
-              onClick={() => setMode(m)}
-            >
-              {m === "freehand"
-                ? "Circle"
-                : m === "box"
-                  ? "Rectangle"
-                  : "Point"}
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              setPaths([]);
-              setMarks([]);
+      )}
+      {inputVisible && (
+        <div className="lens-input-popover" style={inputStyle}>
+          <textarea
+            id="lens-question"
+            aria-label="Ask Lens"
+            value={question}
+            onChange={(event) => setQuestion(event.target.value.slice(0, 4_000))}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                void window.desk.dismiss();
+              } else if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void submit();
+              }
             }}
-          >
-            Clear selection
-          </button>
+            rows={2}
+            maxLength={4_000}
+            placeholder="Ask about this…"
+          />
+          <div className="lens-input-hint">Enter to ask · Shift+Enter for a new line · Esc to cancel</div>
         </div>
-        <div className="actions lens-selection-actions" aria-label="Selection actions">
-          {(["Check my work", "Hint", "Explain", "Practice this", "Organize"] as const).map((label) => (
-            <button type="button" key={label} onClick={() => { setQuestion(label); setStatus(`Ask Lens to ${label.toLowerCase()}.`); }}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <details className="lens-more-controls" open={Boolean(image)}>
-          <summary>Screen context</summary>
-          <button
-            disabled={busy}
-            onClick={() =>
-              void window.desk
-                .captureScreen()
-                .then((c) => {
-                  setImage(c.image);
-                  setShare(false);
-                  setHistory([]);
-                  setAnswer("");
-                  setMarks([]);
-                  setStatus(
-                    "Screen captured for this interaction only. Review it before sharing.",
-                  );
-                })
-                .catch((e) => setStatus(userError(e)))
-            }
-          >
-            Capture this screen
-          </button>
-          {image && (
-            <>
-              <details>
-                <summary>Review captured screen</summary>
-                <img
-                  className="capture-preview"
-                  src={image}
-                  alt="Screen captured for this Lens interaction"
-                />
-              </details>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={share}
-                  onChange={(e) => setShare(e.target.checked)}
-                />
-                Include this captured screen with my question
-              </label>
-            </>
-          )}
-        </details>
-        {answer && (
-          <div className="lens-answer" aria-live="polite">
-            <div className="lens-answer-text">{answer}</div>
-            <div className="lens-actions" aria-label="Lens actions">
-              {classId && (
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={async () => {
-                    setActionBusy(true);
-                    setStatus("");
-                    try {
-                      await save({
-                        type: "source.create",
-                        input: lensAnswerSourceInput(
-                          answer,
-                          classId,
-                          taskId ?? null,
-                        ),
-                      });
-                      setStatus("Lens answer saved as a source.");
-                    } catch (error) {
-                      setStatus(userError(error));
-                    } finally {
-                      setActionBusy(false);
-                    }
-                  }}
-                >
-                  Save answer as source
-                </button>
-              )}
-              {classId && (
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={async () => {
-                    setActionBusy(true);
-                    setStatus("");
-                    try {
-                      await save({
-                        type: "memory.create",
-                        input: lensAnswerMemoryInput(answer, classId),
-                      });
-                      setStatus("Lens answer saved as a note.");
-                    } catch (error) {
-                      setStatus(userError(error));
-                    } finally {
-                      setActionBusy(false);
-                    }
-                  }}
-                >
-                  Save answer as note
-                </button>
-              )}
-              {classId && taskId && (
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={() => void saveAnswerToNotes()}
-                >
-                  Save answer to Notes
-                </button>
-              )}
-              {classId && taskId && (
-                <button type="button" disabled={actionBusy} onClick={() => void saveAnswerToNotes("enhanced")}>
-                  Enhance Notes
-                </button>
-              )}
-              {classId && (
-                <button
-                  type="button"
-                  aria-expanded={showMistake}
-                  disabled={actionBusy}
-                  onClick={() => setShowMistake((shown) => !shown)}
-                >
-                  Save as mistake
-                </button>
-              )}
-              {classId && (
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={async () => {
-                    setActionBusy(true);
-                    setStatus("");
-                    try {
-                      await save({
-                        type: "task.create",
-                        input: lensFollowUpTaskInput(
-                          answer,
-                          classId,
-                          taskResource ?? null,
-                        ),
-                      });
-                      setStatus(
-                        taskResource
-                          ? "Lens resource review prepared."
-                          : "Lens follow-up task created.",
-                      );
-                    } catch (error) {
-                      setStatus(userError(error));
-                    } finally {
-                      setActionBusy(false);
-                    }
-                  }}
-                >
-                  {taskResource
-                    ? "Prepare resource review"
-                    : "Create follow-up task"}
-                </button>
-              )}
-              {taskId && taskResource && (
-                <button
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={async () => {
-                    setActionBusy(true);
-                    setStatus("");
-                    try {
-                      await window.desk.openResource(taskId);
-                      setStatus("Opened task resource.");
-                    } catch (error) {
-                      setStatus(userError(error));
-                    } finally {
-                      setActionBusy(false);
-                    }
-                  }}
-                >
-                  Open task resource
-                </button>
-              )}
-            </div>
-            {showMistake && classId && (
-              <form
-                className="lens-mistake"
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  setActionBusy(true);
-                  setStatus("");
-                  try {
-                    const values = new FormData(event.currentTarget);
-                    await save({
-                      type: "mistake.create",
-                      input: lensAnswerMistakeInput(
-                        answer,
-                        classId,
-                        taskId ?? null,
-                        {
-                          concept: String(values.get("concept")),
-                          originalAttempt: String(
-                            values.get("originalAttempt"),
-                          ),
-                          whatWentWrong: String(values.get("whatWentWrong")),
-                        },
-                      ),
-                    });
-                    setShowMistake(false);
-                    setStatus("Mistake saved at low confidence for review.");
-                  } catch (error) {
-                    setStatus(userError(error));
-                  } finally {
-                    setActionBusy(false);
-                  }
-                }}
-              >
-                <p>
-                  Describe what happened. Lens will save its answer as a
-                  low-confidence correction for you to review.
-                </p>
-                <label>
-                  Concept
-                  <input
-                    name="concept"
-                    required
-                    maxLength={300}
-                    defaultValue={title}
-                  />
-                </label>
-                <label>
-                  What I tried
-                  <textarea name="originalAttempt" required maxLength={5000} />
-                </label>
-                <label>
-                  What went wrong
-                  <textarea name="whatWentWrong" required maxLength={5000} />
-                </label>
-                <button type="submit" disabled={actionBusy}>
-                  Save mistake
-                </button>
-              </form>
-            )}
-          </div>
-        )}
-        <form className="lens-question-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask();
+      )}
+      {(selecting || inputVisible) && (
+        <svg
+          className="lens-selection-surface"
+          aria-label="Draw a freeform Lens selection"
+          onPointerDown={(event) => {
+            if (!selecting || paths.length >= 8) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setDrawing(true);
+            setPaths((all) => [...all, [point(event)]]);
           }}
+          onPointerMove={updatePath}
+          onPointerUp={() => {
+            setDrawing(false);
+            if (interaction.phase === "typed-selecting") void window.desk.lensSelectionFinished();
+          }}
+          onPointerCancel={() => setDrawing(false)}
         >
-          <div className="lens-select-grid">
-            <label>
-              Study action
-              <select
-                aria-label="Study action"
-                value={activity}
-                onChange={(event) => setActivity(event.target.value as StudyActivityKind)}
-              >
-                {studyActivityKind.options.map((kind) => (
-                  <option key={kind} value={kind}>{activityLabel(kind)}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Tutoring mode
-              <select
-                aria-label="Tutoring mode"
-                value={tutoringMode}
-                disabled={busy || savingMode}
-                onChange={async (e) => {
-                  setSavingMode(true);
-                  setStatus("");
-                  try {
-                    await saveTutoringMode(e.target.value as TutoringMode);
-                    setStatus("Tutoring mode saved.");
-                  } catch (error) {
-                    setStatus(userError(error));
-                  } finally {
-                    setSavingMode(false);
-                  }
-                }}
-              >
-                <option value="guide">Guide me</option>
-                <option value="balanced">Balanced</option>
-                <option value="direct">Explain directly</option>
-              </select>
-            </label>
-          </div>
-          <p className="muted">{activityInstruction(activity, tutoringMode)}</p>
-          <label>
-            Ask The Desk
-            <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              required
-              maxLength={4000}
-              placeholder="Why does friction point this way?"
+          {paths.map((path, index) => (
+            <path
+              key={index}
+              data-lens-selection-path="true"
+              d={path.map((value, pointIndex) => `${pointIndex ? "L" : "M"} ${value.x * window.innerWidth} ${value.y * window.innerHeight}`).join(" ")}
+              fill="none"
+              stroke="#E8A47C"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          </label>
-          <div className="actions">
-            <button
-              className="primary"
-              disabled={busy || savingMode || !question.trim()}
-            >
-              {busy ? "Thinking…" : "Ask"}
-            </button>
-            <button type="button" onClick={() => void window.desk.dismiss()}>
-              Dismiss · Esc
-            </button>
-          </div>
-        </form>
-        {status && (
-          <p className="lens-status" role="status" aria-live="polite">
-            {status}
-          </p>
-        )}
-      </section>
-    </div>
+          ))}
+          {marks.map((mark, index) => {
+            const x = mark.x * window.innerWidth;
+            const y = mark.y * window.innerHeight;
+            const x2 = (mark.x2 ?? mark.x) * window.innerWidth;
+            const y2 = (mark.y2 ?? mark.y) * window.innerHeight;
+            return mark.type === "highlight" ? (
+              <rect key={index} x={Math.min(x, x2)} y={Math.min(y, y2)} width={Math.abs(x2 - x)} height={Math.abs(y2 - y)} fill="#E8C66A" fillOpacity=".28" />
+            ) : (
+              <circle key={index} cx={x} cy={y} r={Math.max(6, Math.abs(x2 - x) / 2)} fill="none" stroke="#77A887" strokeWidth="2" />
+            );
+          })}
+        </svg>
+      )}
+      {answerVisible && (
+        <section className="lens-answer-surface" aria-live="polite">
+          <header className="lens-answer-header">
+            <div>
+              <div className="eyebrow">Lens{className ? ` · ${className}` : ""}</div>
+              <strong>{error ? "Lens needs attention" : "Answer"}</strong>
+            </div>
+            <button type="button" className="lens-close" aria-label="Dismiss Lens" onClick={() => void window.desk.dismiss()}>×</button>
+          </header>
+          <div className="lens-answer-text">{error || answer?.explanation || "Lens could not complete this request."}</div>
+          {answer && (
+            <details className="lens-answer-details" open>
+              <summary>Save or continue</summary>
+              {(scopedSources.length > 0 || browserContext) && (
+                <div className="lens-answer-context">
+                  {scopedSources.length > 0 && <span>{scopedSources.length} Library source{scopedSources.length === 1 ? "" : "s"} in scope</span>}
+                  {browserContext && <span>{browserContext.context.title || "Browser context"}</span>}
+                  {browserContext && <button type="button" onClick={() => void clearBrowserContext()}>Clear browser context</button>}
+                </div>
+              )}
+              <div className="lens-actions" aria-label="Lens actions">
+                {classId && <button type="button" disabled={actionBusy} onClick={async () => { setActionBusy(true); try { await save({ type: "source.create", input: lensAnswerSourceInput(answer.explanation, classId, taskId ?? null) }); setStatus("Lens answer saved as a source."); } catch (value) { setError(userError(value)); } finally { setActionBusy(false); } }}>Save as source</button>}
+                {classId && <button type="button" disabled={actionBusy} onClick={async () => { setActionBusy(true); try { await save({ type: "memory.create", input: lensAnswerMemoryInput(answer.explanation, classId) }); setStatus("Lens answer saved as a note."); } catch (value) { setError(userError(value)); } finally { setActionBusy(false); } }}>Save as note</button>}
+                {classId && taskId && <button type="button" disabled={actionBusy} onClick={() => void saveAnswerToNotes()}>Save to Notes</button>}
+                {classId && taskId && <button type="button" disabled={actionBusy} onClick={() => void saveAnswerToNotes("enhanced")}>Enhance Notes</button>}
+                {classId && <button type="button" aria-expanded={showMistake} disabled={actionBusy} onClick={() => setShowMistake((value) => !value)}>Save as mistake</button>}
+                {classId && <button type="button" disabled={actionBusy} onClick={async () => { setActionBusy(true); try { await save({ type: "task.create", input: lensFollowUpTaskInput(answer.explanation, classId, taskResource ?? null) }); setStatus(taskResource ? "Lens resource review prepared." : "Lens follow-up task created."); } catch (value) { setError(userError(value)); } finally { setActionBusy(false); } }}>{taskResource ? "Prepare review" : "Create follow-up"}</button>}
+                {taskId && taskResource && <button type="button" disabled={actionBusy} onClick={async () => { setActionBusy(true); try { await window.desk.openResource(taskId); setStatus("Opened task resource."); } catch (value) { setError(userError(value)); } finally { setActionBusy(false); } }}>Open resource</button>}
+              </div>
+              {showMistake && classId && <form className="lens-mistake" onSubmit={async (event) => { event.preventDefault(); setActionBusy(true); try { const values = new FormData(event.currentTarget); await save({ type: "mistake.create", input: lensAnswerMistakeInput(answer.explanation, classId, taskId ?? null, { concept: String(values.get("concept")), originalAttempt: String(values.get("originalAttempt")), whatWentWrong: String(values.get("whatWentWrong")) }) }); setShowMistake(false); setStatus("Mistake saved for review."); } catch (value) { setError(userError(value)); } finally { setActionBusy(false); } }}><label>Concept<input name="concept" required maxLength={300} defaultValue={title} /></label><label>What I tried<textarea name="originalAttempt" required maxLength={5000} /></label><label>What went wrong<textarea name="whatWentWrong" required maxLength={5000} /></label><button type="submit" disabled={actionBusy}>Save mistake</button></form>}
+            </details>
+          )}
+          {status && <p className="lens-status" role="status">{status}</p>}
+        </section>
+      )}
+      {!selecting && !inputVisible && !answerVisible && error && <p className="lens-status" role="alert">{error}</p>}
+    </main>
   );
 }

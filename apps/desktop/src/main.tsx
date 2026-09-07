@@ -24,6 +24,7 @@ import type {
   Task,
   SearchResult,
   CanvasRecord,
+  LensHotkeyStatus,
 } from "../../../packages/domain/contracts";
 import type { DeskSyncStatus } from "../../../packages/integrations/supabase-sync";
 import { deriveHome } from "../../../packages/planner/home";
@@ -119,6 +120,18 @@ function App() {
   const [canvas, setCanvas] = useState<CanvasTarget>();
   const [browserContext, setBrowserContext] =
     useState<BrowserBridgeMessage | null>(null);
+  const [lensHotkeyStatus, setLensHotkeyStatus] = useState<LensHotkeyStatus>({
+    available: false,
+    source: "unavailable",
+    message: "Lens shortcut is starting…",
+  });
+  useEffect(() => {
+    void window.desk.lensHotkeyStatus().then(setLensHotkeyStatus).catch(() => undefined);
+    const timer = window.setInterval(() => {
+      void window.desk.lensHotkeyStatus().then(setLensHotkeyStatus).catch(() => undefined);
+    }, 2_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     let active = true;
     const refresh = () =>
@@ -494,8 +507,6 @@ function App() {
   if (kind === "lens")
     return (
       <Lens
-        tutoringMode={data.tutoringMode}
-        saveTutoringMode={(mode) => act({ type: "tutor.mode", mode }, true)}
         title={activeTask?.title ?? "No active study context"}
         className={
           data.classes.find((c) => c.id === activeTask?.classId)?.name ?? ""
@@ -910,9 +921,13 @@ function App() {
             />
             <h2>Lens</h2>
             <p>
-              Option/Alt + Space opens Lens. This build supports a local
-              selection overlay and explicit screen capture. Connect an AI
-              provider above for typed assistance. Voice is not available yet.
+              Hold Option/Alt + Space, circle something while you talk, and
+              release to ask Lens. Double-tap the same shortcut for a typed
+              question. Lens needs Screen Recording, Microphone, and Input
+              Monitoring permission to work from any app.
+            </p>
+            <p className={lensHotkeyStatus.available ? "muted" : "error"} role="status">
+              {lensHotkeyStatus.message}
             </p>
           </>
         ) : page === "Capture Inbox" ? (

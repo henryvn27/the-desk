@@ -7,7 +7,8 @@ import {
 } from "../intelligence/authority";
 import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
-import type { LensInput, LensResponse } from "../intelligence/lens-provider";
+import type { LensInput, LensResponse, LensSelection } from "../intelligence/lens-provider";
+import type { LensInteractionState } from "../intelligence/lens-interaction";
 import {
   studyActivityKind,
   studyMode,
@@ -1115,6 +1116,21 @@ export type LensCapture = {
   height: number;
   displayId: string;
   capturedAt: string;
+  bounds?: { x: number; y: number; width: number; height: number };
+};
+export type LensSubmitInput = {
+  question?: string;
+  transcript?: string;
+  sourceIds?: string[];
+  activityKind?: import("../study/activities").StudyActivityKind;
+  selection?: LensSelection;
+  history?: import("../intelligence/lens-provider").LensHistoryTurn[];
+};
+export type LensSubmitResult = LensResponse | { needsQuestion: true; message: string };
+export type LensHotkeyStatus = {
+  available: boolean;
+  source: "native" | "electron-fallback" | "unavailable";
+  message: string;
 };
 export type RecordingStart = {
   recordingId: string;
@@ -1144,6 +1160,15 @@ export interface DeskAPI {
   canvas(id: string): Promise<CanvasRecord>;
   search(query: string): Promise<SearchResult[]>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
+  lensSubmit(input: LensSubmitInput): Promise<LensSubmitResult>;
+  lensDraft(selection: LensSelection, transcript?: string): Promise<void>;
+  lensSelectionFinished(): Promise<void>;
+  lensKeyUp(): Promise<void>;
+  lensHotkeyStatus(): Promise<LensHotkeyStatus>;
+  lensInteractionState(): Promise<LensInteractionState>;
+  onLensInteraction(listener: (state: LensInteractionState) => void): () => void;
+  onLensAnswer(listener: (response: LensResponse) => void): () => void;
+  onLensError(listener: (message: string) => void): () => void;
   browserContext(): Promise<import("../integrations/browser-bridge").BrowserBridgeMessage | null>;
   onBrowserContext(
     listener: (message: import("../integrations/browser-bridge").BrowserBridgeMessage) => void,

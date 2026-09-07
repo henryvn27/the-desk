@@ -49,8 +49,9 @@ export function ProviderSettings() {
         logging settings still apply.
       </p>
       <p className="muted">
-        Lens sends your question and session context when you press Ask. A
-        captured screen is shared only when you select that option.
+        Lens sends your question and session context when you release the
+        hold-to-talk shortcut or press Enter in typed mode. The selected
+        screen region is shared only for that Lens request.
       </p>
       {connection.source !== "development-env" && (
         <div className="actions">

@@ -1,6 +1,23 @@
 import { build } from "esbuild";
-import { cp } from "node:fs/promises";
+import { chmod, cp, mkdir } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 await cp("node_modules/@excalidraw/excalidraw/dist/prod/fonts","dist/fonts",{recursive:true});
+await mkdir("dist-electron", { recursive: true });
+if (process.platform === "darwin") {
+  execFileSync("clang", [
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-framework",
+    "CoreGraphics",
+    "-framework",
+    "CoreFoundation",
+    "apps/desktop/electron/lens-hotkey.c",
+    "-o",
+    "dist-electron/lens-hotkey",
+  ]);
+  await chmod("dist-electron/lens-hotkey", 0o755);
+}
 await build({
   entryPoints: [
     "apps/desktop/electron/main.ts",

@@ -17,6 +17,35 @@ const api: DeskAPI = {
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
   search: (query) => ipcRenderer.invoke("desk:search", query),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
+  lensSubmit: (input) => ipcRenderer.invoke("desk:lens-submit", input),
+  lensDraft: (selection, transcript) => ipcRenderer.invoke("desk:lens-draft", selection, transcript),
+  lensSelectionFinished: () => ipcRenderer.invoke("desk:lens-selection-finished"),
+  lensKeyUp: () => ipcRenderer.invoke("desk:lens-key-up"),
+  lensHotkeyStatus: () => ipcRenderer.invoke("desk:lens-hotkey-status"),
+  lensInteractionState: () => ipcRenderer.invoke("desk:lens-interaction-state"),
+  onLensInteraction: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, value: unknown) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return;
+      listener(value as import("../../../packages/intelligence/lens-interaction").LensInteractionState);
+    };
+    ipcRenderer.on("desk:lens-interaction", receive);
+    return () => ipcRenderer.removeListener("desk:lens-interaction", receive);
+  },
+  onLensAnswer: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, value: unknown) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return;
+      listener(value as import("../../../packages/intelligence/lens-provider").LensResponse);
+    };
+    ipcRenderer.on("desk:lens-answer", receive);
+    return () => ipcRenderer.removeListener("desk:lens-answer", receive);
+  },
+  onLensError: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, value: unknown) => {
+      if (typeof value === "string") listener(value);
+    };
+    ipcRenderer.on("desk:lens-error", receive);
+    return () => ipcRenderer.removeListener("desk:lens-error", receive);
+  },
   browserContext: () => ipcRenderer.invoke("desk:browser-context"),
   onBrowserContext: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, value: unknown) => {
