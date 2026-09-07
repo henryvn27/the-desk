@@ -338,6 +338,9 @@ function App() {
   const next = sharedNextAction?.taskId
     ? data.tasks.find((task) => task.id === sharedNextAction.taskId) ?? plannedNext
     : plannedNext;
+  const learningTask = bestAction?.taskId
+    ? data.tasks.find((task) => task.id === bestAction.taskId)
+    : undefined;
   const homeClassRows = data.classes.map((course) => {
     const openTasks = data.tasks
       .filter((task) => task.classId === course.id && !task.completed)
@@ -354,18 +357,28 @@ function App() {
       }
     });
   }, [active, busy, next]);
+  const startLearning = React.useCallback(() => {
+    if (!learningTask || active || busy) return;
+    void act({ type: "session.start", taskId: learningTask.id }).then((state) => {
+      if (state) {
+        setLastId("");
+        if (learningTask.resource) void open(learningTask.id);
+      }
+    });
+  }, [active, busy, learningTask]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (page !== "Home" || !next || active || busy) return;
+      if (page !== "Home" || (!next && !learningTask) || active || busy) return;
       if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
       const target = event.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
       event.preventDefault();
-      startNext();
+      if (next) startNext();
+      else startLearning();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [active, busy, next, page, startNext]);
+  }, [active, busy, learningTask, next, page, startLearning, startNext]);
   const elapsed = active
     ? Math.max(
         0,
@@ -832,6 +845,7 @@ function App() {
                 </details>
                 <div className="actions">
                   {bestAction.testOut && <button className="primary" type="button" onClick={() => setTestOutPlan(bestAction.testOut)}>Test out</button>}
+                  {learningTask && <button className="primary" type="button" disabled={busy} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={startLearning}>Start study <span className="shortcut-hint" aria-hidden="true">⌘/Ctrl+Enter</span></button>}
                   {bestAction.conceptIds[0] && <button type="button" onClick={() => void act({ type: "memory.create", input: { text: learningOverrideText("skip-concept", bestAction.conceptIds[0]!, "not relevant right now"), category: "planning", classId: bestAction.classId ?? null } })}>Not relevant</button>}
                   {bestAction.classId && <button type="button" onClick={() => setPage(bestAction.classId!)}>Open class workspace</button>}
                 </div>

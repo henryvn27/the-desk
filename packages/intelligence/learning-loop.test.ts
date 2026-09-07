@@ -136,6 +136,17 @@ test("repeated failure exposes the weakest prerequisite as a targeted remediatio
   assert.match(candidate?.reason ?? "", /weakest prerequisite/i);
 });
 
+test("learning recommendations retain an unfinished linked task for direct session start", () => {
+  const work = task("121", "Mixed practice");
+  const conceptRecord = concept("122", "Energy conservation", [work.id], [], {
+    reviewDue: "2026-09-07T11:00:00.000Z",
+  });
+  const state = snapshot({ tasks: [work], concepts: [conceptRecord] });
+  const action = deriveLearningLoop(state, now).nextBestAction;
+  assert.equal(action.kind, "review");
+  assert.equal(action.taskId, work.id);
+});
+
 test("test-out creates a small source-aware check instead of silently treating review as mastery", () => {
   const work = task("401", "Momentum set");
   const conceptRecord = concept("402", "Momentum", [work.id], [], {

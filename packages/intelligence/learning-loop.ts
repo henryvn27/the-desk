@@ -177,6 +177,17 @@ function conceptFor(snapshot: Snapshot, id: string | undefined) {
   return id ? snapshot.concepts.find((concept) => concept.id === id) : undefined;
 }
 
+function firstOpenTaskForConcepts(snapshot: Snapshot, conceptIds: string[]) {
+  const linked = new Set(conceptIds);
+  return snapshot.tasks
+    .filter((task) => !task.completed && snapshot.concepts.some((concept) => linked.has(concept.id) && concept.taskIds.includes(task.id)))
+    .sort((a, b) => {
+      const aDue = a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY;
+      const bDue = b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY;
+      return aDue - bDue || a.id.localeCompare(b.id);
+    })[0] ?? null;
+}
+
 const overridePrefix = "desk.learning.override:";
 
 /** Persist recommendation corrections through the existing AcademicMemory store. */
@@ -379,11 +390,13 @@ function actionForRemediation(snapshot: Snapshot, candidate: RemediationCandidat
   const state = model.getConceptState(candidate.conceptId);
   const sourceIds = linkedSourceIds(snapshot, conceptFor(snapshot, candidate.conceptId)?.classId);
   const testOut = buildTestOutPlan(snapshot, candidate.conceptId, now, undefined, model);
+  const task = firstOpenTaskForConcepts(snapshot, [candidate.conceptId, candidate.blockedConceptId]);
   return {
     id: `next-best:remediation:${candidate.id}`,
     kind: "remediation",
     title: `Fix ${candidate.conceptName} before returning to ${candidate.blockedConceptName}`,
     classId: conceptFor(snapshot, candidate.conceptId)?.classId,
+    ...(task ? { taskId: task.id } : {}),
     conceptIds: [candidate.conceptId, candidate.blockedConceptId],
     estimatedMinutes: candidate.estimatedMinutes,
     reason: {
@@ -408,6 +421,7 @@ function actionForConcept(snapshot: Snapshot, state: ConceptState, now: Date, ki
   const concept = conceptFor(snapshot, state.conceptId)!;
   const sourceIds = linkedSourceIds(snapshot, concept.classId);
   const testOut = buildTestOutPlan(snapshot, state.conceptId, now, undefined, model);
+  const task = firstOpenTaskForConcepts(snapshot, [state.conceptId]);
   const due = state.memory.reviewDue && finiteDate(state.memory.reviewDue) && +finiteDate(state.memory.reviewDue)! <= +now;
   const title = kind === "test_out" ? `Test out of ${state.name}` : due ? `Retrieve ${state.name} before it fades` : `Practice ${state.name} unaided`;
   return {
@@ -415,6 +429,7 @@ function actionForConcept(snapshot: Snapshot, state: ConceptState, now: Date, ki
     kind,
     title,
     classId: concept.classId,
+    ...(task ? { taskId: task.id } : {}),
     conceptIds: [state.conceptId],
     estimatedMinutes: testOut?.estimatedMinutes ?? 12,
     reason: {
