@@ -1992,6 +1992,14 @@
       "Live Google OAuth, real Chrome/Edge installation/permissions, Classroom/Drive/Calendar transport, voice/OCR/PDF device paths and Windows interactive UI remain unverified.",
       "The local directory artifact is development-signed and not notarized; public distribution signing/notarization is still an external release step.",
       "QA-LENS-002 remains open because an earlier installed run observed an intermittent extra SVG path even though the closure rerun passed."
-    ]
+    ],
+    "ci": {
+      "run": "34088140936",
+      "url": "https://github.com/henryvn27/the-desk/actions/runs/34088140936",
+      "commit": "200096448fa9ca2a4f937e53f570259f7a6a3e10",
+      "macos": "PASS: npm ci, npm run check, npm run package",
+      "windows": "PASS: npm ci, npm run check, npm run package",
+      "limitation": "Hosted CI proves build/package and automated checks, not Windows interactive UI, native permissions or public distribution."
+    }
   }
 }

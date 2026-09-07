@@ -26,7 +26,7 @@
       "title": "Windows interactive runtime unverified",
       "severity": "high",
       "status": "open",
-      "evidence": "Windows hosted check/build/package passed at effd09b, https://github.com/henryvn27/the-desk/actions/runs/33997130565. Interactive Windows remains unverified."
+      "evidence": "Windows hosted check/build/package passed for closure commit 200096448fa9ca2a4f937e53f570259f7a6a3e10 in workflow https://github.com/henryvn27/the-desk/actions/runs/34088140936. Interactive Windows UI, native permissions and installed restart behavior remain unverified."
     },
     {
       "id": "BUILD-001",

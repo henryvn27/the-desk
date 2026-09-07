@@ -13,6 +13,7 @@ Generated from V1Completion.json. Full Electron/React/TypeScript rebuild; legacy
 - PASS: signed macOS arm64 directory artifact at release/mac-arm64; notarization skipped
 - 49 of 49 development and installed macOS suites passed with isolated temporary data
 - Installed app.asar SHA-256: 95c5bda880bc59db607c41fd716df144f22e0315360becb249010247cd2dc99c
+- Hosted CI run 34088140936 (https://github.com/henryvn27/the-desk/actions/runs/34088140936) passes macOS and Windows npm ci/check/package for commit 200096448fa9ca2a4f937e53f570259f7a6a3e10.
 
 External blockers remain explicit: Live OpenRouter account/authentication still returns sanitized HTTP 401; no successful answer, usage or provider privacy-account verification is claimed. Production Supabase migration/RLS deployment, session refresh and cross-client merge remain unverified; local SQLite remains authoritative. Live Google OAuth, real Chrome/Edge installation/permissions, Classroom/Drive/Calendar transport, voice/OCR/PDF device paths and Windows interactive UI remain unverified. The local directory artifact is development-signed and not notarized; public distribution signing/notarization is still an external release step. QA-LENS-002 remains open because an earlier installed run observed an intermittent extra SVG path even though the closure rerun passed.
 

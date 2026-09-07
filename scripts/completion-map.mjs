@@ -14,7 +14,7 @@ const rows = (items) =>
 const header =
   "| ID | Requirement | Status | Implementation | Automated | Live | macOS | Windows | Remaining |\n|---|---|---|---|---|---|---|---|---|\n";
 const closure = map.latestClosure
-  ? `## Latest release-closure snapshot\n\n- Recorded: ${map.latestClosure.recordedAt}\n- Branch: ${map.latestClosure.branch}\n- Status: **${map.latestClosure.status}**\n- Source commit before closure edits: ${map.latestClosure.sourceCommitBeforeClosure}\n- SQLite remains authoritative locally; Supabase is bounded account/cloud sync only.\n- ${map.latestClosure.checks["npm run check"]}\n- ${map.latestClosure.checks["npm run package"]}\n- ${map.latestClosure.checks.electronSmokeSuites}\n- Installed app.asar SHA-256: ${map.latestClosure.package.appAsarSha256}\n\nExternal blockers remain explicit: ${map.latestClosure.externalBlockers.join(" ")}\n\n`
+  ? `## Latest release-closure snapshot\n\n- Recorded: ${map.latestClosure.recordedAt}\n- Branch: ${map.latestClosure.branch}\n- Status: **${map.latestClosure.status}**\n- Source commit before closure edits: ${map.latestClosure.sourceCommitBeforeClosure}\n- SQLite remains authoritative locally; Supabase is bounded account/cloud sync only.\n- ${map.latestClosure.checks["npm run check"]}\n- ${map.latestClosure.checks["npm run package"]}\n- ${map.latestClosure.checks.electronSmokeSuites}\n- Installed app.asar SHA-256: ${map.latestClosure.package.appAsarSha256}\n- Hosted CI run ${map.latestClosure.ci.run} (${map.latestClosure.ci.url}) passes macOS and Windows npm ci/check/package for commit ${map.latestClosure.ci.commit}.\n\nExternal blockers remain explicit: ${map.latestClosure.externalBlockers.join(" ")}\n\n`
   : "";
 writeFileSync(
   "Verification/V1Completion.md",
