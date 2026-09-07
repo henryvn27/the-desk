@@ -58,7 +58,8 @@ export function CaptureInbox({
             {item.draft.provenance.sourceName
               ? `File: ${item.draft.provenance.sourceName}`
               : "Pasted text"}{" "}
-            · {new Date(item.draft.provenance.capturedAt).toLocaleString()}
+            · {new Date(item.draft.provenance.capturedAt).toLocaleString()} ·{" "}
+            {item.draft.objectType?.replace(/-/g, " ") ?? "assignment"}
           </p>
           {view === "accepted" ? (
             <p>

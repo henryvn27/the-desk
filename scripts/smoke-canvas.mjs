@@ -9,6 +9,13 @@ const output = resolve("artifacts/canvas");
 await mkdir(output, { recursive: true });
 let app, page;
 const errors = [];
+async function waitForCanvas() {
+  await page.locator(".excalidraw canvas").first().waitFor();
+  // The interactive Excalidraw surface mounts one tick after its static
+  // backing canvas. Give the editor callback time to attach before injecting
+  // pointer input so the first stroke is never lost during a Notes toggle.
+  await page.waitForTimeout(300);
+}
 async function launch() {
   app = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -46,9 +53,10 @@ try {
     });
   });
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
-  await page.getByRole("dialog", { name: "Study canvas" }).waitFor();
-  await page.locator(".excalidraw canvas").first().waitFor();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
+  await page.getByRole("dialog", { name: "Study notes" }).waitFor();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
+  await waitForCanvas();
   await page.getByTestId("toolbar-freedraw").locator("..").click();
   await page.mouse.move(420, 300);
   await page.mouse.down();
@@ -82,7 +90,7 @@ try {
   await page.mouse.up();
   await page.keyboard.press(modifier + "+z");
   await page.keyboard.press(modifier + "+Shift+z");
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   let snapshot = await page.evaluate(() => window.desk.snapshot());
   const id = snapshot.canvases[0].id;
   const before = await page.evaluate((id) => window.desk.canvas(id), id);
@@ -118,11 +126,12 @@ try {
   await page.video().saveAs(join(output, "canvas-drawing.webm"));
   await launch();
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
-  await page.locator(".excalidraw canvas").first().waitFor();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
+  await waitForCanvas();
   const after = await page.evaluate((id) => window.desk.canvas(id), id);
   assert.deepEqual(after.scene, before.scene);
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -168,7 +177,7 @@ try {
     return Object.keys(record.scene.files).length === 1;
   }, "Imported image was not saved");
   await page.mouse.click(900, 530);
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   const withMedia = await page.evaluate((id) => window.desk.canvas(id), id);
   assert.ok(
     withMedia.scene.elements.some(
@@ -185,9 +194,10 @@ try {
   const restoredMedia = await page.evaluate((id) => window.desk.canvas(id), id);
   assert.deepEqual(restoredMedia.scene, withMedia.scene);
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
-  await page.locator(".excalidraw canvas").first().waitFor();
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
+  await waitForCanvas();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -220,13 +230,13 @@ try {
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   await page.getByLabel("Link a Library source").selectOption(sourceId);
   await page
-    .getByRole("complementary", { name: "Canvas sources" })
+    .getByRole("complementary", { name: "Notes sources" })
     .getByText(
       "The net force equals mass times acceleration. Preserve this original passage.",
       { exact: true },
     )
     .waitFor();
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -263,11 +273,12 @@ try {
     "Native Quit must flush the pending ellipse",
   );
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
-  await page.locator(".excalidraw canvas").first().waitFor();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
+  await waitForCanvas();
   // Let engine hydration normalization settle before recording the scene that
   // another writer owns. Compare the failed save to this exact stored baseline.
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -284,9 +295,9 @@ try {
     return record.scene;
   }, id);
   await page.getByTestId("toolbar-diamond").locator("..").click();
-  await page.mouse.move(200, 300);
+  await page.mouse.move(420, 300);
   await page.mouse.down();
-  await page.mouse.move(260, 360);
+  await page.mouse.move(480, 360);
   await page.mouse.up();
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].close();
@@ -309,7 +320,8 @@ try {
       exact: true,
     })
     .click();
-  await page.locator(".excalidraw canvas").first().waitFor();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
+  await waitForCanvas();
   const recoveredSnapshot = await page.evaluate(() => window.desk.snapshot());
   const recovered = recoveredSnapshot.canvases.find((c) => c.id !== id);
   assert.ok(recovered, "Recovery copy must be accessible from Library");
@@ -326,7 +338,7 @@ try {
     (await page.evaluate((id) => window.desk.canvas(id), id)).scene,
     staleBaseline,
   );
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -336,7 +348,7 @@ try {
     recovered.id,
   );
   await page.screenshot({ path: join(output, "canvas-recovered.png") });
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   await app.close();
   await page.video().saveAs(join(output, "canvas-recovery.webm"));
   await launch();
@@ -350,12 +362,12 @@ try {
     [sourceId],
   );
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
   await page.getByRole("button", { name: "Sources", exact: true }).click();
   await page
     .getByRole("button", { name: "Unlink Newton's second law", exact: true })
     .click();
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   assert.deepEqual(
     (await page.evaluate((id) => window.desk.canvas(id), id)).scene.sourceIds,
     [],

@@ -53,11 +53,21 @@ export function decideCapture(
     tasks.some(
       (task) =>
         task.classId === draft.classId &&
-        normalized(task.title) === normalized(draft.title),
+        (normalized(task.title) === normalized(draft.title) ||
+          (task.captureEvidence &&
+            normalized(
+              task.captureEvidence.sourceText ||
+                task.captureEvidence.originalText,
+            ) === normalized(draft.provenance.sourceText))),
     )
   )
     return review(
-      "An assignment with this title already exists in this class. Review possible duplicates or updates.",
+      "An assignment with this title or the same captured content already exists in this class. Review possible duplicates or updates.",
+    );
+  const objectType = draft.objectType ?? "assignment";
+  if (objectType !== "assignment")
+    return review(
+      `This capture looks like a ${objectType.replace(/-/g, " ")}; review it in Capture Inbox instead of filing it as an assignment.`,
     );
   const parsed = taskInput.safeParse({
     title: draft.title,

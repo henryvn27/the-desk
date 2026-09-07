@@ -7,6 +7,7 @@ import {
   type Snapshot,
 } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
+import { createStudentModel } from "../../../packages/intelligence/student-model";
 
 const kindLabels: Record<Assessment["kind"], string> = {
   quiz: "Quiz",
@@ -36,6 +37,7 @@ export function Assessments({
   const [editing, setEditing] = useState<Assessment | null | undefined>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const model = createStudentModel(data);
   async function change(command: Command) {
     setBusy(true);
     setError("");
@@ -108,6 +110,20 @@ export function Assessments({
               : "No preparation tasks linked"}
             {assessment.gradeCategoryId && " · linked grade category"}
           </p>
+          {(() => {
+            const readiness = model.getAssessmentReadiness(assessment.id);
+            return readiness ? (
+              <>
+                <p>
+                  <strong>Student Model readiness:</strong>{" "}
+                  {readiness.state.replace("-", " ")}
+                </p>
+                <p className="muted">
+                  {readiness.why.slice(0, 3).join(" ")}
+                </p>
+              </>
+            ) : null;
+          })()}
           {assessment.notes && <p>{assessment.notes}</p>}
           <div className="actions">
             <button

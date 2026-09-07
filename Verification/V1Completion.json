@@ -1929,5 +1929,69 @@
     "releaseGateCount": 15,
     "deferredCount": 25,
     "unmappedSections": []
+  },
+  "latestClosure": {
+    "recordedAt": "2026-09-07",
+    "branch": "codex/desk-v1-electron",
+    "status": "READY_EXCEPT_EXTERNAL_BLOCKERS",
+    "sourceCommitBeforeClosure": "1c2a959",
+    "authoritativeStore": "SQLite local-first; Supabase is bounded account/cloud sync only",
+    "checks": {
+      "npm run check": "PASS: Electron-only guard, typecheck, ESLint, 238 domain tests, 10 extension tests, Vite/Electron production build and MV3 extension build",
+      "npm run package": "PASS: signed macOS arm64 directory artifact at release/mac-arm64; notarization skipped",
+      "releaseBoundary": "PASS: 414 generated build files, 21,676 app.asar entries, no credential-shaped build files, bounded provider failure handling",
+      "electronSmokeSuites": "49 of 49 development and installed macOS suites passed with isolated temporary data",
+      "visualAudit": "Capture audit screenshots and notes retained under artifacts/audits/capture; Home, Capture, Notes, Library and class screenshots retained under artifacts/"
+    },
+    "package": {
+      "appAsarSha256": "95c5bda880bc59db607c41fd716df144f22e0315360becb249010247cd2dc99c",
+      "installedPath": "/Users/henry/Applications/The Desk V1.app",
+      "installedAppAsarMatchesPackage": true,
+      "codesign": "Apple Development: Henry Van Ness (7XU4TFYB8Y); codesign --verify --deep --strict PASS",
+      "notarization": "NOT PERFORMED; spctl assessment rejects the local development-signed directory artifact",
+      "rollback": "/Users/henry/Applications/The Desk V1.app.previous-20260907T053625Z-release-closure"
+    },
+    "benchmarks": {
+      "capture": {
+        "objectTypeAccuracy": 1,
+        "classRoutingAccuracy": 1,
+        "dueDateAccuracy": 1,
+        "autoFilePrecision": 1,
+        "reviewRate": 0.9333,
+        "meanParseMs": 3.287,
+        "singleCaptureMs": 6.762,
+        "durableStoreMs": 15.454,
+        "meanBrier": 0.1572
+      },
+      "notes": {
+        "sceneBytes": 1165197,
+        "blocks": 600,
+        "inkStrokes": 2000,
+        "graphSamples": 800,
+        "parseMs": 13.87,
+        "indexMs": 0.29,
+        "graphMs": 43.99
+      },
+      "library": {
+        "textCharacters": 174007,
+        "sections": 1800,
+        "matches": 500,
+        "annotations": 500,
+        "indexedResults": 100,
+        "searchMs": 0.23,
+        "indexedSearchMs": 2.76,
+        "annotationsMs": 1781.33
+      },
+      "home": "10 scenario benchmark passed: normal day, weekend, overload, exam tomorrow, nothing due, missed session, uncertain deadline, plan change, active session and offline",
+      "class": "AP Physics C benchmark passed with current/upcoming unit projection, assessment, learning, teacher, source and grade evidence",
+      "planner": "Benchmark passed; mean repair churn improved from 0.0833 to 0 and duration realism/performance-pattern rates improved"
+    },
+    "externalBlockers": [
+      "Live OpenRouter account/authentication still returns sanitized HTTP 401; no successful answer, usage or provider privacy-account verification is claimed.",
+      "Production Supabase migration/RLS deployment, session refresh and cross-client merge remain unverified; local SQLite remains authoritative.",
+      "Live Google OAuth, real Chrome/Edge installation/permissions, Classroom/Drive/Calendar transport, voice/OCR/PDF device paths and Windows interactive UI remain unverified.",
+      "The local directory artifact is development-signed and not notarized; public distribution signing/notarization is still an external release step.",
+      "QA-LENS-002 remains open because an earlier installed run observed an intermittent extra SVG path even though the closure rerun passed."
+    ]
   }
 }

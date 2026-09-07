@@ -8,7 +8,19 @@ const output = resolve("artifacts/smoke");
 await mkdir(output, { recursive: true });
 let desktop;
 let page;
+let controllerPage;
 const errors = [];
+async function waitForWindow(hash) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const candidate = desktop.windows().find((w) => w.url().endsWith(hash));
+    if (candidate) {
+      candidate.on("pageerror", (e) => errors.push(e.message));
+      return candidate;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Window ${hash} did not open`);
+}
 async function launch() {
   desktop = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -16,6 +28,7 @@ async function launch() {
     env: { ...process.env, DESK_DATA_DIR: data, TZ: "UTC", DESK_ENABLE_DEVELOPMENT_KEY: "0" },
     recordVideo: { dir: output },
   });
+  controllerPage = undefined;
   await desktop.firstWindow();
   for (let attempt = 0; attempt < 100; attempt++) {
     page = desktop.windows().find((w) => w.url().endsWith("#main"));
@@ -52,16 +65,19 @@ try {
   await page.getByRole("button", { name: "Start session →" }).waitFor();
   await page.screenshot({ path: join(output, "home.png") });
   await page.getByRole("button", { name: "Start session →" }).click();
-  await page.getByRole("button", { name: "Pause", exact: true }).waitFor();
+  await page.getByText("Study session in progress", { exact: true }).waitFor();
+  controllerPage = await waitForWindow("#controller");
+  await controllerPage.getByRole("button", { name: "Pause", exact: true }).waitFor();
   let snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.sessions.filter((s) => !s.endedAt).length, 1);
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await controllerPage.getByRole("button", { name: "Pause", exact: true }).click();
+  await controllerPage.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await desktop.close();
   await launch();
-  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
-  await page.getByRole("button", { name: "Lens", exact: true }).click();
+  controllerPage = await waitForWindow("#controller");
+  await controllerPage.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await controllerPage.getByRole("button", { name: "Resume", exact: true }).click();
+  await controllerPage.getByRole("button", { name: "Lens", exact: true }).click();
   let lens;
   for (let attempt = 0; attempt < 100; attempt++) {
     lens = desktop.windows().find((w) => w.url().endsWith("#lens"));
@@ -100,7 +116,7 @@ try {
     .waitFor();
   await lens.screenshot({ path: join(output, "lens-selection.png") });
   await lens.getByRole("button", { name: "Dismiss · Esc" }).click();
-  await page.getByRole("button", { name: "Finish task", exact: true }).click();
+  await controllerPage.getByRole("button", { name: "Finish task", exact: true }).click();
   await page.getByRole("button", { name: "Looks right", exact: true }).click();
   await page.getByText("Ready when you are.", { exact: true }).waitFor();
   snapshot = await page.evaluate(() => window.desk.snapshot());
@@ -114,10 +130,10 @@ try {
   const futureDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
   const original = `AP Physics C: Friction review due ${futureDate}, 30 minutes`;
   await page
-    .getByLabel("Paste an assignment or a few clear assignment lines")
+    .getByLabel("Paste a capture or a few clear assignment lines")
     .fill(original);
   await page
-    .getByRole("button", { name: "Interpret text", exact: true })
+    .getByRole("button", { name: "Capture now", exact: true })
     .click();
   await page.getByRole("button", { name: "Review capture", exact: true }).click();
   assert.equal(
@@ -150,7 +166,8 @@ try {
   await page
     .getByRole("button", { name: "Start session →", exact: true })
     .click();
-  await page
+  controllerPage = await waitForWindow("#controller");
+  await controllerPage
     .getByRole("button", { name: "End · keep unfinished", exact: true })
     .click();
   await page.getByRole("button", { name: "Add details", exact: true }).click();
@@ -319,7 +336,7 @@ try {
   await page.getByRole("button", { name: "Save source", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page
-    .getByLabel("Search tasks, notes and sources", { exact: true })
+    .getByLabel("Search tasks, Notes, sources and math", { exact: true })
     .fill("perpendicular");
   await page.getByText("Vector reference", { exact: true }).click();
   await page.screenshot({ path: join(output, "source-library.png") });

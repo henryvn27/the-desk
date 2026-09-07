@@ -8,6 +8,14 @@ const output = resolve("artifacts/session-correction");
 await mkdir(output, { recursive: true });
 let app, page;
 const errors = [];
+async function waitForController() {
+  for (let i = 0; i < 100; i++) {
+    const controller = app.windows().find((window) => window.url().endsWith("#controller"));
+    if (controller) return controller;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Controller did not open");
+}
 async function launch() {
   app = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -56,7 +64,9 @@ try {
   await page
     .getByRole("button", { name: "Start session →", exact: true })
     .click();
-  await page.getByRole("button", { name: "Finish task", exact: true }).click();
+  const controller = await waitForController();
+  await controller.getByRole("button", { name: "Finish task", exact: true }).click();
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor();
   await page
     .getByRole("button", { name: "Correct completion", exact: true })
     .waitFor();

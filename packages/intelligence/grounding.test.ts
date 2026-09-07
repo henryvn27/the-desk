@@ -49,6 +49,15 @@ test("Lens grounds only active task and class-wide sources with honest provenanc
     /No active academic session/,
   );
 });
+test("explicit Library source scopes work without an active study session", () => {
+  const result = JSON.parse(
+    lensContext({ ...state, sessions: [] }, "velocity", ["other-class", "class-wide"]),
+  );
+  assert.equal(result.scope, "selected-sources");
+  assert.deepEqual(result.selectedSourceIds, ["other-class", "class-wide"]);
+  assert.deepEqual(result.sources.map((item: { id: string }) => item.id).sort(), ["class-wide", "other-class"]);
+  assert.equal(result.sources.every((item: { scope: string }) => item.scope === "selected"), true);
+});
 test("Grounding respects serialized request budget and discloses exclusions", () => {
   const sources = Array.from({ length: 30 }, (_, i) =>
     source(String(i).padStart(2, "0"), ["task"], [], '"\\\n'.repeat(5000)),

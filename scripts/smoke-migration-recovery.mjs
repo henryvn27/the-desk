@@ -170,7 +170,7 @@ try {
   assert.ok(migrated.batch.every((operation) => operation.payload === "{}"));
 
   const migratedDatabase = new DatabaseSync(legacyPath);
-  assert.equal(schemaVersion(migratedDatabase), 38);
+  assert.equal(schemaVersion(migratedDatabase), 42);
   assert.deepEqual(
     rows(
       migratedDatabase.prepare("SELECT id,name,color FROM classes ORDER BY id"),
@@ -214,7 +214,7 @@ try {
     preservedPayload,
   );
   const resumedDatabase = new DatabaseSync(legacyPath);
-  assert.equal(schemaVersion(resumedDatabase), 38);
+  assert.equal(schemaVersion(resumedDatabase), 42);
   assert.equal(
     resumedDatabase
       .prepare("SELECT payload FROM outbox WHERE id=?")
@@ -372,9 +372,9 @@ try {
       {
         result: "PASS",
         flows: [
-          "schema-36 class, task and outbox rows migrate through the real DeskStore to schema 38",
+          "schema-36 class, task and outbox rows migrate through the real DeskStore to schema 42",
           "legacy JSON data stays byte-for-byte stable and new outbox fields receive safe defaults",
-          "an existing schema-37 outbox payload survives resumed schema-38 migration exactly",
+          "an existing schema-37 outbox payload survives resumed schema-42 migration exactly",
           "future and structurally corrupt schemas are rejected without replacing their schema, version or sentinel data",
           "an abruptly terminated writer reopens with committed class/task/outbox data and passes SQLite integrity check",
         ],

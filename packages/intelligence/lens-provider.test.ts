@@ -60,6 +60,7 @@ test("sends one strict OpenRouter request with approved multimodal routing and p
         paths: [{ points: [{ x: 0.2, y: 0.3 }] }],
       },
       history: [{ role: "user", content: "Look at the graph." }],
+      activity: { kind: "check", conceptIds: ["slope"] },
     },
     "test-key",
     { fetch: fetcher },
@@ -75,6 +76,8 @@ test("sends one strict OpenRouter request with approved multimodal routing and p
   assert.equal(body.response_format.type, "json_schema");
   assert.equal(body.response_format.json_schema.strict, true);
   assert.equal(body.messages.at(-1).content[1].type, "image_url");
+  assert.equal(body.messages.at(-1).content[0].text.includes('"activity":{"kind":"check"'), true);
+  assert.match(body.messages[0].content, /Study activity contract \(check\)/);
   assert.equal(result.explanation, modelOutput.explanation);
   assert.deepEqual(result.overlays, modelOutput.overlays);
   assert.equal(result.usage, null);

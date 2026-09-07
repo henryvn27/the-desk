@@ -17,8 +17,8 @@
       "title": "Full V1 vertical not yet implemented or live verified",
       "severity": "high",
       "status": "in_progress",
-      "evidence": "2026-09-06: exact installed macOS arm64 build passes bounded account, sync, conflict, migration, Lens, browser-bridge, session-evidence, Plan and acceptance smokes; full Capture-to-Replan, production integrations, voice, Windows and strict distribution evidence remain open.",
-      "notes": "Continue bounded implementation and evidence; do not call the release complete while the completion map or release gates retain material gaps."
+      "evidence": "2026-09-07: the signed installed macOS arm64 build passes all 49 bounded Electron smoke suites, including Capture-to-Replan slices, Notes/Canvas, Source reading, Study/Lens, account, sync, conflict, migration/recovery and restart persistence. Production integrations, live provider authentication, voice/PDF/OCR, Windows interactive proof and public distribution remain open.",
+      "notes": "The local V1 status is READY_EXCEPT_EXTERNAL_BLOCKERS; do not convert bounded fixtures into claims about production services or public distribution."
     },
     {
       "id": "V1-002",
@@ -95,8 +95,8 @@
       "title": "macOS directory artifact is development-signed and not notarized",
       "severity": "high",
       "status": "open",
-      "evidence": "2026-09-06: release and installed app.asar hashes match 457036aed558dc52f8828cc6fddfcea86954b31edfc1d9718b1a897ba3f842b9. codesign reports the local Apple Development identity and strict deep verification passes; electron-builder skipped notarization, so no notarized release is claimed.",
-      "notes": "Requires the authorized signing/notarization environment and release credentials; local implementation work continues independently."
+      "evidence": "2026-09-07: release and installed app.asar hashes match 95c5bda880bc59db607c41fd716df144f22e0315360becb249010247cd2dc99c. codesign reports the local Apple Development identity and strict deep verification passes; spctl rejects the local directory artifact because notarization was not performed.",
+      "notes": "Requires the authorized Developer ID signing/notarization environment and release credentials; local implementation work is complete for this gate."
     },
     {
       "id": "GOOGLE-001",
@@ -106,6 +106,15 @@
       "status": "open",
       "evidence": "2026-09-06: runtime-validated multi-identity/progressive capability state model and installed connection/account UI pass. The local loopback browser bridge and packaged MV3 extension now pass bounded host/transport and installed browser-context smokes; live OAuth, real Chrome/Edge installation, Classroom/Calendar/Drive transport and Windows interaction remain unverified.",
       "notes": "Provider-neutral fallbacks stay explicit. Do not claim sync or live site capture from a saved URL or OAuth-shaped state. The extension/host implementation is reviewable, but browser permission and live-site behavior still need external runtime proof."
+    },
+    {
+      "id": "REL-002",
+      "area": "release",
+      "title": "V1 release closure recorded with bounded evidence and explicit external blockers",
+      "severity": "medium",
+      "status": "verified",
+      "evidence": "Verification/RELEASE_CLOSURE.md records npm run check, signed macOS package/install hash equality, strict codesign, 49 development and installed smoke suites, performance benchmarks, visual audit limits and the final architecture duplication audit on 2026-09-07.",
+      "notes": "Status is READY_EXCEPT_EXTERNAL_BLOCKERS, not a claim of notarized public distribution or production service acceptance."
     }
   ]
 }

@@ -24,12 +24,16 @@ export function Capture({
   existing,
   policy = "balanced",
   initialDraft,
+  initialText,
+  contextClassId,
   onQueue,
   onImport,
 }: {
   policy?: CapturePolicy;
   initialDraft?: CaptureDraft;
-  onQueue?: (text: string) => Promise<void>;
+  initialText?: string;
+  contextClassId?: string;
+  onQueue?: (text: string, contextClassId?: string) => Promise<void>;
   onImport?: () => Promise<void>;
   classes: Class[];
   gradeCategories: GradeCategory[];
@@ -45,7 +49,7 @@ export function Capture({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [manual, setManual] = useState(Boolean(existing));
-  const [paste, setPaste] = useState("");
+  const [paste, setPaste] = useState(initialText ?? "");
   const [drafts, setDrafts] = useState<CaptureDraft[]>(
     initialDraft ? [initialDraft] : [],
   );
@@ -85,10 +89,13 @@ export function Capture({
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
+  useEffect(() => {
+    if (initialText !== undefined) setPaste(initialText);
+  }, [initialText]);
   function interpret() {
     setError("");
     if (onQueue) {
-      void onQueue(paste).catch((e) => setError(userError(e)));
+      void onQueue(paste, contextClassId).catch((e) => setError(userError(e)));
       return;
     }
     try {
@@ -104,27 +111,54 @@ export function Capture({
       setError(userError(e));
     }
   }
+  const contextClass = contextClassId
+    ? classes.find((item) => item.id === contextClassId)
+    : undefined;
   return (
-    <dialog ref={dialog} aria-labelledby="capture-title" onCancel={onClose}>
-      <h2 id="capture-title">
-        {existing ? "Edit assignment" : "Capture an assignment"}
-      </h2>
+    <dialog
+      ref={dialog}
+      className="capture-dialog"
+      aria-labelledby="capture-title"
+      onCancel={onClose}
+    >
+      <div className="capture-shell">
+        <section className="capture-main">
+          <header className="capture-header">
+            <p className="capture-kicker">The Desk</p>
+            <h2 id="capture-title">
+              {existing ? "Edit assignment" : "Quick capture"}
+            </h2>
+            <p className="capture-lede">
+              {existing
+                ? "Keep the assignment accurate before it returns to your plan."
+                : "Get it out of your head. Desk will sort the rest."}
+            </p>
+          </header>
       {!draft && !manual && (
         <section>
           <label>
-            Paste an assignment or a few clear assignment lines
+            Paste a capture or a few clear assignment lines
             <textarea
               value={paste}
               onChange={(e) => setPaste(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  interpret();
+                }
+              }}
               maxLength={20000}
+              autoFocus
             />
           </label>
           <button
+            className="primary"
             type="button"
             disabled={busy || !paste.trim()}
             onClick={interpret}
+            aria-keyshortcuts="Meta+Enter Control+Enter"
           >
-            Interpret text
+            {onQueue ? "Capture now" : "Interpret text"}
           </button>
           {onImport && (
             <button
@@ -144,6 +178,12 @@ export function Capture({
               Imported text follows your capture policy.
             </p>
           )}
+          {onQueue && (
+            <p className="muted">
+              Saved locally first; classification and filing can finish in
+              Capture Inbox.
+            </p>
+          )}
           <button type="button" onClick={() => setManual(true)}>
             Enter manually
           </button>
@@ -160,6 +200,12 @@ export function Capture({
           <p>
             Review {index + 1} of {drafts.length}
           </p>
+          {draft.objectType && draft.objectType !== "assignment" && (
+            <p className="muted">
+              Desk recognizes this as a {draft.objectType.replace(/-/g, " ")}.
+              It will stay in Capture Inbox for review.
+            </p>
+          )}
           {draft.uncertainties.length > 0 && (
             <details open>
               <summary>Details to check</summary>
@@ -246,6 +292,7 @@ export function Capture({
                         capturedAt: draft.provenance.capturedAt,
                         authority: draft.provenance.authority,
                         confidence: draft.confidence,
+                        objectType: draft.objectType,
                         candidateDates: draft.deadline?.candidates ?? [],
                         uncertainties: draft.uncertainties.map(
                           (u) => u.message,
@@ -470,6 +517,36 @@ export function Capture({
           </div>
         </form>
       )}
+        </section>
+        <aside className="capture-rail" aria-label="Capture context">
+          <div className="capture-rail-glow" aria-hidden="true" />
+          <div className="capture-rail-content">
+            <p className="capture-rail-label">Ready when you are</p>
+            <h3>
+              {initialText
+                ? "A source is already waiting."
+                : contextClass
+                  ? `${contextClass.name} is in focus.`
+                  : "One clean handoff."}
+            </h3>
+            <p>
+              {initialText
+                ? "The page context stays attached to the original capture."
+                : "Your text is saved locally before classification or filing finishes."}
+            </p>
+            {contextClass && (
+              <div className="capture-context-card">
+                <span className="dot" aria-hidden="true" />
+                <span>{contextClass.name}</span>
+              </div>
+            )}
+            <div className="capture-shortcut">
+              <span>Save instantly</span>
+              <kbd>⌘/Ctrl ↵</kbd>
+            </div>
+          </div>
+        </aside>
+      </div>
     </dialog>
   );
 }

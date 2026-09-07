@@ -5,16 +5,26 @@ import { authorityClaimsConflict, authorityPriority } from "./authority";
 import type { Snapshot } from "../domain/contracts";
 
 /** Bounded, local evidence only. No URL fetching or inferred source authority. */
-export function lensContext(state: Snapshot, question = ""): string {
+export function lensContext(
+  state: Snapshot,
+  question = "",
+  sourceIds?: string[],
+): string {
   const active = state.sessions.find((session) => !session.endedAt);
   const task = state.tasks.find((item) => item.id === active?.taskId);
-  if (!task)
+  const requested = sourceIds?.length ? new Set(sourceIds) : undefined;
+  if (!task && !requested)
     return "No active academic session. Ask if academic context is unclear.";
   const eligible = state.sources
     .filter(
       (source) =>
-        source.taskIds.includes(task.id) ||
-        (source.taskIds.length === 0 && source.classIds.includes(task.classId)),
+        requested
+          ? requested.has(source.id)
+          : Boolean(
+              task &&
+                (source.taskIds.includes(task.id) ||
+                  (source.taskIds.length === 0 && source.classIds.includes(task.classId))),
+            ),
     )
     .map((source) => ({
       ...source,
@@ -24,12 +34,12 @@ export function lensContext(state: Snapshot, question = ""): string {
       (a, b) =>
         sourcePriority(a.kind) - sourcePriority(b.kind) ||
         b.passage.matchedQueryTerms - a.passage.matchedQueryTerms ||
-        Number(b.taskIds.includes(task.id)) -
-          Number(a.taskIds.includes(task.id)) ||
+        Number(Boolean(task && b.taskIds.includes(task.id))) -
+          Number(Boolean(task && a.taskIds.includes(task.id))) ||
         a.id.localeCompare(b.id),
     );
   const authorityClaims = (state.authorityClaims ?? [])
-    .filter((claim) => claim.taskId === task.id)
+    .filter((claim) => task && claim.taskId === task.id)
     .sort(
       (a, b) =>
         authorityPriority(a.authorityKind) -
@@ -37,16 +47,21 @@ export function lensContext(state: Snapshot, question = ""): string {
         b.capturedAt.localeCompare(a.capturedAt) ||
         a.id.localeCompare(b.id),
     );
-  const authorityResolution = (state.authorityResolutions ?? []).find(
-    (resolution) =>
-      resolution.taskId === task.id && resolution.fact === "due-date",
-  );
+  const authorityResolution = task
+    ? (state.authorityResolutions ?? []).find(
+        (resolution) =>
+          resolution.taskId === task.id && resolution.fact === "due-date",
+      )
+    : undefined;
+  const selectedClassId = task?.classId ?? eligible.flatMap((source) => source.classIds)[0];
   const context = {
-    class: state.classes.find((course) => course.id === task.classId)?.name,
-    task: task.title,
-    notesExcerpt: task.notes.slice(0, 2000),
-    notesTruncated: task.notes.length > 2000,
-    resource: task.resource,
+    scope: requested ? "selected-sources" : "active-task",
+    selectedSourceIds: requested ? [...requested] : undefined,
+    class: state.classes.find((course) => course.id === selectedClassId)?.name,
+    task: task?.title ?? "Selected Library sources",
+    notesExcerpt: task?.notes.slice(0, 2000) ?? "",
+    notesTruncated: (task?.notes.length ?? 0) > 2000,
+    resource: task?.resource ?? null,
     resourceFetched: false,
     resourceOmitted: false,
     memories: [] as {
@@ -89,13 +104,13 @@ export function lensContext(state: Snapshot, question = ""): string {
   };
   if (JSON.stringify(context).length > 20000) {
     context.notesExcerpt = "";
-    context.notesTruncated = task.notes.length > 0;
+    context.notesTruncated = (task?.notes.length ?? 0) > 0;
     context.resource = null;
-    context.resourceOmitted = task.resource !== null;
+    context.resourceOmitted = task?.resource !== null && task?.resource !== undefined;
   }
   const memories = (state.memories ?? []).filter(
     (memory) =>
-      (!memory.classId || memory.classId === task.classId) &&
+      (!memory.classId || memory.classId === selectedClassId) &&
       (memory.origin === "explicit" ||
         (state.inference?.enabled && inferenceEvidenceCurrent(memory, state))),
   );
@@ -146,7 +161,7 @@ export function lensContext(state: Snapshot, question = ""): string {
       authority: source.authority,
       kind: source.kind ?? "unspecified",
       kindReportedBy: "user" as const,
-      scope: source.taskIds.includes(task.id) ? "task" : "class",
+      scope: task && source.taskIds.includes(task.id) ? "task" : requested ? "selected" : "class",
       ...source.passage,
     };
     context.sources.push(entry);

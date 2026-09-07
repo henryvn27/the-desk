@@ -17,8 +17,9 @@ import {
 } from "electron";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { DeskStore } from "../../../packages/domain/store";
 import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
@@ -33,6 +34,7 @@ import {
   browserContextForLens,
   type BrowserBridgeMessage,
 } from "../../../packages/integrations/browser-bridge";
+import { studyActivityKind, type StudyActivityKind } from "../../../packages/study/activities";
 import {
   startBrowserBridgeHost,
   type BrowserBridgeHost,
@@ -61,6 +63,26 @@ let controller: BrowserWindow | null = null;
 let lensRequest: AbortController | null = null;
 let browserBridge: BrowserBridgeHost | null = null;
 let pendingBrowserContext: BrowserBridgeMessage | null = null;
+let pendingLensContext: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] } | null = null;
+type RecordingManifest = {
+  version: 1;
+  canvasId: string;
+  startedAt: string;
+  endedAt?: string;
+  mimeType: string;
+  chunkCount: number;
+  status: "recording" | "complete" | "interrupted" | "failed";
+};
+const recordingManifest = z.strictObject({
+  version: z.literal(1),
+  canvasId: z.string().uuid(),
+  startedAt: z.iso.datetime(),
+  endedAt: z.iso.datetime().optional(),
+  mimeType: z.string().trim().max(80),
+  chunkCount: z.number().int().min(0).max(100_000),
+  status: z.enum(["recording", "complete", "interrupted", "failed"]),
+});
+const recordingSessions = new Map<string, RecordingManifest>();
 const windows = new Set<BrowserWindow>();
 function makeWindow(kind: "main" | "lens" | "controller") {
   const bounds =
@@ -103,16 +125,49 @@ function makeWindow(kind: "main" | "lens" | "controller") {
   void win.loadURL(`desk://app/index.html#${kind}`);
   return win;
 }
-function showLens() {
+function sendLensContext() {
+  if (!lens || lens.isDestroyed() || !pendingLensContext) return;
+  const context = pendingLensContext;
+  lens.webContents.send("desk:lens-context", context);
+  // The Lens renderer subscribes after its document loads. Keep the launch
+  // context while this window is open so a first-load race cannot lose a
+  // Notes selection; closing Lens clears it.
+}
+function showLens(context?: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] }) {
+  pendingLensContext = context ?? pendingLensContext;
   if (lens && !lens.isDestroyed()) {
     lens.focus();
+    sendLensContext();
     return;
   }
   lens = makeWindow("lens");
+  lens.webContents.once("did-finish-load", sendLensContext);
+  setTimeout(sendLensContext, 250);
   lens.on("closed", () => {
     lensRequest?.abort();
+    pendingLensContext = null;
     lens = null;
   });
+}
+function recordingDirectory(recordingId: string) {
+  return join(app.getPath("userData"), "note-recordings", recordingId);
+}
+async function loadRecordingManifest(recordingId: string) {
+  const cached = recordingSessions.get(recordingId);
+  if (cached) return cached;
+  try {
+    const value = recordingManifest.parse(JSON.parse(
+      await readFile(join(recordingDirectory(recordingId), "manifest.json"), "utf8"),
+    ));
+    recordingSessions.set(recordingId, value);
+    return value;
+  } catch {
+    throw Error("This recording no longer exists.");
+  }
+}
+async function saveRecordingManifest(recordingId: string, manifest: RecordingManifest) {
+  recordingSessions.set(recordingId, manifest);
+  await writeFile(join(recordingDirectory(recordingId), "manifest.json"), JSON.stringify(manifest), "utf8");
 }
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(
@@ -157,8 +212,43 @@ app.whenReady().then(async () => {
     ]),
   );
   const root = resolve(__dirname, "../dist");
-  protocol.handle("desk", (request) => {
+  protocol.handle("desk", async (request) => {
     const url = new URL(request.url);
+    if (url.host === "recording") {
+      const recordingId = decodeURIComponent(url.pathname.slice(1));
+      if (!/^[0-9a-f-]{36}$/i.test(recordingId))
+        return new Response("Not found", { status: 404 });
+      try {
+        const manifest = await loadRecordingManifest(recordingId);
+        if (!manifest.chunkCount)
+          return new Response(null, {
+            status: 204,
+            headers: { "Content-Type": manifest.mimeType },
+          });
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            try {
+              for (let index = 0; index < manifest.chunkCount; index += 1) {
+                const chunk = await readFile(join(recordingDirectory(recordingId), `${String(index).padStart(6, "0")}.chunk`));
+                controller.enqueue(new Uint8Array(chunk));
+              }
+              controller.close();
+            } catch (error) {
+              controller.error(error);
+            }
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "Content-Type": manifest.mimeType.split(";", 1)[0]!,
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      } catch {
+        return new Response("Recording unavailable", { status: 404 });
+      }
+    }
     const file = resolve(root, "." + decodeURIComponent(url.pathname));
     if (url.host !== "app" || !file.startsWith(root + sep))
       return new Response("Forbidden", { status: 403 });
@@ -319,7 +409,7 @@ app.whenReady().then(async () => {
     const snapshot = store.snapshot();
     const active = snapshot.sessions.find((s) => !s.endedAt);
     const input = lensInputSchema.parse({ ...value, context: undefined });
-    const localContext = lensContext(snapshot, input.question);
+    const localContext = lensContext(snapshot, input.question, input.sourceIds);
     const browserContext = pendingBrowserContext
       ? browserContextForLens(pendingBrowserContext).slice(0, 8_000)
       : "";
@@ -358,6 +448,13 @@ app.whenReady().then(async () => {
   ipcMain.handle("desk:rebalance-preview", (event) => {
     check(event);
     return store.previewRebalance();
+  });
+  ipcMain.handle("desk:focus-controller", (event) => {
+    check(event);
+    if (controller && !controller.isDestroyed()) {
+      controller.show();
+      controller.focus();
+    }
   });
   ipcMain.handle("desk:snapshot", (event) => {
     check(event);
@@ -437,6 +534,10 @@ app.whenReady().then(async () => {
     check(event);
     return store.canvas(z.string().uuid().parse(id));
   });
+  ipcMain.handle("desk:search", (event, value) => {
+    check(event);
+    return store.search(z.string().trim().max(200).parse(value));
+  });
   ipcMain.handle("desk:canvas-export", async (event, id, raw) => {
     check(event);
     const board = store.canvas(z.string().uuid().parse(id));
@@ -496,9 +597,24 @@ app.whenReady().then(async () => {
       throw Error("Invalid resource URL.");
     await shell.openExternal(url.href);
   });
-  ipcMain.handle("desk:lens", (event) => {
+  ipcMain.handle("desk:lens", (event, rawContext) => {
     check(event);
-    showLens();
+    const context = z
+      .object({
+        question: z.string().trim().max(4_000).optional(),
+        activityKind: studyActivityKind.optional(),
+        sourceIds: z.array(z.string().uuid()).max(100).optional(),
+      })
+      .strict()
+      .optional()
+      .parse(rawContext);
+    showLens(context);
+  });
+  ipcMain.handle("desk:lens-context", (event) => {
+    check(event);
+    if (!lens || lens.webContents !== event.sender)
+      throw Error("Open Lens to read its launch context.");
+    return pendingLensContext;
   });
   ipcMain.handle("desk:capture-screen", async (event) => {
     check(event);
@@ -541,6 +657,71 @@ app.whenReady().then(async () => {
     } finally {
       if (!target.isDestroyed()) target.show();
     }
+  });
+  ipcMain.handle("desk:recording-start", async (event, rawCanvasId, rawMimeType) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Notes in the main Desk window to record.");
+    const canvasId = z.string().uuid().parse(rawCanvasId);
+    const canvas = store.canvas(canvasId);
+    const sessionId = store
+      .snapshot()
+      .sessions.find((session) => !session.endedAt && session.taskId === canvas.taskId)
+      ?.id;
+    const mimeType = z.string().trim().max(80).optional().parse(rawMimeType) ?? "audio/webm";
+    if (!/^audio\/(?:webm|mp4|ogg|wav)(?:;.*)?$/i.test(mimeType))
+      throw Error("This audio format is not supported.");
+    const recordingId = randomUUID();
+    const startedAt = new Date().toISOString();
+    const manifest: RecordingManifest = {
+      version: 1,
+      canvasId,
+      startedAt,
+      mimeType,
+      chunkCount: 0,
+      status: "recording",
+    };
+    await mkdir(recordingDirectory(recordingId), { recursive: true });
+    await saveRecordingManifest(recordingId, manifest);
+    return { recordingId, startedAt, mimeType: manifest.mimeType, ...(sessionId ? { sessionId } : {}) };
+  });
+  ipcMain.handle("desk:recording-chunk", async (event, rawId, rawIndex, rawData) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Notes in the main Desk window to save recording audio.");
+    const recordingId = z.string().uuid().parse(rawId);
+    const chunkIndex = z.number().int().min(0).max(100_000).parse(rawIndex);
+    if (!(rawData instanceof Uint8Array) || rawData.byteLength < 1 || rawData.byteLength > 8 * 1024 * 1024)
+      throw Error("Recording chunks must be between 1 byte and 8 MB.");
+    const manifest = await loadRecordingManifest(recordingId);
+    if (manifest.status !== "recording") throw Error("This recording has already ended.");
+    if (chunkIndex > manifest.chunkCount) throw Error("Recording chunks must arrive in order.");
+    if (chunkIndex < manifest.chunkCount)
+      return { recordingId, chunkIndex, chunkCount: manifest.chunkCount };
+    await writeFile(join(recordingDirectory(recordingId), `${String(chunkIndex).padStart(6, "0")}.chunk`), Buffer.from(rawData));
+    const next = { ...manifest, chunkCount: manifest.chunkCount + 1 };
+    await saveRecordingManifest(recordingId, next);
+    return { recordingId, chunkIndex, chunkCount: next.chunkCount };
+  });
+  ipcMain.handle("desk:recording-finish", async (event, rawId) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Notes in the main Desk window to finish recording.");
+    const recordingId = z.string().uuid().parse(rawId);
+    const manifest = await loadRecordingManifest(recordingId);
+    const endedAt = new Date().toISOString();
+    if (manifest.status === "recording")
+      await saveRecordingManifest(recordingId, { ...manifest, status: "complete", endedAt });
+    return { recordingId, endedAt: manifest.endedAt ?? endedAt, chunkCount: manifest.chunkCount };
+  });
+  ipcMain.handle("desk:recording-url", async (event, rawId) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Notes in the main Desk window to play a recording.");
+    const recordingId = z.string().uuid().parse(rawId);
+    const manifest = await loadRecordingManifest(recordingId);
+    store.canvas(manifest.canvasId);
+    return `desk://recording/${recordingId}`;
   });
   ipcMain.handle("desk:dismiss", (event) => {
     check(event);

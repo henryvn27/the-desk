@@ -9,6 +9,14 @@ const output = resolve("artifacts/checklist");
 await mkdir(output, { recursive: true });
 let app, page;
 const errors = [];
+async function waitForController() {
+  for (let i = 0; i < 100; i++) {
+    const controller = app.windows().find((window) => window.url().endsWith("#controller"));
+    if (controller) return controller;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Controller did not open");
+}
 async function launch() {
   app = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -93,25 +101,15 @@ try {
   await page
     .getByRole("button", { name: "Start session →", exact: true })
     .click();
-  await page
+  let controller = await waitForController();
+  await controller
     .getByText("1 of 2 steps checked · Next step: Resolve components", {
       exact: true,
     })
     .waitFor();
-  let controller;
-  await waitFor(
-    () =>
-      Boolean(
-        (controller = app
-          .windows()
-          .find((p) => p.url().endsWith("#controller"))),
-      ),
-    "Controller did not open",
-  );
   await controller.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await controller.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await page
-    .locator("section.session")
     .screenshot({ path: join(output, "checklist-progress.png") });
   const bounds = await controller.evaluate(() => ({
     height: innerHeight,
@@ -130,14 +128,18 @@ try {
   if (video)
     await copyFile(await video.path(), join(output, "checklist-operated.webm"));
   await launch();
-  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  controller = await waitForController();
+  await controller.getByRole("button", { name: "Resume", exact: true }).waitFor();
   assert.equal(
-    await page.getByLabel("Draw diagram", { exact: true }).isChecked(),
+    (await page.evaluate(() => window.desk.snapshot())).tasks[0].checklist.find(
+      (item) => item.title === "Draw diagram",
+    ).completed,
     true,
   );
-  await page
+  await controller
     .getByRole("button", { name: "End · keep unfinished", exact: true })
     .click();
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor();
   await page
     .getByText("1 of 2 steps were checked when this session ended.", {
       exact: true,

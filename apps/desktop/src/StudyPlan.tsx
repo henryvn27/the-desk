@@ -1,4 +1,5 @@
 import { Rebalance } from "./Rebalance";
+import { PlannerWhatIf } from "./PlannerWhatIf";
 import { useState } from "react";
 import type {
   Block,
@@ -18,10 +19,14 @@ export function StudyPlan({
   data,
   week,
   save,
+  autoPreview = false,
+  onAutoPreview,
 }: {
   data: Snapshot;
   week: ReturnType<typeof planWeek>;
   save: (c: Command) => Promise<unknown>;
+  autoPreview?: boolean;
+  onAutoPreview?: () => void;
 }) {
   const [editing, setEditing] = useState<Block | StudyBlock>();
   const [status, setStatus] = useState("");
@@ -63,6 +68,11 @@ export function StudyPlan({
             : "Suggested · "}
           {b.why}
         </small>
+        {week.durationRanges.find((range) => range.taskId === b.taskId) && (
+          <small className="duration-range">
+            Likely {week.durationRanges.find((range) => range.taskId === b.taskId)!.likelyMinutes}–{week.durationRanges.find((range) => range.taskId === b.taskId)!.upperMinutes} min from reviewed history
+          </small>
+        )}
         {saved && +new Date(b.end) < Date.now() && (
           <p>
             Time has passed. Review the assignment’s remaining work; this block
@@ -114,7 +124,8 @@ export function StudyPlan({
         </button>
         <span className="muted">Saves a copy for a calendar you control.</span>
       </div>
-      <Rebalance data={data} save={save} />
+      <Rebalance data={data} save={save} autoPreview={autoPreview} onAutoPreview={onAutoPreview} />
+      <PlannerWhatIf data={data} week={week} />
       <section aria-label="Plan history">
         <h2>Plan history</h2>
         {data.plans.length ? (

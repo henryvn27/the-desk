@@ -3,12 +3,16 @@ import { useState } from "react";
 import type {
   Command,
   Concept,
+  ConfidenceCaptureInput,
   Snapshot,
   SessionAttemptInput,
   StudySession,
   Task,
 } from "../../../packages/domain/contracts";
-import { sessionAttemptInput } from "../../../packages/domain/contracts";
+import {
+  confidenceCaptureInput,
+  sessionAttemptInput,
+} from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 
 export function SessionReview({
@@ -31,11 +35,13 @@ export function SessionReview({
 }) {
   const [editing, setEditing] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [confidenceOpen, setConfidenceOpen] = useState(false);
   const [error, setError] = useState("");
   async function confirm(
     notes: string,
     remainingMinutes: number | null,
     attempts: SessionAttemptInput[] = [],
+    confidence?: ConfidenceCaptureInput,
   ) {
     setError("");
     try {
@@ -46,6 +52,7 @@ export function SessionReview({
           notes,
           remainingMinutes,
           attempts,
+          confidence,
         },
         true,
       );
@@ -80,6 +87,20 @@ export function SessionReview({
         Paused time excluded. Understanding and submission haven’t been
         assessed.
       </p>
+      {session.summary && (
+        <details className="session-summary" open>
+          <summary>What this session established</summary>
+          <p>
+            {session.summary.completedActivityCount} of {session.summary.activityCount} planned moves completed · {session.summary.checkedAttemptCount} checked attempt{session.summary.checkedAttemptCount === 1 ? "" : "s"} · {session.summary.hintCount} hint{session.summary.hintCount === 1 ? "" : "s"} logged.
+          </p>
+          <p>
+            Next: {session.summary.nextAction.replaceAll("-", " ")}. Evidence is {session.summary.evidenceQuality}.
+          </p>
+          <ul>
+            {session.summary.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}
+          </ul>
+        </details>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -92,6 +113,7 @@ export function SessionReview({
             const f = new FormData(e.currentTarget);
             const remaining = String(f.get("remaining") ?? "");
             let attempts: SessionAttemptInput[] = [];
+            let confidence: ConfidenceCaptureInput | undefined;
             try {
               if (evidenceOpen)
                 attempts = [
@@ -107,7 +129,23 @@ export function SessionReview({
               setError(userError(caught));
               return;
             }
-            void confirm(String(f.get("notes")), remaining ? Number(remaining) : null, attempts);
+            if (confidenceOpen) {
+              try {
+                confidence = confidenceCaptureInput.parse({
+                  rating: Number(f.get("confidenceRating")),
+                  conceptIds: f.getAll("confidenceConceptIds").map(String),
+                });
+              } catch (caught) {
+                setError(userError(caught));
+                return;
+              }
+            }
+            void confirm(
+              String(f.get("notes")),
+              remaining ? Number(remaining) : null,
+              attempts,
+              confidence,
+            );
           }}
         >
           <label>
@@ -173,6 +211,50 @@ export function SessionReview({
               <label>
                 Evidence note
                 <textarea name="evidenceNotes" maxLength={5000} />
+              </label>
+            </fieldset>
+          )}
+          {concepts.length > 0 && (
+            <div className="actions">
+              <button
+                type="button"
+                onClick={() => setConfidenceOpen((open) => !open)}
+              >
+                {confidenceOpen ? "Remove confidence check" : "Add confidence check"}
+              </button>
+            </div>
+          )}
+          {confidenceOpen && concepts.length > 0 && (
+            <fieldset>
+              <legend>Confidence check · optional</legend>
+              <p className="muted">
+                Predict how well you can perform the selected concepts, then
+                compare it with a checked attempt later.
+              </p>
+              <label>
+                Confidence (1 low – 5 high)
+                <select name="confidenceRating" defaultValue="3">
+                  <option value="1">1 · Not confident</option>
+                  <option value="2">2 · Slightly confident</option>
+                  <option value="3">3 · Unsure</option>
+                  <option value="4">4 · Confident</option>
+                  <option value="5">5 · Very confident</option>
+                </select>
+              </label>
+              <label>
+                Concepts involved
+                <select
+                  name="confidenceConceptIds"
+                  multiple
+                  size={Math.min(5, Math.max(2, concepts.length))}
+                  defaultValue={concepts.map((concept) => concept.id)}
+                >
+                  {concepts.map((concept) => (
+                    <option key={concept.id} value={concept.id}>
+                      {concept.name}
+                    </option>
+                  ))}
+                </select>
               </label>
             </fieldset>
           )}

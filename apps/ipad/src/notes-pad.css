@@ -1,0 +1,9 @@
+.notes-pad { min-height: 100dvh; padding: 22px; background: #f7f4ed; color: #1f2326; }
+.notes-pad header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 14px; }
+.notes-pad h1 { margin: 4px 0 0; font-size: clamp(28px, 7vw, 44px); }
+.notes-pad-toggle { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid #d7d0c4; border-radius: 12px; background: #fffdfa; }
+.notes-pad-toggle button { min-height: 40px; padding: 8px 14px; border: 0; border-radius: 8px; background: transparent; }
+.notes-pad-toggle button[aria-pressed="true"] { background: #1f2326; color: #fffdfa; }
+.notes-pad-canvas { height: calc(100dvh - 132px); min-height: 480px; overflow: hidden; border-radius: 16px; touch-action: none; }
+.notes-pad-sources { color: #6f756f; font-size: 13px; }
+@media (max-width: 640px) { .notes-pad { padding: 14px; } .notes-pad header { align-items: flex-start; flex-direction: column; } .notes-pad-canvas { height: calc(100dvh - 180px); } }

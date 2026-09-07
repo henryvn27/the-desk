@@ -10,6 +10,7 @@ import {
   inferenceRoute,
   type RoutingTier,
 } from "./routing";
+import { activityInstruction, studyActivityKind } from "../study/activities";
 
 export const LENS_MODEL = "openai/gpt-5.6-terra" as const;
 export const LENS_TIMEOUT_MS = 45_000;
@@ -57,9 +58,19 @@ export const lensInputSchema = z
   .object({
     question: z.string().trim().min(1).max(4_000),
     context: z.string().max(20_000).optional(),
+    sourceIds: z.array(z.string().uuid()).max(100).optional(),
     imageDataUrl: pngDataUrl.optional(),
     selection: lensSelectionSchema.optional(),
     history: z.array(lensHistoryTurnSchema).max(8).optional(),
+    activity: z
+      .object({
+        kind: studyActivityKind,
+        id: z.string().trim().min(1).max(160).optional(),
+        conceptIds: z.array(z.string().trim().min(1).max(160)).max(20).optional(),
+        prompt: z.string().trim().max(2_000).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type LensInput = z.infer<typeof lensInputSchema>;
@@ -355,7 +366,9 @@ function buildRequest(
       text: JSON.stringify({
         question: input.question,
         context: input.context ?? null,
+        sourceScope: input.sourceIds ?? null,
         selection: input.selection ?? null,
+        activity: input.activity ?? null,
       }),
     },
   ];
@@ -367,7 +380,13 @@ function buildRequest(
     messages: [
       {
         role: "system",
-        content: INSTRUCTIONS + "\n\n" + teachingInstructions(mode),
+        content:
+          INSTRUCTIONS +
+          "\n\n" +
+          teachingInstructions(mode) +
+          (input.activity
+            ? `\n\nStudy activity contract (${input.activity.kind}): ${activityInstruction(input.activity.kind, mode)}`
+            : ""),
       },
       ...(input.history ?? []).map((turn) => ({
         role: turn.role,

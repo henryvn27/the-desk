@@ -126,10 +126,10 @@ try {
     .getByText("Lens answer saved as a note.", { exact: true })
     .waitFor();
   await lens
-    .getByRole("button", { name: "Save answer to Canvas", exact: true })
+    .getByRole("button", { name: "Save answer to Notes", exact: true })
     .click();
   await lens
-    .getByText("Lens answer saved to Canvas with its source.", { exact: true })
+    .getByText("Lens answer saved to Notes with its source.", { exact: true })
     .waitFor();
   await lens
     .getByRole("button", { name: "Save as mistake", exact: true })
@@ -237,9 +237,12 @@ try {
     .filter({ hasText: "Review force balance" });
   await taskRow.waitFor();
   await taskRow
-    .getByRole("button", { name: "Open canvas", exact: true })
+    .getByRole("button", { name: "Open Notes", exact: true })
     .click();
-  await page.getByRole("dialog", { name: "Study canvas" }).waitFor();
+  await page.getByRole("dialog", { name: "Study notes" }).waitFor();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
+  await page.locator(".canvas-workspace").waitFor();
+  await page.locator(".excalidraw canvas").first().waitFor();
   await page.locator(".canvas-workspace").screenshot({
     path: join(output, "lens-canvas-artifact.png"),
   });

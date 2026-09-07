@@ -12,6 +12,15 @@ let app;
 let page;
 const errors = [];
 
+async function waitForController() {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = app.windows().find((window) => window.url().endsWith("#controller"));
+    if (candidate) return candidate;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Study controller did not open");
+}
+
 async function launch() {
   app = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -83,7 +92,9 @@ try {
   });
 
   await page.getByRole("button", { name: "Start session →", exact: true }).click();
-  await page.getByRole("button", { name: "End · keep unfinished", exact: true }).click();
+  const controller = await waitForController();
+  await controller.getByRole("button", { name: "End · keep unfinished", exact: true }).click();
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor();
   await page.getByRole("button", { name: "Add details", exact: true }).click();
   await page.getByRole("button", { name: "Record a checked attempt", exact: true }).click();
   await page.locator('select[name="evidenceConceptIds"]').selectOption({ label: "Force direction" });

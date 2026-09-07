@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DeskStore } from "./store";
+import { decideCapture } from "../intelligence/capture-policy";
+import { interpretCapture } from "../intelligence/capture";
 const now = new Date("2026-09-06T12:00:00Z");
 const complete =
   "English 12: Read chapter 3 due 2026-09-10T20:00:00Z, 30 minutes";
@@ -109,4 +111,60 @@ test("every mode keeps incomplete, ambiguous, risky-type and conflicting evidenc
       store.close();
     }
   }
+});
+
+test("specialized captures stay in Inbox and identical source text is a duplicate signal", () => {
+  const [worksheet] = interpretCapture(
+    "AP Physics C Worksheet: Forces practice problems 1–20. Submit by 2026-09-12T22:00:00Z, 60 minutes.",
+    {
+      classes: [{ id: "physics", name: "AP Physics C", color: "#123456" }],
+      now,
+      timeZone: "UTC",
+      sourceName: "forces-worksheet.pdf",
+    },
+  );
+  assert.equal(worksheet!.objectType, "worksheet");
+  assert.equal(
+    decideCapture(worksheet!, "balanced", [], now).action,
+    "review",
+  );
+
+  const [assignment] = interpretCapture(complete, {
+    classes: [{ id: "english", name: "English 12", color: "#654321" }],
+    now,
+    timeZone: "UTC",
+  });
+  const decision = decideCapture(
+    assignment!,
+    "balanced",
+    [
+      {
+        id: "00000000-0000-4000-8000-000000000001",
+        title: "A renamed assignment",
+        classId: "english",
+        dueAt: assignment!.deadline!.instant,
+        minutes: 30,
+        resource: null,
+        notes: "",
+        completed: false,
+        revision: 0,
+        createdAt: now.toISOString(),
+        workKind: "assignment",
+        importance: "normal",
+        deadlineConfirmed: true,
+        captureEvidence: {
+          source: "pasted-text",
+          originalText: complete,
+          sourceText: complete,
+          capturedAt: now.toISOString(),
+          authority: "user-provided-text",
+          candidateDates: ["2026-09-10"],
+          uncertainties: [],
+        },
+      },
+    ],
+    now,
+  );
+  assert.equal(decision.action, "review");
+  assert.match(decision.reason, /same captured content/i);
 });

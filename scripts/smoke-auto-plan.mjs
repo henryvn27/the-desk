@@ -8,6 +8,14 @@ const output = resolve("artifacts/auto-plan");
 await mkdir(output, { recursive: true });
 let app, page;
 const errors = [];
+async function waitForController() {
+  for (let i = 0; i < 100; i++) {
+    const controller = app.windows().find((window) => window.url().endsWith("#controller"));
+    if (controller) return controller;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Controller did not open");
+}
 async function launch() {
   app = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -118,12 +126,11 @@ try {
     true,
   );
   await page.getByRole("button", { name: "Home", exact: true }).click();
-  await page
+  const controller = await waitForController();
+  await controller
     .getByRole("button", { name: "End · keep unfinished", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "End · keep unfinished", exact: true })
-    .waitFor({ state: "hidden" });
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor();
   const ended = await page.evaluate(() => window.desk.snapshot());
   assert.equal(
     ended.tasks.find((t) => t.id === pending.id).autoPlanPending,

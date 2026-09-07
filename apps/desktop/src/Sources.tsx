@@ -17,14 +17,20 @@ export function Sources({
   search,
   save,
   classify,
+  openReader,
 }: {
   data: Snapshot;
   classId?: string;
   search: string;
   save: (input: SourceInput) => Promise<unknown>;
   classify: (source: Source, kind: SourceKind) => Promise<unknown>;
+  openReader: (source: Source) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [scopeQuestion, setScopeQuestion] = useState("");
+  const [scopeMode, setScopeMode] = useState<"compare" | "synthesize" | "guide" | "quiz">("compare");
+  const [scopeStatus, setScopeStatus] = useState("");
   const sources = data.sources.filter(
     (s) =>
       (!classId ||
@@ -32,7 +38,9 @@ export function Sources({
         s.taskIds.some((id) =>
           data.tasks.some((t) => t.id === id && t.classId === classId),
         )) &&
-      `${s.title} ${s.text}`.toLowerCase().includes(search.toLowerCase()),
+      `${s.title} ${s.text} ${(s.annotations ?? []).map((annotation) => `${annotation.text} ${annotation.comment}`).join(" ")}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
   return (
     <section>
@@ -40,11 +48,50 @@ export function Sources({
         <h2>Sources</h2>
         <button onClick={() => setAdding(true)}>Save text source</button>
       </div>
+      <section className="source-workbench" aria-label="Source comparison workspace">
+        <div className="eyebrow">Reading workspace</div>
+        <h3>Connect sources</h3>
+        <p className="muted">Select saved sources to compare, synthesize, make a study guide, or quiz yourself. Lens receives only this explicit scope and keeps each source's reported authority visible.</p>
+        <div className="source-scope-picker">
+          {sources.map((source) => (
+            <label className="check" key={source.id}>
+              <input
+                type="checkbox"
+                checked={selectedSourceIds.includes(source.id)}
+                onChange={() => setSelectedSourceIds((current) => current.includes(source.id) ? current.filter((id) => id !== source.id) : [...current, source.id].slice(-20))}
+              />
+              <span>{source.title}<small>{formatLabels[source.format ?? "text"]} · rev {source.revision ?? 0} · {source.kind ?? "unspecified"}</small></span>
+            </label>
+          ))}
+          {!sources.length && <span className="muted">Save a source to build a reading scope.</span>}
+        </div>
+        {!!selectedSourceIds.length && (
+          <div className="source-workbench-form">
+            <select aria-label="Source question mode" value={scopeMode} onChange={(event) => setScopeMode(event.target.value as typeof scopeMode)}>
+              <option value="compare">Compare selected sources</option>
+              <option value="synthesize">Synthesize selected sources</option>
+              <option value="guide">Create a study guide</option>
+              <option value="quiz">Quiz me from these sources</option>
+            </select>
+            <input aria-label="Question about selected sources" value={scopeQuestion} onChange={(event) => setScopeQuestion(event.target.value)} placeholder="What should I connect?" maxLength={4_000} />
+            <button className="primary" type="button" onClick={() => {
+              const request = scopeQuestion.trim() || (scopeMode === "compare" ? "Compare these sources and cite where they agree or differ." : scopeMode === "synthesize" ? "Synthesize the selected sources with a citation for each grounded claim." : scopeMode === "guide" ? "Create a study guide from the selected sources and cite each section." : "Quiz me from the selected sources and cite the source for each correction.");
+              setScopeStatus("Opening Lens with this source scope…");
+              void window.desk.lens({ question: request, sourceIds: selectedSourceIds }).catch(() => setScopeStatus("Lens could not be opened."));
+            }}>Ask Lens with scope</button>
+            <button type="button" onClick={() => setSelectedSourceIds([])}>Clear</button>
+          </div>
+        )}
+        {scopeStatus && <p className="muted" role="status">{scopeStatus}</p>}
+      </section>
       {sources.map((s) => (
         <details key={s.id} className="source">
-          <summary>{s.title}</summary>
+          <summary>
+            <span className="source-summary-title"><input type="checkbox" aria-label={`Use ${s.title} in source scope`} checked={selectedSourceIds.includes(s.id)} onClick={(event) => event.stopPropagation()} onChange={() => setSelectedSourceIds((current) => current.includes(s.id) ? current.filter((id) => id !== s.id) : [...current, s.id].slice(-20))} />{s.title}</span>
+            <span className="source-summary-meta">{formatLabels[s.format ?? "text"]} · rev {s.revision ?? 0}</span>
+          </summary>
           <p className="muted">
-            Pasted by you · {new Date(s.createdAt).toLocaleDateString()}
+            Saved in Library · {new Date(s.createdAt).toLocaleDateString()} · {s.annotations?.length ?? 0} annotations
           </p>
           <p>
             {s.classIds
@@ -62,7 +109,14 @@ export function Sources({
             </p>
           )}
           <SourceClassification source={s} save={classify} />
-          <p className="source-text">{s.text}</p>
+          <div className="actions source-card-actions">
+            <button type="button" className="primary" onClick={() => openReader(s)}>Open reader</button>
+            {s.sourceUrl && <a className="button-link" href={s.sourceUrl} target="_blank" rel="noreferrer">Original</a>}
+          </div>
+          {!!s.annotations?.length && (
+            <p className="muted">{s.annotations.filter((annotation) => annotation.noteRefs.length).length} annotation{ s.annotations.filter((annotation) => annotation.noteRefs.length).length === 1 ? "" : "s" } linked into Notes.</p>
+          )}
+          <p className="source-preview">{s.text.slice(0, 320)}{s.text.length > 320 ? "…" : ""}</p>
         </details>
       ))}
       {!sources.length && <p className="muted">No matching saved sources.</p>}
@@ -77,6 +131,14 @@ export function Sources({
     </section>
   );
 }
+
+const formatLabels: Record<NonNullable<SourceInput["format"]>, string> = {
+  text: "Text",
+  pdf: "PDF",
+  slides: "Slides",
+  transcript: "Transcript",
+  web: "Web capture",
+};
 function SourceCapture({
   data,
   classId,
@@ -96,9 +158,9 @@ function SourceCapture({
   }, []);
   return (
     <dialog ref={dialog} onCancel={close} aria-labelledby="source-heading">
-      <h2 id="source-heading">Save a text source</h2>
+      <h2 id="source-heading">Save a source</h2>
       <p>
-        Keep the original passage and reuse it across classes or assignments.
+        Keep the original representation and reuse it across classes or assignments.
       </p>
       <form
         onSubmit={(e) => {
@@ -108,6 +170,8 @@ function SourceCapture({
           setError("");
           void save({
             kind: sourceKind.parse(f.get("kind")),
+            format: String(f.get("format")) as SourceInput["format"],
+            sourceUrl: String(f.get("sourceUrl") || "") || null,
             title: String(f.get("title")),
             text: String(f.get("text")),
             classIds: f.getAll("classes").map(String),
@@ -121,6 +185,18 @@ function SourceCapture({
         <label>
           Source title
           <input name="title" required maxLength={500} />
+        </label>
+        <label>
+          Representation
+          <select aria-label="Source representation" name="format" defaultValue="text">
+            {(Object.keys(formatLabels) as NonNullable<SourceInput["format"]>[]).map((format) => (
+              <option key={format} value={format}>{formatLabels[format]}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Original URL (optional)
+          <input name="sourceUrl" type="url" placeholder="https://…" />
         </label>
         <label>
           Source type

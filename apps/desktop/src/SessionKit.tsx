@@ -47,13 +47,13 @@ export function SessionKit({
           ))}
         </div>
       )}
-      {kit.classSources.length > 0 && (
+      {kit.referenceSources.length > 0 && (
         <details>
-          <summary>Class reference ({kit.classSources.length})</summary>
+          <summary>Relevant class reference ({kit.referenceSources.length})</summary>
           <p className="muted">
-            Saved for this class; not specifically linked to this assignment.
+            Selected from class material using the planned objective. Open Library for the full collection.
           </p>
-          {kit.classSources.map((source) => (
+          {kit.referenceSources.map((source) => (
             <details key={source.id}>
               <summary>{source.title}</summary>
               <p className="source-text">{source.text}</p>
@@ -105,17 +105,40 @@ export function SessionKit({
         <div>
           <h4>Concepts to review</h4>
           <p className="muted">
-            Explicit preparedness evidence for this class; it does not claim
-            mastery or completion.
+            Student Model readiness is derived from checked performance,
+            retrieval and transfer. Notes and explanations alone do not count.
           </p>
+          {kit.objective && (
+            <p>
+              <strong>Suggested objective:</strong> {kit.objective.title} · {kit.objective.reason}
+            </p>
+          )}
           {kit.concepts.map((concept) => (
             <details key={concept.id}>
+              {(() => {
+                const derived = kit.conceptStates.find(
+                  (item) => item.conceptId === concept.id,
+                );
+                return (
+                  <>
               <summary>
-                {concept.name} · {concept.preparedness.replace("-", " ")}
+                {concept.name} · {derived?.preparedness.replace("-", " ") ?? "insufficient evidence"}
               </summary>
               <p>
                 <strong>Status:</strong> {concept.status.replace("-", " ")}
               </p>
+              {derived && (
+                <>
+                  <p>
+                    <strong>Competence:</strong> {derived.competence.label} ·{" "}
+                    <strong>Retrievability:</strong> {derived.retrievability.label} ·{" "}
+                    <strong>Transfer:</strong> {derived.transferDepth.label}
+                  </p>
+                  <p>
+                    <strong>Why:</strong> {derived.why.slice(0, 3).join(" ")}
+                  </p>
+                </>
+              )}
               <p>
                 <strong>Retention:</strong>{" "}
                 {concept.retentionMode === "long-term" ? "Long-term" : "Course"}
@@ -125,8 +148,25 @@ export function SessionKit({
                   <strong>Evidence:</strong> {concept.evidenceNote}
                 </p>
               )}
+                  </>
+                );
+              })()}
             </details>
           ))}
+        </div>
+      )}
+      {kit.recommendedActivities.length > 0 && (
+        <div>
+          <h4>Suggested study moves</h4>
+          <p className="muted">These are selected from the same Student Model used when a session starts.</p>
+          <ol className="session-activities-preview">
+            {kit.recommendedActivities.map((activity) => (
+              <li key={activity.id}>
+                <strong>{activity.kind.replace("-", " ")}</strong> · {activity.prompt}
+                <span className="muted">{activity.rationale}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
       {kit.attempts.length > 0 && (

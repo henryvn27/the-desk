@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { noteDocument } from "./notes";
 
 const MAX_SCENE_BYTES = 20 * 1024 * 1024;
 const id = z.string().min(1).max(500);
@@ -7,6 +8,7 @@ const imageMimeType = z.enum([
   "image/jpeg",
   "image/webp",
   "image/gif",
+  "application/pdf",
 ]);
 
 export const mathSource = z.object({
@@ -72,6 +74,9 @@ export const canvasScene = z
   .strictObject({
     engine: z.literal("excalidraw"),
     version: z.literal(1),
+    // Optional and additive: legacy Canvas scenes remain valid byte-for-byte.
+    // Notes document flow is stored beside the existing freeform scene.
+    document: noteDocument.optional(),
     sourceIds: z.array(z.string().uuid()).max(100).optional(),
     notebook: notebook.optional(),
     elements: z.array(element).max(10_000),

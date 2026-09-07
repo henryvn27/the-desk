@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Task, StudySession } from "../domain/contracts";
-import { durationSuggestion } from "./duration";
+import { durationRangeSuggestion, durationSuggestion } from "./duration";
 
 function fixture() {
   const tasks: Task[] = [20, 40, 600].map((_, i) => ({
@@ -69,6 +69,22 @@ test("duration learning uses a robust median, matching class/type, with bounded 
     null,
   );
   assert.equal(tasks[0]!.minutes, 20);
+});
+
+test("duration ranges use the same reviewed evidence and stay conservative", () => {
+  const { tasks, sessions } = fixture();
+  assert.deepEqual(durationRangeSuggestion(tasks, sessions, input), {
+    lowerMinutes: 45,
+    likelyMinutes: 60,
+    upperMinutes: 480,
+    ratio: 2,
+    samples: 3,
+    confidence: "emerging",
+  });
+  assert.equal(
+    durationRangeSuggestion(tasks, sessions, { ...input, classId: "other" }),
+    null,
+  );
 });
 test("partial, unreviewed, changed, tiny, legacy, and multiple-session work cannot train estimates", () => {
   const exclusions: ((tasks: Task[], sessions: StudySession[]) => void)[] = [

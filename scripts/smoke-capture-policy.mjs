@@ -19,8 +19,8 @@ async function launch() {
 const snap = () => page.evaluate(() => window.desk.snapshot());
 async function capture(text) {
   await page.getByRole("button", { name: "Capture", exact: true }).click();
-  await page.getByLabel("Paste an assignment or a few clear assignment lines").fill(text);
-  await page.getByRole("button", { name: "Interpret text", exact: true }).click();
+  await page.getByLabel("Paste a capture or a few clear assignment lines").fill(text);
+  await page.getByRole("button", { name: "Capture now", exact: true }).click();
   await page.getByRole("heading", { name: "Capture Inbox", exact: true }).waitFor();
 }
 async function mode(value) {

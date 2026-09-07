@@ -1,6 +1,11 @@
-# Canvas
+# Canvas and Notes
 
-The Desk owns canvas identity, assignment association, timestamps and optimistic revisions in SQLite schema 5. `packages/canvas/scene.ts` is the versioned scene boundary; the initial renderer adapter uses Excalidraw 0.18.1. This scene format preserves engine fields and original ink, but a future renderer replacement will require an explicit conversion, not a package swap.
+The user-facing artifact is now **Notes**. “Canvas” remains the internal
+renderer, coordinate plane and freeform workspace name so existing artifacts
+and Lens primitives stay compatible. Notes document flow is stored additively
+inside the same scene envelope; see [NOTES_POST_V1.md](./NOTES_POST_V1.md).
+
+The Desk owns Notes identity, assignment association, timestamps and optimistic revisions in the `canvases` table (introduced in schema 5 and fenced for Notes in schema 39). `packages/canvas/scene.ts` is the versioned scene boundary; the renderer adapter uses Excalidraw 0.18.1. This scene format preserves engine fields, original ink and additive document blocks, but a future renderer replacement will require an explicit conversion, not a package swap. Schema 40 fences the separate Student Model JSON extensions so older writers cannot discard prerequisite links or confidence captures; schema 41 fences shared StudyActivity session state without replacing the Canvas renderer or local session store.
 
 The renderer loads on demand. Fonts are packaged locally. Embedded web content and Excalidraw AI are disabled; browser navigation remains denied by the desktop shell. Scene validation bounds element count and serialized bytes, rejects embedded content and validates supported raster data URLs. Main validates commands again. Full scenes are fetched separately from the frequently refreshed snapshot.
 

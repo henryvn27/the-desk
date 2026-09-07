@@ -21,7 +21,7 @@ async function launch() {
   await page.getByText("Make room for focus.", { exact: true }).waitFor();
 }
 async function save() {
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -60,6 +60,7 @@ try {
   await page.getByRole("button", { name: "Library", exact: true }).click();
   await page.getByRole("button", { name: "New notebook", exact: true }).click();
   await page.getByRole("navigation", { name: "Notebook pages" }).waitFor();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
   await page.locator(".excalidraw canvas").first().waitFor();
   const id = (await page.evaluate(() => window.desk.snapshot())).canvases[0].id;
   await draw("rectangle");
@@ -127,7 +128,7 @@ try {
   assert.equal(png.readUInt32BE(20), 1123);
   await copyFile(path, join(output, "notebook-export.png"));
   await page.screenshot({ path: join(output, "notebook-page-two.png") });
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   const persisted = await page.evaluate((id) => window.desk.canvas(id), id);
   await app.close();
   await page.video().saveAs(join(output, "notebook-pages.webm"));
@@ -137,7 +138,8 @@ try {
     persisted.scene,
   );
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
   await save();
   const hydrated = await page.evaluate((id) => window.desk.canvas(id), id);
   await page.getByLabel("Page", { exact: true }).selectOption(firstId);
@@ -164,7 +166,7 @@ try {
     });
   }, id);
   await draw("diamond");
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   await page.getByRole("alert").waitFor();
   assert.deepEqual(
     (await page.evaluate((id) => window.desk.canvas(id), id)).scene,

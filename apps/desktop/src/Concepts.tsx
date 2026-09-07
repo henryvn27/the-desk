@@ -7,6 +7,7 @@ import {
   type Snapshot,
 } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
+import { createStudentModel } from "../../../packages/intelligence/student-model";
 
 const statusLabels: Record<Concept["status"], string> = {
   "not-started": "Not started",
@@ -57,19 +58,25 @@ export function Concepts({
       setBusy(false);
     }
   }
+  const model = createStudentModel(data);
   const ordered = [...data.concepts].sort(
     (a, b) =>
-      (a.reviewDue ? Date.parse(a.reviewDue) : Infinity) -
-        (b.reviewDue ? Date.parse(b.reviewDue) : Infinity) ||
+      (model.getReviewDue(a.id).dueAt
+        ? Date.parse(model.getReviewDue(a.id).dueAt!)
+        : Infinity) -
+        (model.getReviewDue(b.id).dueAt
+          ? Date.parse(model.getReviewDue(b.id).dueAt!)
+          : Infinity) ||
       a.name.localeCompare(b.name),
   );
   return (
     <section>
       <h1>Concepts &amp; preparedness</h1>
       <p>
-        Keep explicit evidence about what you are learning, how ready you feel,
-        and what should be reviewed. This record supports planning without
-        claiming completion or mastery automatically.
+        The Student Model interprets the existing Attempts, Mistakes, Memory,
+        and session evidence into separate competence, retrievability,
+        evidence-confidence, transfer, and calibration dimensions. It never
+        treats reading, notes, or an AI answer as performance evidence.
       </p>
       <button
         disabled={busy || editing !== undefined}
@@ -104,20 +111,44 @@ export function Concepts({
       {!ordered.length && <p className="muted">No concepts recorded yet.</p>}
       {ordered.map((concept) => (
         <article className="source" key={concept.id}>
+          {(() => {
+            const derived = model.getConceptState(concept.id);
+            const review = model.getReviewDue(concept.id);
+            return (
+              <>
           <h2>{concept.name}</h2>
           <p className="muted">
             {data.classes.find((course) => course.id === concept.classId)
               ?.name ?? "Unknown class"}{" "}
-            · Status {statusLabels[concept.status]} · Preparedness{" "}
+            · Recorded status {statusLabels[concept.status]} · Recorded preparedness{" "}
             {preparednessLabels[concept.preparedness]} · Retention{" "}
             {concept.retentionMode === "long-term" ? "Long-term" : "Course"}
           </p>
           <p>
-            <strong>Review:</strong>{" "}
-            {concept.reviewDue
-              ? new Date(concept.reviewDue).toLocaleString()
-              : "When ready"}
-            {" · "}
+            <strong>Student Model:</strong>{" "}
+            {derived ? preparednessLabels[derived.preparedness] : "Insufficient evidence"}
+            {review.dueAt && (
+              <> · {review.status === "due" ? "Review due" : "Review scheduled"} {new Date(review.dueAt).toLocaleString()}</>
+            )}
+          </p>
+          {derived && (
+            <>
+              <p>
+                <strong>Dimensions:</strong> competence {derived.competence.label} · retrievability {derived.retrievability.label} · evidence confidence {derived.evidenceConfidence.label} · transfer {derived.transferDepth.label} · calibration {derived.calibration.status.replace("-", " ")}
+              </p>
+              <p><strong>Why?</strong></p>
+              <ul>
+                {derived.why.slice(0, 5).map((why) => <li key={why}>{why}</li>)}
+              </ul>
+              {derived.mistakePatterns.length > 0 && (
+                <p>
+                  <strong>Mistake patterns:</strong>{" "}
+                  {derived.mistakePatterns.map((pattern) => `${pattern.label} (${pattern.persistence})`).join(" · ")}
+                </p>
+              )}
+            </>
+          )}
+          <p>
             <strong>Evidence:</strong> {concept.attempts} attempts,{" "}
             {percentage(concept)}, {concept.hintCount} hints
           </p>
@@ -159,6 +190,9 @@ export function Concepts({
               Forget concept
             </button>
           </div>
+              </>
+            );
+          })()}
         </article>
       ))}
     </section>
@@ -182,6 +216,9 @@ function ConceptForm({
     existing?.classId ?? data.classes[0]?.id ?? "",
   );
   const tasks = data.tasks.filter((task) => task.classId === classId);
+  const prerequisites = data.concepts.filter(
+    (concept) => concept.classId === classId && concept.id !== existing?.id,
+  );
   return (
     <form
       onSubmit={(event) => {
@@ -193,6 +230,9 @@ function ConceptForm({
           conceptInput.parse({
             classId: String(values.get("classId")),
             taskIds: values.getAll("taskIds").map(String),
+            prerequisiteConceptIds: values
+              .getAll("prerequisiteConceptIds")
+              .map(String),
             name: String(values.get("name")),
             status: String(values.get("status")),
             preparedness: String(values.get("preparedness")),
@@ -239,6 +279,22 @@ function ConceptForm({
           {tasks.map((task) => (
             <option key={task.id} value={task.id}>
               {task.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Prerequisite concepts
+        <select
+          name="prerequisiteConceptIds"
+          aria-label="Prerequisite concepts"
+          multiple
+          size={Math.min(6, Math.max(2, prerequisites.length))}
+          defaultValue={existing?.prerequisiteConceptIds ?? []}
+        >
+          {prerequisites.map((prerequisite) => (
+            <option key={prerequisite.id} value={prerequisite.id}>
+              {prerequisite.name}
             </option>
           ))}
         </select>

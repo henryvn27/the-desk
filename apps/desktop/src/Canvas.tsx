@@ -10,6 +10,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
 import { canvasScene, type CanvasScene } from "../../../packages/canvas/scene";
+import { appendNoteEditEvent, ensureNoteDocument, insertNoteBlock, updateNoteBlock, type NoteDocument } from "../../../packages/canvas/notes";
 import type { CanvasRecord, Source } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 import CanvasMath from "./CanvasMath";
@@ -25,15 +26,18 @@ import {
   pageNeedsRepair,
 } from "./notebook-renderer";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import NotesFlow from "./NotesFlow";
 
 export default function Canvas({
   record,
   sources,
   close,
+  initialBlockId,
 }: {
   record: CanvasRecord;
   sources: Source[];
   close: () => void;
+  initialBlockId?: string;
 }) {
   const [status, setStatus] = useState("Saved"),
     [error, setError] = useState("");
@@ -59,11 +63,19 @@ export default function Canvas({
   const [showSources, setShowSources] = useState(false);
   const [showMath, setShowMath] = useState(false);
   const [links, setLinks] = useState(sourceIds.current);
-  function queueDocument(value: unknown) {
+  const [view, setView] = useState<"notes" | "canvas">("notes");
+  const [noteDocument, setNoteDocument] = useState(() =>
+    ensureNoteDocument(record.scene.document),
+  );
+  const freeformBlockId = useRef<string | undefined>(undefined);
+  const lastFreeformEdit = useRef<{ recordingId: string; atMs: number } | undefined>(undefined);
+  function queueDocument(value: unknown, syncDocument = true) {
     try {
       const scene = canvasScene.parse(value);
       invalid.current = false;
       documentScene.current = scene;
+      if (syncDocument)
+        setNoteDocument((current) => scene.document ?? current);
       const serialized = JSON.stringify(scene);
       if (serialized === last.current) return;
       last.current = serialized;
@@ -80,13 +92,32 @@ export default function Canvas({
   function queueScene(value: unknown) {
     try {
       const visible = canvasScene.parse(value);
-      if (!documentScene.current.notebook) return queueDocument(visible);
+      const markFreeformEdit = (scene: CanvasScene) => {
+        const blockId = freeformBlockId.current;
+        const recording = scene.document?.recordings?.find((item) => item.status === "recording");
+        const startedAt = recording ? Date.parse(recording.startedAt) : NaN;
+        if (!blockId || !recording || !Number.isFinite(startedAt)) return { scene, syncDocument: false };
+        const atMs = Math.max(0, Math.min(24 * 60 * 60 * 1000, Date.now() - startedAt));
+        const previous = lastFreeformEdit.current;
+        if (previous && previous.recordingId === recording.id && atMs - previous.atMs < 750)
+          return { scene, syncDocument: false };
+        lastFreeformEdit.current = { recordingId: recording.id, atMs };
+        return { scene: { ...scene, document: appendNoteEditEvent(scene.document!, recording.id, blockId, atMs) }, syncDocument: true };
+      };
+      if (!documentScene.current.notebook) {
+        const marked = markFreeformEdit({
+          ...visible,
+          ...(documentScene.current.document
+            ? { document: documentScene.current.document }
+            : {}),
+        });
+        return queueDocument(marked.scene, marked.syncDocument);
+      }
       if (activePageId !== documentScene.current.notebook.activePageId) return;
       const elements = visible.elements
         .filter((element) => element.id !== pageFrame?.id)
         .map((element) => ({ ...element, frameId: null }));
-      queueDocument(
-        replaceNotebookPage(
+      const marked = markFreeformEdit(replaceNotebookPage(
           {
             ...documentScene.current,
             files: visible.files,
@@ -94,8 +125,8 @@ export default function Canvas({
           },
           activePageId!,
           elements,
-        ),
-      );
+        ));
+      queueDocument(marked.scene, marked.syncDocument);
     } catch (e) {
       invalid.current = true;
       setError(userError(e));
@@ -122,9 +153,12 @@ export default function Canvas({
     }
   }
   function changeLinks(next: string[]) {
-    if (!editor.current) return;
     sourceIds.current = next;
     setLinks(next);
+    if (!editor.current) {
+      queueDocument({ ...documentScene.current, sourceIds: next });
+      return;
+    }
     queueScene({
       engine: "excalidraw",
       version: 1,
@@ -139,6 +173,7 @@ export default function Canvas({
   const editor = useRef<ExcalidrawImperativeAPI | null>(null);
   const [exporting, setExporting] = useState(false);
   function inkTool(highlight: boolean) {
+    if (view !== "canvas") return;
     editor.current?.updateScene({
       appState: {
         currentItemStrokeColor: highlight ? "#ffd43b" : "#1e1e1e",
@@ -175,7 +210,7 @@ export default function Canvas({
     }
   }
   async function exportPNG() {
-    if (!editor.current) return;
+    if (view !== "canvas" || !editor.current) return;
     setExporting(true);
     setError("");
     try {
@@ -252,14 +287,146 @@ export default function Canvas({
     }
     if (pending.current) await flush();
   }
+  function changeNoteDocument(next: import("../../../packages/canvas/notes").NoteDocument) {
+    queueDocument({ ...documentScene.current, document: next });
+  }
+  function openFreeform(block: Extract<import("../../../packages/canvas/notes").NoteBlock, { type: "freeform" }>) {
+    freeformBlockId.current = block.id;
+    if (block.collapsed)
+      queueDocument({ ...documentScene.current, document: updateNoteBlock(noteDocument, block.id, { collapsed: false }) });
+    setView("canvas");
+  }
+  async function addNoteFiles(input: File[]) {
+    const allowed = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"]);
+    const files = input.filter((file) => allowed.has(file.type));
+    if (!files.length) {
+      setError("Import a PNG, JPEG, WebP, GIF or PDF file.");
+      return;
+    }
+    if (files.some((file) => file.size > 12 * 1024 * 1024) || files.reduce((total, file) => total + file.size, 0) > 16 * 1024 * 1024) {
+      setError("Keep each paper or file under 12 MB and the batch under 16 MB.");
+      return;
+    }
+    try {
+      const encoded = await Promise.all(files.map(async (file) => {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return { file, dataURL: `data:${file.type};base64,${btoa(binary)}` };
+      }));
+      const currentScene = documentScene.current;
+      const currentFiles = { ...currentScene.files };
+      let nextDocument: NoteDocument = currentScene.document ?? noteDocument;
+      let afterId = nextDocument.blocks.at(-1)?.id ?? null;
+      const captures = [...(nextDocument.captures ?? [])];
+      for (const { file, dataURL } of encoded) {
+        const fileId = crypto.randomUUID();
+        currentFiles[fileId] = {
+          id: fileId,
+          mimeType: file.type as "image/png" | "image/jpeg" | "image/webp" | "image/gif" | "application/pdf",
+          dataURL,
+          created: Date.now(),
+        };
+        const captureId = crypto.randomUUID();
+        captures.push({ id: captureId, kind: "paper", originalFileId: fileId, capturedAt: new Date().toISOString() });
+        nextDocument = insertNoteBlock(nextDocument, afterId, {
+          id: crypto.randomUUID(),
+          type: file.type === "application/pdf" ? "file" : "image",
+          fileId,
+          name: file.name,
+          caption: "Original capture preserved. Add a cleaned derivative or OCR in the linked source.",
+          captureId,
+        });
+        afterId = nextDocument.blocks.at(-1)?.id ?? afterId;
+      }
+      queueDocument({ ...currentScene, files: currentFiles, document: { ...nextDocument, captures } });
+      setError("");
+      setStatus(files.length === 1 ? "Paper capture inserted" : `${files.length} paper captures inserted`);
+    } catch (e) {
+      setError(userError(e));
+    }
+  }
+  async function addCaptureDerivative(captureId: string, file: File) {
+    const allowed = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"]);
+    if (!allowed.has(file.type) || file.size > 12 * 1024 * 1024) {
+      setError("Keep a cleaned derivative to PNG, JPEG, WebP, GIF or PDF under 12 MB.");
+      return;
+    }
+    const capture = documentScene.current.document?.captures?.find((item) => item.id === captureId);
+    if (!capture) {
+      setError("This paper capture no longer exists.");
+      return;
+    }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      const fileId = crypto.randomUUID();
+      const files = { ...documentScene.current.files, [fileId]: {
+        id: fileId,
+        mimeType: file.type as "image/png" | "image/jpeg" | "image/webp" | "image/gif" | "application/pdf",
+        dataURL: `data:${file.type};base64,${btoa(binary)}`,
+        created: Date.now(),
+      } };
+      const document = documentScene.current.document!;
+      const captures = document.captures!.map((item) => item.id === captureId ? { ...item, cleanedFileId: fileId } : item);
+      queueDocument({ ...documentScene.current, files, document: { ...document, captures } });
+      setError("");
+      setStatus("Cleaned derivative attached; original paper is preserved.");
+    } catch (e) {
+      setError(userError(e));
+    }
+  }
+  async function createCaptureSource(captureId: string, text: string) {
+    const value = text.trim();
+    if (!value) return;
+    const capture = documentScene.current.document?.captures?.find((item) => item.id === captureId);
+    if (!capture) {
+      setError("This paper capture no longer exists.");
+      return;
+    }
+    try {
+      const next = await window.desk.command({
+        type: "source.create",
+        input: {
+          kind: "class-material",
+          title: `${record.title} paper capture`,
+          text: value,
+          classIds: [],
+          taskIds: [record.taskId],
+        },
+      });
+      const source = next.sources.at(-1);
+      if (!source) throw Error("The paper source could not be saved.");
+      const document = documentScene.current.document!;
+      const captures = document.captures!.map((item) => item.id === captureId ? { ...item, sourceId: source.id } : item);
+      queueDocument({ ...documentScene.current, document: { ...document, captures } });
+      setError("");
+      setStatus("Paper semantic layer linked to Sources.");
+    } catch (e) {
+      setError(userError(e));
+    }
+  }
+  function studyCapture(captureId: string) {
+    if (!captureId) return;
+    void window.desk.lens()
+      .then(() => setStatus("Lens opened for the paper capture. Draw the precise area to study."))
+      .catch((e) => setError(userError(e)));
+  }
   return (
-    <div className="canvas-workspace" role="dialog" aria-label="Study canvas">
+    <div className="canvas-workspace" role="dialog" aria-label="Study notes">
       <div className="canvas-header">
         <strong>{record.title}</strong>
         <span role="status">{status}</span>
-        <button onClick={() => setShowMath(true)}>Math</button>
-        <button onClick={() => inkTool(false)}>Pen</button>
-        <button onClick={() => inkTool(true)}>Highlighter</button>
+        <div className="notes-view-toggle" role="group" aria-label="Notes views">
+          <button type="button" aria-pressed={view === "notes"} onClick={() => { setShowMath(false); editor.current = null; setView("notes"); }}>Notes</button>
+          <button type="button" aria-pressed={view === "canvas"} onClick={() => setView("canvas")}>Freeform canvas</button>
+        </div>
+        {view === "canvas" && <>
+          <button onClick={() => setShowMath(true)}>Math</button>
+          <button onClick={() => inkTool(false)}>Pen</button>
+          <button onClick={() => inkTool(true)}>Highlighter</button>
+        </>}
         <button
           aria-expanded={showSources}
           onClick={() => setShowSources(!showSources)}
@@ -267,7 +434,7 @@ export default function Canvas({
           Sources
         </button>
         <button onClick={() => void flush().catch(() => {})}>
-          Save canvas
+          Save notes
         </button>
         <button disabled={exporting} onClick={() => void exportPNG()}>
           Export PNG
@@ -280,7 +447,7 @@ export default function Canvas({
               .catch(() => {});
           }}
         >
-          Close canvas
+          Close notes
         </button>
       </div>
       {page && (
@@ -333,12 +500,12 @@ export default function Canvas({
           )}
         </div>
       )}
-      {showMath && editor.current && (
+      {showMath && view === "canvas" && editor.current && (
         <CanvasMath api={editor.current} close={() => setShowMath(false)} />
       )}
       <div className="canvas-body">
         {showSources && (
-          <aside className="canvas-sources" aria-label="Canvas sources">
+          <aside className="canvas-sources" aria-label="Notes sources">
             <h2>Sources</h2>
             <label htmlFor="canvas-source">Link a Library source</label>
             <select
@@ -381,12 +548,30 @@ export default function Canvas({
             })}
           </aside>
         )}
-        <div
-          className="canvas-engine"
-          style={changingPage ? { pointerEvents: "none" } : undefined}
-        >
+        {view === "notes" ? (
+          <NotesFlow
+            document={noteDocument}
+            files={documentScene.current.files}
+            canvasId={record.id}
+            onChange={changeNoteDocument}
+            openFreeform={openFreeform}
+            initialBlockId={initialBlockId}
+            onAddFiles={(files) => void addNoteFiles(files)}
+            onAddCaptureDerivative={(captureId, file) => void addCaptureDerivative(captureId, file)}
+            onCreateCaptureSource={(captureId, text) => void createCaptureSource(captureId, text)}
+            onStudyCapture={studyCapture}
+            onStudySelection={(text) => void window.desk.lens({
+              question: `Check this Note block:\n\n${text}`,
+              activityKind: "check",
+            }).catch((e) => setError(userError(e)))}
+          />
+        ) : (
+          <div
+            className="canvas-engine"
+            style={changingPage ? { pointerEvents: "none" } : undefined}
+          >
           <Excalidraw
-            key={activePageId ?? "infinite"}
+            key={`${activePageId ?? "infinite"}-canvas`}
             excalidrawAPI={(api) => {
               editor.current = api;
               if (pageFrame)
@@ -442,7 +627,8 @@ export default function Canvas({
               });
             }}
           />
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

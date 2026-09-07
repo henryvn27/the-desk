@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 38);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 42);
     assert.ok(
       check
         .prepare(
@@ -625,6 +625,67 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
   }
 });
 
+test("unified search indexes persisted Notes blocks and returns an exact block location", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-note-search-"));
+  const path = join(directory, "test.sqlite");
+  const store = new DeskStore(path);
+  try {
+    const classId = store.execute({ type: "class.create", name: "Calculus" }).classes[0]!.id;
+    const taskId = store.execute({
+      type: "task.create",
+      input: {
+        title: "Derivatives lecture",
+        classId,
+        dueAt: null,
+        minutes: 30,
+        deadlineConfirmed: true,
+        resource: null,
+        notes: "Practice chain rule",
+      },
+    }).tasks[0]!.id;
+    const canvas = store.execute({ type: "canvas.create", taskId }).canvases[0]!;
+    const scene = {
+      engine: "excalidraw" as const,
+      version: 1 as const,
+      elements: [],
+      files: {},
+      viewBackgroundColor: "#fff",
+      document: {
+        version: 1 as const,
+        blocks: [{ id: "heading-1", type: "heading" as const, level: 2, text: "Chain rule" }],
+      },
+    };
+    store.execute({ type: "canvas.save", id: canvas.id, revision: 0, scene });
+    const results = store.search("chain rule");
+    const note = results.find((result) => result.kind === "note");
+    assert.equal(note?.id, canvas.id);
+    assert.equal(note?.blockId, "heading-1");
+    assert.ok(results.some((result) => result.kind === "task"));
+    store.execute({
+      type: "canvas.save",
+      id: canvas.id,
+      revision: 1,
+      scene: {
+        ...scene,
+        document: {
+          ...scene.document,
+          blocks: [
+            ...scene.document.blocks,
+            { id: "paper-1", type: "image" as const, fileId: "file-1", name: "physics scan", captureId: "capture-1" },
+          ],
+          captures: [{ id: "capture-1", kind: "paper" as const, originalFileId: "file-1", ocrText: "friction coefficient" }],
+          recordings: [{ id: "recording-1", status: "complete" as const, startedAt: "2026-09-06T12:00:00.000Z", chunkCount: 1, mimeType: "audio/webm", transcript: [{ id: "segment-1", startMs: 0, endMs: 1000, text: "lecture torque diagram", blockId: "heading-1" }] }],
+        },
+      },
+    });
+    assert.equal(store.search("friction coefficient").find((result) => result.kind === "note")?.blockId, "paper-1");
+    assert.equal(store.search("torque diagram").find((result) => result.kind === "note")?.blockId, "heading-1");
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
 test("saved blocks survive restart and reject conflicting, stale, locked, and late edits atomically", () => {
   const directory = mkdtempSync(join(tmpdir(), "desk-blocks-"));
   const path = join(directory, "test.sqlite");
@@ -839,12 +900,16 @@ test("rebalance previews are atomic, stale-safe, expire, and retain locks and hi
     const before = store.snapshot();
     let preview = store.previewRebalance(now);
     assert.deepEqual(store.snapshot(), before);
-    assert.equal(preview.replaced.length, 1);
-    assert.deepEqual(preview.kept, [locked]);
+    assert.equal(preview.replaced.length, 0);
+    assert.deepEqual(
+      new Set(preview.kept.map((block) => block.id)),
+      new Set(before.studyBlocks.map((block) => block.id)),
+    );
     assert.equal(
       preview.added.reduce((sum, b) => sum + b.minutes, 0),
-      90,
+      60,
     );
+    assert.match(preview.reason ?? "", /stability preserved/i);
     assert.throws(
       () =>
         store.execute(

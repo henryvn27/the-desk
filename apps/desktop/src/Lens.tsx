@@ -1,13 +1,18 @@
 import type { TutoringMode } from "../../../packages/intelligence/tutoring";
 import { userError } from "./errors";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   LensOverlayMark,
   LensHistoryTurn,
 } from "../../../packages/intelligence/lens-provider";
-import type { Command } from "../../../packages/domain/contracts";
-import type { Snapshot } from "../../../packages/domain/contracts";
+import type { Command, Snapshot, Source } from "../../../packages/domain/contracts";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
+import {
+  activityInstruction,
+  activityLabel,
+  studyActivityKind,
+  type StudyActivityKind,
+} from "../../../packages/study/activities";
 import {
   lensAnswerCanvasScene,
   lensAnswerMemoryInput,
@@ -27,6 +32,8 @@ export function Lens({
   browserContext,
   clearBrowserContext,
   save,
+  initialActivity,
+  sources,
 }: {
   tutoringMode: TutoringMode;
   saveTutoringMode: (mode: TutoringMode) => Promise<unknown>;
@@ -38,6 +45,8 @@ export function Lens({
   browserContext: BrowserBridgeMessage | null;
   clearBrowserContext: () => Promise<void>;
   save: (command: Command) => Promise<Snapshot | undefined>;
+  initialActivity?: StudyActivityKind;
+  sources: Source[];
 }) {
   const [savingMode, setSavingMode] = useState(false);
   const [paths, setPaths] = useState<Point[][]>([]),
@@ -47,12 +56,27 @@ export function Lens({
     [image, setImage] = useState<string>(),
     [share, setShare] = useState(false),
     [question, setQuestion] = useState(""),
+    [activity, setActivity] = useState<StudyActivityKind>(initialActivity ?? "check"),
     [answer, setAnswer] = useState(""),
     [marks, setMarks] = useState<LensOverlayMark[]>([]),
     [history, setHistory] = useState<LensHistoryTurn[]>([]),
     [busy, setBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [showMistake, setShowMistake] = useState(false);
+  const [scopeIds, setScopeIds] = useState<string[]>([]);
+  const scopedSources = sources.filter((source) => scopeIds.includes(source.id));
+  useEffect(() => {
+    const applyContext = (context: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] } | null) => {
+      if (!context) return;
+      if (context.question) setQuestion(context.question);
+      if (context.activityKind && studyActivityKind.safeParse(context.activityKind).success)
+        setActivity(context.activityKind);
+      if (context.sourceIds) setScopeIds([...new Set(context.sourceIds)]);
+    };
+    const unsubscribe = window.desk.onLensContext(applyContext);
+    void window.desk.lensContext().then(applyContext).catch(() => undefined);
+    return unsubscribe;
+  }, []);
   const width = window.innerWidth,
     height = window.innerHeight;
   const point = (e: React.PointerEvent): Point => ({
@@ -87,9 +111,11 @@ export function Lens({
     try {
       const result = await window.desk.askLens({
         question: q,
+        ...(scopeIds.length ? { sourceIds: scopeIds } : {}),
         ...(share && image ? { imageDataUrl: image } : {}),
         selection: { paths: paths.map((points) => ({ points })) },
         history,
+        activity: { kind: activity },
       });
       setAnswer(result.explanation);
       setMarks(share && image ? result.overlays : []);
@@ -106,6 +132,33 @@ export function Lens({
       setStatus(userError(e));
     } finally {
       setBusy(false);
+    }
+  }
+  async function saveAnswerToNotes(origin: "lens" | "enhanced" = "lens") {
+    if (!classId || !taskId || !answer) return;
+    setActionBusy(true);
+    setStatus("");
+    try {
+      const withSource = await save({
+        type: "source.create",
+        input: lensAnswerSourceInput(answer, classId, taskId),
+      });
+      const source = withSource?.sources.at(-1);
+      if (!source) throw Error("Lens source was not saved.");
+      const withCanvas = await save({ type: "canvas.create", taskId });
+      const canvas = withCanvas?.canvases.at(-1);
+      if (!canvas) throw Error("Lens Notes workspace was not created.");
+      await save({
+        type: "canvas.save",
+        id: canvas.id,
+        revision: canvas.revision,
+        scene: lensAnswerCanvasScene(answer, source.id, origin),
+      });
+      setStatus(origin === "enhanced" ? "Enhanced Notes saved with source provenance." : "Lens answer saved to Notes with its source.");
+    } catch (error) {
+      setStatus(userError(error));
+    } finally {
+      setActionBusy(false);
     }
   }
   return (
@@ -214,9 +267,18 @@ export function Lens({
         })}
       </svg>
       <section className="lens-panel">
-        <div className="eyebrow">Lens · {className}</div>
+        <div className="eyebrow">Lens · {className || "Library"}</div>
         <h2>{title}</h2>
         <p>Circle one or more areas, or ask about your current task.</p>
+        {!!scopedSources.length && (
+          <section className="source-scope" aria-label="Selected Library sources">
+            <strong>Grounded in selected Library sources</strong>
+            <p className="muted">Desk will keep this question scoped to these saved revisions.</p>
+            <ul>
+              {scopedSources.map((source) => <li key={source.id}>{source.title} <span className="muted">· rev {source.revision ?? 0} · {source.kind ?? "unspecified"}</span></li>)}
+            </ul>
+          </section>
+        )}
         {browserContext && (
           <div className="source" role="status">
             <strong>Browser context attached</strong>
@@ -255,6 +317,13 @@ export function Lens({
           >
             Clear selection
           </button>
+        </div>
+        <div className="actions lens-selection-actions" aria-label="Selection actions">
+          {(["Check my work", "Hint", "Explain", "Practice this", "Organize"] as const).map((label) => (
+            <button type="button" key={label} onClick={() => { setQuestion(label); setStatus(`Ask Lens to ${label.toLowerCase()}.`); }}>
+              {label}
+            </button>
+          ))}
         </div>
         <button
           disabled={busy}
@@ -354,37 +423,14 @@ export function Lens({
                 <button
                   type="button"
                   disabled={actionBusy}
-                  onClick={async () => {
-                    setActionBusy(true);
-                    setStatus("");
-                    try {
-                      const withSource = await save({
-                        type: "source.create",
-                        input: lensAnswerSourceInput(answer, classId, taskId),
-                      });
-                      const source = withSource?.sources.at(-1);
-                      if (!source) throw Error("Lens source was not saved.");
-                      const withCanvas = await save({
-                        type: "canvas.create",
-                        taskId,
-                      });
-                      const canvas = withCanvas?.canvases.at(-1);
-                      if (!canvas) throw Error("Lens Canvas was not created.");
-                      await save({
-                        type: "canvas.save",
-                        id: canvas.id,
-                        revision: canvas.revision,
-                        scene: lensAnswerCanvasScene(answer, source.id),
-                      });
-                      setStatus("Lens answer saved to Canvas with its source.");
-                    } catch (error) {
-                      setStatus(userError(error));
-                    } finally {
-                      setActionBusy(false);
-                    }
-                  }}
+                  onClick={() => void saveAnswerToNotes()}
                 >
-                  Save answer to Canvas
+                  Save answer to Notes
+                </button>
+              )}
+              {classId && taskId && (
+                <button type="button" disabled={actionBusy} onClick={() => void saveAnswerToNotes("enhanced")}>
+                  Enhance Notes
                 </button>
               )}
               {classId && (
@@ -518,6 +564,19 @@ export function Lens({
             void ask();
           }}
         >
+          <label>
+            Study action
+            <select
+              aria-label="Study action"
+              value={activity}
+              onChange={(event) => setActivity(event.target.value as StudyActivityKind)}
+            >
+              {studyActivityKind.options.map((kind) => (
+                <option key={kind} value={kind}>{activityLabel(kind)}</option>
+              ))}
+            </select>
+          </label>
+          <p className="muted">{activityInstruction(activity, tutoringMode)}</p>
           <label>
             Tutoring mode
             <select

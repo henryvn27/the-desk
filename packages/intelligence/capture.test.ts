@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { interpretCapture } from "./capture";
+import { classifyCaptureText, interpretCapture } from "./capture";
 import type { Class } from "../domain/contracts";
 
 const classes: Class[] = [
@@ -132,4 +132,59 @@ test("unknown fields stay unknown and the exact original paste is preserved", ()
     "deadline",
     "minutes",
   ]);
+});
+
+test("specialized capture hints stay deterministic and preserve assignment routing", () => {
+  assert.deepEqual(
+    classifyCaptureText("AP Physics C Syllabus\nOffice hours Thursday", "physics-syllabus.pdf"),
+    { type: "syllabus", confidence: "high" },
+  );
+  assert.deepEqual(
+    classifyCaptureText("[handwriting] AP Physics C friction notes", "page.png"),
+    { type: "handwritten-note", confidence: "high" },
+  );
+  assert.deepEqual(
+    classifyCaptureText("AP Physics C Problem Set 4 due 2026-09-08T22:00:00Z"),
+    { type: "assignment", confidence: "high" },
+  );
+  assert.deepEqual(
+    classifyCaptureText("[image OCR uncertain] 7 3 ?", "IMG_9999.jpg"),
+    { type: "unknown", confidence: "low" },
+  );
+});
+
+test("month-name dates are extracted but remain reviewable without a year", () => {
+  const [draft] = interpretCapture(
+    "AP Physics C problem set due Sep 8 at 10 PM",
+    context,
+  );
+  assert.equal(draft!.deadline?.date, "2026-09-08");
+  assert.equal(draft!.deadline?.time, "22:00");
+  assert.equal(draft!.deadline?.requiresConfirmation, true);
+  assert.match(
+    draft!.uncertainties.find((item) => item.field === "deadline")!.message,
+    /Confirm/,
+  );
+});
+
+test("calendar-like weekdays in syllabus and timetable prose are not deadlines", () => {
+  const [syllabus] = interpretCapture(
+    "AP Physics C Syllabus\nOffice hours Thursday",
+    { ...context, sourceName: "physics-syllabus.pdf" },
+  );
+  assert.equal(syllabus!.deadline, null);
+  const [timetable] = interpretCapture(
+    "AP Physics C timetable\nPeriod 2 Monday 9:00",
+    { ...context, sourceName: "fall-timetable.pdf" },
+  );
+  assert.equal(timetable!.deadline, null);
+});
+
+test("foreground class context is a medium-confidence routing hint", () => {
+  const [draft] = interpretCapture("Finish the worksheet when I can", {
+    ...context,
+    contextClassId: "physics",
+  });
+  assert.equal(draft!.classId, "physics");
+  assert.equal(draft!.confidence.classId, "medium");
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   Command,
   RebalancePreview,
@@ -9,28 +9,38 @@ import { userError } from "./errors";
 export function Rebalance({
   data,
   save,
+  autoPreview = false,
+  onAutoPreview,
 }: {
   data: Snapshot;
   save: (c: Command) => Promise<unknown>;
+  autoPreview?: boolean;
+  onAutoPreview?: () => void;
 }) {
   const [preview, setPreview] = useState<RebalancePreview>();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const label = (b: Block) =>
     `${data.tasks.find((t) => t.id === b.taskId)?.title ?? "Assignment"} · ${new Date(b.start).toLocaleString()} · ${b.minutes} min`;
+  function requestPreview() {
+    setBusy(true);
+    setStatus("");
+    void window.desk
+      .previewRebalance()
+      .then(setPreview)
+      .catch((e) => setStatus(userError(e)))
+      .finally(() => setBusy(false));
+  }
+  useEffect(() => {
+    if (!autoPreview) return;
+    onAutoPreview?.();
+    requestPreview();
+  }, [autoPreview]);
   return (
     <section>
       <button
         disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          setStatus("");
-          void window.desk
-            .previewRebalance()
-            .then(setPreview)
-            .catch((e) => setStatus(userError(e)))
-            .finally(() => setBusy(false));
-        }}
+        onClick={requestPreview}
       >
         Preview rebalance
       </button>
@@ -67,6 +77,7 @@ export function Rebalance({
             {new Date(preview.expiresAt).toLocaleTimeString()}. No assignment
             will be deleted or marked complete.
           </p>
+          {preview.reason && <p className="session-progress">{preview.reason}</p>}
           <h3>Release {preview.replaced.length} unlocked reservations</h3>
           {preview.replaced.map((b) => (
             <p key={b.id}>{label(b)}</p>

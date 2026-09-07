@@ -22,14 +22,17 @@ import type {
   Snapshot,
   Command,
   Task,
+  SearchResult,
+  CanvasRecord,
 } from "../../../packages/domain/contracts";
 import type { DeskSyncStatus } from "../../../packages/integrations/supabase-sync";
-import { planWeek, todayWindow } from "../../../packages/planner";
+import { deriveHome } from "../../../packages/planner/home";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
 import { StudyPlan } from "./StudyPlan";
 import { PlanningSettings } from "./PlanningSettings";
-import { Gradebook } from "./Gradebook";
+import { ClassOverview } from "./ClassOverview";
 import { Sources } from "./Sources";
+import SourceReader from "./SourceReader";
 import "./style.css";
 import { Capture } from "./Capture";
 import { ProviderSettings } from "./ProviderSettings";
@@ -43,6 +46,7 @@ import { SessionKit } from "./SessionKit";
 import { SessionReview } from "./SessionReview";
 import { BrowserBridgeSettings } from "./BrowserBridgeSettings";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
+type CanvasTarget = CanvasRecord & { initialBlockId?: string };
 declare global {
   interface Window {
     EXCALIDRAW_ASSET_PATH: string;
@@ -106,11 +110,13 @@ function App() {
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
   const [captureNotice, setCaptureNotice] = useState("");
+  const [captureText, setCaptureText] = useState("");
+  const [planRepairRequested, setPlanRepairRequested] = useState(false);
   const [syncStatus, setSyncStatus] = useState(emptySync);
+  const [focusSearch, setFocusSearch] = useState(false);
   const [editing, setEditing] = useState<Task>();
   const [reviewingCapture, setReviewingCapture] = useState<CaptureInboxItem>();
-  const [canvas, setCanvas] =
-    useState<import("../../../packages/domain/contracts").CanvasRecord>();
+  const [canvas, setCanvas] = useState<CanvasTarget>();
   const [browserContext, setBrowserContext] =
     useState<BrowserBridgeMessage | null>(null);
   useEffect(() => {
@@ -129,16 +135,28 @@ function App() {
       window.clearInterval(timer);
     };
   }, []);
-  async function openCanvas(taskId: string, canvasId?: string) {
+  async function openCanvas(taskId: string, canvasId?: string, blockId?: string) {
     try {
+      // Search deep-links carry the canonical canvas id. Read it directly so
+      // a just-created or just-updated Note cannot be missed by the React
+      // snapshot refresh cadence and accidentally forked into a blank canvas.
+      if (canvasId) {
+        const direct = await window.desk.canvas(canvasId);
+        if (direct.taskId !== taskId) throw Error("That Note is linked to a different task.");
+        setCanvas(blockId ? { ...direct, initialBlockId: blockId } : direct);
+        return;
+      }
       const existing = data.canvases.find(
-        (c) => c.taskId === taskId && (!canvasId || c.id === canvasId),
+        (c) => c.taskId === taskId,
       );
       const id =
         existing?.id ??
         (await act({ type: "canvas.create", taskId }, true))?.canvases.at(-1)
           ?.id;
-      if (id) setCanvas(await window.desk.canvas(id));
+      if (id) {
+        const record = await window.desk.canvas(id);
+        setCanvas(blockId ? { ...record, initialBlockId: blockId } : record);
+      }
     } catch (e) {
       setError(userError(e));
     }
@@ -180,6 +198,9 @@ function App() {
   const kind = location.hash.slice(1);
   const active = data.sessions.find((s) => !s.endedAt);
   const activeTask = data.tasks.find((t) => t.id === active?.taskId);
+  const captureContextClassId = data.classes.some((c) => c.id === page)
+    ? page
+    : activeTask?.classId;
   const unreviewed = [...data.sessions]
     .reverse()
     .find((s) => s.endedAt && s.completionReported !== undefined && !s.review);
@@ -234,17 +255,31 @@ function App() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setCapture(false);
+        setCaptureText("");
         if (kind === "lens") void window.desk.dismiss();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "Space") {
+        e.preventDefault();
+        setCaptureText("");
+        setCapture(true);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setPage("Library");
-        document.querySelector<HTMLInputElement>("#search")?.focus();
+        setFocusSearch(true);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [kind]);
+  useEffect(() => {
+    if (!focusSearch || page !== "Library") return;
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLInputElement>("#search")?.focus();
+      setFocusSearch(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusSearch, page]);
   async function act(c: Command, reportToCaller = false) {
     setBusy(true);
     setError("");
@@ -266,29 +301,30 @@ function App() {
       setError(userError(e));
     }
   }
-  const capacity = todayWindow(new Date(tick), data.planning);
-  const week = planWeek(
-    data.tasks,
-    new Date(tick),
-    data.planning,
-    data.studyBlocks,
-    data,
-  );
-  const schedule = {
-    blocks: [
-      ...week.blocks,
-      ...data.studyBlocks.filter(
-        (b) =>
-          !b.cancelledAt &&
-          data.tasks.some((t) => t.id === b.taskId && !t.completed),
-      ),
-    ]
-      .filter(
-        (b) => Date.parse(b.end) > tick && Date.parse(b.start) < +capacity.end,
-      )
-      .sort((a, b) => a.start.localeCompare(b.start)),
-  };
-  const next = data.tasks.find((t) => t.id === schedule.blocks[0]?.taskId);
+  const home = deriveHome(data, new Date(tick));
+  const week = home.plan;
+  const next = home.next ? data.tasks.find((t) => t.id === home.next!.taskId) : undefined;
+  const startNext = React.useCallback(() => {
+    if (!next || active || busy) return;
+    void act({ type: "session.start", taskId: next.id }).then((state) => {
+      if (state) {
+        setLastId("");
+        if (next.resource) void open(next.id);
+      }
+    });
+  }, [active, busy, next]);
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (page !== "Home" || !next || active || busy) return;
+      if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
+      event.preventDefault();
+      startNext();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [active, busy, next, page, startNext]);
   const elapsed = active
     ? Math.max(
         0,
@@ -335,6 +371,48 @@ function App() {
               )}
             </p>
           )}
+          {active.activityState && (
+            <section className="study-activity-panel" aria-label="Study activities">
+              <div className="eyebrow">
+                {active.activityState.mode === "standard"
+                  ? "Adaptive study"
+                  : active.activityState.mode === "quiz"
+                    ? "Quiz mode"
+                    : "Exam mode"}
+              </div>
+              <p className="muted">
+                {active.activityState.mode === "exam"
+                  ? "Fixed blueprint · no hints or feedback before submission."
+                  : "Complete a response before asking for support; checked attempts are the learning evidence."}
+              </p>
+              <ol className="study-activities">
+                {active.activityState.activities.map((activity) => (
+                  <li key={activity.id} className={`study-activity study-activity-${activity.status}`}>
+                    <div>
+                      <strong>{activity.kind.replace("-", " ")}</strong>
+                      <span className="muted"> · {activity.intendedDifficulty}</span>
+                      <p>{activity.prompt}</p>
+                      <small className="muted">{activity.rationale}</small>
+                    </div>
+                    <div className="actions">
+                      {activity.status === "queued" && (
+                        <button onClick={() => void act({ type: "session.activity", activityId: activity.id, action: "start" })}>Start</button>
+                      )}
+                      {activity.status === "active" && activity.hintsAllowed && (
+                        <button onClick={() => void act({ type: "session.activity", activityId: activity.id, action: "hint" })}>Log hint</button>
+                      )}
+                      {activity.status === "active" && (
+                        <>
+                          <button onClick={() => void act({ type: "session.activity", activityId: activity.id, action: "skip" })}>Skip</button>
+                          <button className="primary" onClick={() => void act({ type: "session.activity", activityId: activity.id, action: "complete" })}>Done</button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
           {kind === "main" && activeTask && (
             <SessionKit
               task={activeTask}
@@ -379,6 +457,15 @@ function App() {
       )}
     </section>
   );
+  const activeHomeSummary = active && activeTask ? (
+    <section className="session-home-summary" aria-label="Active study session">
+      <div className="eyebrow">Study session in progress</div>
+      <h2>{activeTask.title}</h2>
+      <p>{Math.floor(elapsed)} min · {active.pausedAt ? "Paused" : "Working"}{active.activityState ? ` · ${active.activityState.mode === "standard" ? "Adaptive study" : active.activityState.mode === "quiz" ? "Quiz" : "Exam"}` : ""}</p>
+      <p className="muted">The compact Study controller has the session controls.</p>
+      <button type="button" onClick={() => void window.desk.focusController()}>Open study controller</button>
+    </section>
+  ) : null;
   if (!workspaceReady)
     return (
       <main className="startup-state">
@@ -421,6 +508,8 @@ function App() {
           await window.desk.clearBrowserContext();
           setBrowserContext(null);
         }}
+        initialActivity={active?.activityState?.activities.find((item) => item.id === active?.activityState?.currentId)?.kind}
+        sources={data.sources}
         save={(command) => act(command, true)}
       />
     );
@@ -531,6 +620,22 @@ function App() {
               </p>
             </div>
             <div className="actions">
+              <button
+                onClick={() => {
+                  const context = browserContext.context;
+                  const text = [
+                    context.title,
+                    context.selectionText || context.visibleText,
+                    `Source: ${context.url}`,
+                  ]
+                    .filter((value) => Boolean(value?.trim()))
+                    .join("\n\n");
+                  setCaptureText(text);
+                  setCapture(true);
+                }}
+              >
+                Capture to Inbox
+              </button>
               <button onClick={() => void window.desk.lens()}>Ask Lens</button>
               <button
                 onClick={() =>
@@ -561,37 +666,19 @@ function App() {
         {page === "Home" ? (
           <>
             <h1>Make room for focus.</h1>
-            {!active && unreviewed && reviewTask && (
-              <SessionReview
-                key={unreviewed.id}
-                session={unreviewed}
-                canCorrect={
-                  data.sessions.filter((s) => s.taskId === reviewTask.id).at(-1)
-                    ?.id === unreviewed.id
-                }
-                task={reviewTask}
-                concepts={data.concepts.filter(
-                  (concept) => concept.classId === reviewTask.classId,
-                )}
-                save={act}
-                busy={busy}
-              />
-            )}
-            {active ? (
-              sessionPanel
-            ) : next ? (
+            {active ? activeHomeSummary : next ? (
               <section className="next">
                 <div className="eyebrow">
-                  Next · {data.classes.find((c) => c.id === next.classId)?.name}
+                  Next{home.next && Date.parse(home.next.start) > tick ? ` · ${new Date(home.next.start).toLocaleDateString(undefined, { weekday: "short" })}` : ""} · {data.classes.find((c) => c.id === next.classId)?.name}
                 </div>
                 <h2>{next.title}</h2>
                 <p>
-                  {schedule.blocks[0]?.minutes} minutes
+                  {home.next?.minutes} minutes
                   {next.resource ? " · Resource ready" : ""}
                 </p>
                 <details>
                   <summary>Why this?</summary>
-                  <p>{schedule.blocks[0]?.why}</p>
+                  <p>{home.next?.why}</p>
                 </details>
                 <details>
                   <summary>Preview study materials</summary>
@@ -605,30 +692,36 @@ function App() {
                 <button
                   className="primary"
                   disabled={busy}
-                  onClick={() =>
-                    void act({ type: "session.start", taskId: next.id }).then(
-                      (s) => {
-                        if (s) {
-                          setLastId("");
-                          if (next.resource) void open(next.id);
-                        }
-                      },
-                    )
-                  }
+                  aria-keyshortcuts="Control+Enter Meta+Enter"
+                  onClick={startNext}
                 >
-                  Start session →
+                  Start session → <span className="shortcut-hint" aria-hidden="true">⌘/Ctrl+Enter</span>
                 </button>
+                <div className="actions">
+                  <button
+                    disabled={busy}
+                    onClick={() => void act({ type: "session.start", taskId: next.id, mode: "quiz" })}
+                  >
+                    Start adaptive quiz
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => void act({ type: "session.start", taskId: next.id, mode: "exam" })}
+                  >
+                    Start fixed exam
+                  </button>
+                </div>
               </section>
             ) : (
               <section className="next">
                 <h2>
                   {data.classes.length
-                    ? "Ready when you are."
+                    ? home.schedule.length ? "Nothing else needs starting today." : "Ready when you are."
                     : "A place for your schoolwork."}
                 </h2>
                 <p>
                   {data.classes.length
-                    ? "Capture an assignment to plan your next session."
+                    ? home.schedule.length ? "Your next planned block is shown in Upcoming." : "Capture an assignment to plan your next session."
                     : "Add your first class, then capture an assignment."}
                 </p>
                 <button onClick={() => setCapture(true)}>
@@ -636,41 +729,82 @@ function App() {
                 </button>
               </section>
             )}
+            {home.planChange && (
+              <p className="plan-change-note" role="status">
+                <strong>Plan updated.</strong> {home.planChange.text}
+              </p>
+            )}
             <h2 className="section-title">Today</h2>
-            {schedule.blocks.slice(1).map((b) => (
+            {home.today.map((b) => (
               <div className="row" key={b.taskId}>
-                <span>{data.tasks.find((t) => t.id === b.taskId)?.title}</span>
+                <span>{data.tasks.find((t) => t.id === b.taskId)?.title}<small>{new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</small></span>
                 <span>{b.minutes} min</span>
               </div>
             ))}
-            {!schedule.blocks.slice(1).length && (
-              <p className="muted">No other blocks planned.</p>
+            {!home.today.length && (
+              <p className="muted">No remaining study blocks planned today.</p>
             )}
-            {week.unscheduled.length > 0 && (
-              <>
-                <h2 className="section-title">Needs attention</h2>
-                {week.overloadMinutes > 0 && (
-                  <p>
-                    {week.overloadMinutes} minutes of required work remain
-                    outside this seven-day plan.
-                  </p>
+            {!active && (home.attention.length > 0 || (unreviewed && reviewTask)) && (
+              <section aria-labelledby="home-attention-title">
+                <h2 className="section-title" id="home-attention-title">Needs attention</h2>
+                {unreviewed && reviewTask && (
+                  <SessionReview
+                    key={unreviewed.id}
+                    session={unreviewed}
+                    canCorrect={
+                      data.sessions.filter((s) => s.taskId === reviewTask.id).at(-1)
+                        ?.id === unreviewed.id
+                    }
+                    task={reviewTask}
+                    concepts={data.concepts.filter(
+                      (concept) => concept.classId === reviewTask.classId,
+                    )}
+                    save={act}
+                    busy={busy}
+                  />
                 )}
-                {week.unscheduled.map((u) => (
-                  <div className="attention" key={u.taskId}>
-                    <strong>
-                      {data.tasks.find((t) => t.id === u.taskId)?.title}
-                    </strong>
-                    <p>{u.reason}</p>
-                    <button
-                      onClick={() =>
-                        setEditing(data.tasks.find((t) => t.id === u.taskId))
-                      }
-                    >
-                      Review assignment
-                    </button>
+                {home.attention.filter((item) => item.kind !== "session-review").map((item) => (
+                  <div className="attention" key={item.id}>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    {item.kind === "overload" ? (
+                      <button type="button" onClick={() => { setPlanRepairRequested(true); setPage("Plan"); }}>Repair plan</button>
+                    ) : item.kind === "integration" ? (
+                      <button type="button" onClick={() => setPage("Settings")}>Review sync</button>
+                    ) : item.taskId ? (
+                      <button type="button" onClick={() => setEditing(data.tasks.find((task) => task.id === item.taskId))}>Review assignment</button>
+                    ) : null}
                   </div>
                 ))}
-              </>
+              </section>
+            )}
+            {!!home.upcoming.length && (
+              <section aria-labelledby="home-upcoming-title">
+                <h2 className="section-title" id="home-upcoming-title">Upcoming</h2>
+                {home.upcoming.map((item) => (
+                  <div className="row" key={item.id}>
+                    <span>{item.title}<small>{item.kind === "assessment" ? "Assessment" : "Deadline"} · {data.classes.find((c) => c.id === item.classId)?.name}</small></span>
+                    <span>{new Date(item.dueAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span>
+                  </div>
+                ))}
+              </section>
+            )}
+            {!!home.continue.length && (
+              <section aria-labelledby="home-continue-title">
+                <h2 className="section-title" id="home-continue-title">Continue</h2>
+                {home.continue.map((item) => (
+                  <div className="row home-continue-row" key={item.id}>
+                    <span>{item.title}<small>{item.detail}</small></span>
+                    {item.kind === "note" && item.canvasId ? (
+                      <button type="button" onClick={() => void openCanvas(item.taskId, item.canvasId, item.blockId)}>Open Note</button>
+                    ) : item.kind === "session" ? (
+                      <button type="button" onClick={() => void act({ type: "session.start", taskId: item.taskId })}>Resume</button>
+                    ) : (
+                      <button type="button" onClick={() => setEditing(data.tasks.find((task) => task.id === item.taskId))}>Open</button>
+                    )}
+                  </div>
+                ))}
+              </section>
             )}
           </>
         ) : page === "Memory" ? (
@@ -694,7 +828,7 @@ function App() {
         ) : page === "Academic context" ? (
           <AcademicContext data={data} save={(c) => act(c, true)} />
         ) : page === "Plan" ? (
-          <StudyPlan data={data} week={week} save={(c) => act(c, true)} />
+          <StudyPlan data={data} week={week} save={(c) => act(c, true)} autoPreview={planRepairRequested} onAutoPreview={() => setPlanRepairRequested(false)} />
         ) : page === "Settings" ? (
           <>
             <h1>Settings</h1>
@@ -759,16 +893,22 @@ function App() {
             saveGrade={(c) => act(c, true)}
             saveProgress={(c) => act(c, true)}
             saveSource={(input) => act({ type: "source.create", input }, true)}
+            saveCommand={(c) => act(c, true)}
             openCanvas={openCanvas}
             newNotebook={newNotebook}
+            navigate={setPage}
+            startTask={(taskId) => {
+              void act({ type: "session.start", taskId });
+            }}
           />
         )}
       </main>
       {canvas && (
-        <React.Suspense fallback={<p>Opening canvas…</p>}>
+        <React.Suspense fallback={<p>Opening notes…</p>}>
           <Canvas
             record={canvas}
             sources={data.sources}
+            initialBlockId={canvas.initialBlockId}
             close={() => setCanvas(undefined)}
           />
         </React.Suspense>
@@ -827,6 +967,8 @@ function App() {
       )}
       {capture && (
         <Capture
+          initialText={captureText}
+          contextClassId={captureContextClassId}
           policy={data.capturePolicy}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
@@ -844,17 +986,19 @@ function App() {
                 `Import saved: ${items.filter((i) => i.status === "accepted").length} filed, ${items.filter((i) => i.status === "pending").length} waiting for review.`,
               );
               setCapture(false);
+              setCaptureText("");
               setPage("Capture Inbox");
             } finally {
               setBusy(false);
             }
           }}
-          onQueue={async (text) => {
+          onQueue={async (text, contextClassId) => {
             const next = await act(
               {
                 type: "inbox.capture",
                 text,
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                ...(contextClassId ? { contextClassId } : {}),
               },
               true,
             );
@@ -863,9 +1007,13 @@ function App() {
               `Capture saved: ${items.filter((i) => i.status === "accepted").length} filed, ${items.filter((i) => i.status === "pending").length} waiting for review.`,
             );
             setCapture(false);
+            setCaptureText("");
             setPage("Capture Inbox");
           }}
-          onClose={() => setCapture(false)}
+          onClose={() => {
+            setCapture(false);
+            setCaptureText("");
+          }}
           onSave={async (input) => {
             const next = await act({ type: "task.create", input }, true);
             if (next) {
@@ -885,10 +1033,13 @@ function Library({
   open,
   edit,
   saveSource,
+  saveCommand,
   saveGrade,
   saveProgress,
   openCanvas,
   newNotebook,
+  navigate,
+  startTask,
 }: {
   data: Snapshot;
   classId?: string;
@@ -899,32 +1050,78 @@ function Library({
   saveSource: (
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
-  openCanvas: (taskId: string, canvasId?: string) => Promise<void>;
+  saveCommand: (command: Command) => Promise<Snapshot | undefined>;
+  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
   newNotebook: (taskId: string) => Promise<void>;
+  navigate: (page: string) => void;
+  startTask: (taskId: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [indexed, setIndexed] = useState<SearchResult[]>([]);
+  const [readerTarget, setReaderTarget] = useState<{ sourceId: string; location?: SearchResult["location"] }>();
+  const readerSource = readerTarget
+    ? data.sources.find((source) => source.id === readerTarget.sourceId)
+    : undefined;
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) {
+      setIndexed([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void window.desk.search(query).then((results) => {
+        if (active) setIndexed(results);
+      }).catch(() => {
+        if (active) setIndexed([]);
+      });
+    }, 120);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [search]);
   return (
     <>
-      <h1>{data.classes.find((c) => c.id === classId)?.name ?? "Library"}</h1>
-      {classId && (
-        <Gradebook
-          key={classId}
+      {classId ? (
+        <ClassOverview
           data={data}
           classId={classId}
-          save={saveGrade}
+          openCanvas={openCanvas}
+          openSource={(sourceId) => setReaderTarget({ sourceId })}
+          editTask={edit}
+          startTask={startTask}
+          navigate={navigate}
+          saveGrade={saveGrade}
         />
-      )}
-      <label htmlFor="search">Search tasks, notes and sources</label>
+      ) : <h1>Library</h1>}
+      <label htmlFor="search">Search tasks, Notes, sources and math</label>
       <input
         id="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
+      {!!search.trim() && (
+        <section className="search-results" aria-label="Unified search results">
+          <div className="eyebrow">Everywhere in your Desk</div>
+          {indexed.length ? indexed.map((result) => (
+            <button key={`${result.kind}-${result.id}-${result.blockId ?? ""}`} className="search-result" type="button" onClick={() => {
+              if (result.kind === "note" && result.taskId) void openCanvas(result.taskId, result.id, result.blockId);
+              else if (result.kind === "source") setReaderTarget({ sourceId: result.id, location: result.location });
+              else if (result.kind === "annotation" && result.sourceId) setReaderTarget({ sourceId: result.sourceId, location: result.location });
+            }}>
+              <span className="search-result-kind">{result.kind === "note" ? "NOTE" : result.kind.toUpperCase()}</span>
+              <span><strong>{result.title}</strong><small>{result.snippet}</small></span>
+            </button>
+          )) : <p className="muted">No indexed matches yet.</p>}
+        </section>
+      )}
       <Sources
         data={data}
         classId={classId}
         search={search}
         save={saveSource}
+        openReader={(source) => setReaderTarget({ sourceId: source.id })}
         classify={(source, kind) =>
           saveProgress({
             type: "source.classify",
@@ -934,6 +1131,25 @@ function Library({
           })
         }
       />
+      {readerSource && (
+        <SourceReader
+          source={readerSource}
+          data={data}
+          initialLocation={readerTarget?.location}
+          close={() => setReaderTarget(undefined)}
+          saveCommand={saveCommand}
+          openCanvas={openCanvas}
+        />
+      )}
+      {data.tasks
+        .filter(
+          (t) =>
+            (!classId || t.classId === classId) &&
+            `${t.title} ${t.notes}`
+              .toLowerCase()
+              .includes(search.toLowerCase()),
+        )
+        .length > 0 && classId && <h2 className="class-library-heading">Assignments &amp; study</h2>}
       {data.tasks
         .filter(
           (t) =>
@@ -965,7 +1181,7 @@ function Library({
                 <TaskChecklist task={t} save={saveProgress} />
               </details>
               <button onClick={() => edit(t)}>Edit assignment</button>
-              <button onClick={() => void openCanvas(t.id)}>Open canvas</button>
+              <button onClick={() => void openCanvas(t.id)}>Open Notes</button>
               <button onClick={() => void newNotebook(t.id)}>
                 New notebook
               </button>

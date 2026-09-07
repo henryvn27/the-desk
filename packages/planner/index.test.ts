@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { plan, planWeek } from "./index";
+import { chooseStableRepair, plan, planWeek } from "./index";
 import type { StudySession, Task } from "../domain/contracts";
 const task = (
   id: string,
@@ -499,4 +499,22 @@ test("weekly planning carries unfinished session work into the next available da
   );
   assert.equal(result.blocks[0]!.taskId, "carry");
   assert.match(result.blocks[0]!.why, /unfinished study session/);
+});
+
+test("repair stability keeps commitments unless recalculation materially restores required time", () => {
+  const tasks = [task("a", 120, "2026-09-08T22:00:00Z")];
+  const conservative = planWeek(tasks, new Date("2026-09-07T08:00:00Z"), {
+    studyStart: "08:00",
+    sleepCutoff: "09:00",
+    studyDays: [1],
+    bufferPercent: 15,
+  });
+  const recalculated = planWeek(tasks, new Date("2026-09-07T08:00:00Z"), {
+    studyStart: "08:00",
+    sleepCutoff: "10:30",
+    studyDays: [1],
+    bufferPercent: 15,
+  });
+  assert.equal(chooseStableRepair(tasks, conservative, recalculated, 2).useRecalculated, true);
+  assert.equal(chooseStableRepair(tasks, recalculated, conservative, 2).useRecalculated, false);
 });

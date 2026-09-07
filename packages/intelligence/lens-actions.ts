@@ -81,6 +81,7 @@ export function lensAnswerMistakeInput(
 export function lensAnswerCanvasScene(
   answer: string,
   sourceId: string,
+  origin: "lens" | "enhanced" = "lens",
 ): CanvasScene {
   const text = sourceInput.shape.text.parse(answer);
   return canvasScene.parse({
@@ -126,6 +127,28 @@ export function lensAnswerCanvasScene(
       },
     ],
     files: {},
+    document: {
+      version: 1,
+      provenance: {
+        origin,
+        sourceIds: [sourceId],
+        createdAt: new Date().toISOString(),
+        basis: "Lens answer linked to its saved source",
+      },
+      blocks: [
+        {
+          id: "lens-answer-heading",
+          type: "heading",
+          level: 2,
+          text: "Lens answer",
+        },
+        {
+          id: "lens-answer-body",
+          type: "paragraph",
+          text,
+        },
+      ],
+    },
     viewBackgroundColor: "#fffdfa",
   });
 }

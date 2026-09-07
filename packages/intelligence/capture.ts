@@ -1,8 +1,25 @@
 import type { Class } from "../domain/contracts";
 
 export type CaptureConfidence = "high" | "medium" | "low";
+export type CaptureObjectType =
+  | "assignment"
+  | "syllabus"
+  | "worksheet"
+  | "graded-assessment"
+  | "rubric"
+  | "lecture-slide"
+  | "handwritten-note"
+  | "timetable"
+  | "teacher-message"
+  | "web-page"
+  | "unknown";
 export type CaptureField =
-  "title" | "classId" | "deadline" | "minutes" | "resources";
+  | "title"
+  | "classId"
+  | "deadline"
+  | "minutes"
+  | "resources"
+  | "objectType";
 
 export type CaptureUncertainty = {
   field: CaptureField;
@@ -26,6 +43,7 @@ export type CapturedDeadline = {
 export type CaptureDraft = {
   title: string;
   classId: string | null;
+  objectType: CaptureObjectType;
   deadline: CapturedDeadline | null;
   minutes: number | null;
   resources: string[];
@@ -47,10 +65,18 @@ export type CaptureContext = {
   now: Date;
   /** Required so relative dates never depend on the machine running the parser. */
   timeZone: string;
+  sourceName?: string;
+  /** Existing foreground/session class context, used only as a reviewable hint. */
+  contextClassId?: string;
 };
 
 type Segment = { text: string; lineNumber: number | null };
-type DateEvidence = { date: string; source: string; explicit: boolean };
+type DateEvidence = {
+  date: string;
+  source: string;
+  explicit: boolean;
+  requiresConfirmation?: boolean;
+};
 
 const WEEKDAYS = [
   "sunday",
@@ -68,11 +94,94 @@ const ISO_DATE_TIME_ALL =
   /\b(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\b/gi;
 const RELATIVE_DATE =
   /\b(?:(?:this|next)\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|\b(?:today|tomorrow)\b/gi;
+const MONTH_DATE =
+  /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/gi;
 const EXPLICIT_TIME =
   /\b(?:at|by)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b|\b(?:at|by)\s+([01]?\d|2[0-3]):([0-5]\d)\b/i;
 const DURATION =
   /\b(?:(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h)(?:\s*(?:and\s*)?(\d+)\s*(?:minutes?|mins?|min|m))?|(\d+)\s*(?:minutes?|mins?|min|m))\b/gi;
 const URL_TOKEN = /\b(?:[a-z][a-z\d+.-]*:\/\/|javascript:)[^\s<>"']+/gi;
+
+/**
+ * Classifies a capture into a small semantic hint for Inbox review. This is
+ * deliberately deterministic and advisory: the original capture, V1
+ * provenance and confidence policy remain authoritative.
+ */
+export function classifyCaptureText(
+  text: string,
+  sourceName?: string,
+): { type: CaptureObjectType; confidence: CaptureConfidence } {
+  const value = `${text}\n${sourceName ?? ""}`.toLocaleLowerCase("en-US");
+  const filename = (sourceName ?? "").toLocaleLowerCase("en-US");
+  const isImage = /\.(?:png|jpe?g|heic|webp|gif|bmp|tiff?)$/.test(filename);
+
+  if (
+    /\b(?:score\s*\d+\s*\/\s*\d+|teacher\s+marks?|teacher\s+comments?|marked\s+incorrect|graded\s+assessment|graded\s+test)\b/.test(
+      value,
+    )
+  )
+    return { type: "graded-assessment", confidence: "high" };
+  if (
+    /\b(?:from\s+(?:dr\.?|mr\.?|mrs\.?|ms\.?|prof\.?|teacher)|teacher\s+e-?mail|email\s+from)\b/.test(
+      value,
+    ) || /(?:^|[-_])(?:teacher|professor)[-_]?email/.test(filename)
+  )
+    return { type: "teacher-message", confidence: "high" };
+  if (
+    /\b(?:syllabus|course\s+outline|grading\s+policy|office\s+hours|course\s+policies)\b/.test(
+      value,
+    )
+  )
+    return { type: "syllabus", confidence: "high" };
+  if (/\b(?:timetable|schedule|period\s+\d+|room\s+\w+)\b/.test(value))
+    return { type: "timetable", confidence: "high" };
+  if (
+    /\b(?:rubric|criteria|points\s+breakdown|grading\s+criteria)\b/.test(
+      value,
+    )
+  )
+    return { type: "rubric", confidence: "high" };
+  if (
+    /\b(?:lecture\s+slides?|slide\s+deck|presentation\s+slides?)\b/.test(
+      value,
+    )
+  )
+    return { type: "lecture-slide", confidence: "high" };
+  if (
+    /\[(?:photo\s+ocr\s+uncertain|whiteboard|handwriting)\]/i.test(
+      value,
+    ) ||
+    /\b(?:handwritten|handwriting|whiteboard|notebook\s+page|class\s+notes|free[- ]body\s+diagram)\b/.test(
+      value,
+    ) ||
+    (isImage && /\b(?:glare|shadow|blurred)\b/.test(value))
+  )
+    return { type: "handwritten-note", confidence: "high" };
+  if (/\b(?:worksheet|practice\s+problems?|problem\s+sheet)\b/.test(value))
+    return { type: "worksheet", confidence: "high" };
+
+  const hasAssignmentMarker =
+    /\b(?:assignment|problem\s+set|homework|lab\s+report|submit|turn\s+in|finish|complete|due|deadline)\b/.test(
+      value,
+    ) ||
+    (/\bread\b/.test(value) &&
+      /\b(?:chapter|pages?|assignment|homework|due|deadline|submit)\b/.test(
+        value,
+      ));
+  if (hasAssignmentMarker)
+    return { type: "assignment", confidence: "high" };
+  if (
+    /\b(?:google\s+classroom|course\s+resources?|web\s+page|website|drive|docs?)\b/.test(
+      value,
+    ) ||
+    /\b(?:https?|ftp):\/\//i.test(text) ||
+    /\.(?:html?|url)$/.test(filename) ||
+    /\bweb[-_]?capture\b/.test(filename)
+  )
+    return { type: "web-page", confidence: "medium" };
+  if (isImage) return { type: "unknown", confidence: "low" };
+  return { type: "unknown", confidence: "low" };
+}
 
 /**
  * Deterministically interprets pasted text into reviewable drafts. It only
@@ -99,7 +208,17 @@ function interpretSegment(
   context: CaptureContext,
 ): CaptureDraft {
   const uncertainties: CaptureUncertainty[] = [];
-  const classMatch = matchClass(sourceText, context.classes);
+  const classMatch = matchClass(
+    sourceText,
+    context.classes,
+    context.contextClassId,
+  );
+  const object = classifyCaptureText(sourceText, context.sourceName);
+  if (object.type === "unknown")
+    uncertainties.push({
+      field: "objectType",
+      message: "I could not identify this capture yet. Review it in Capture Inbox.",
+    });
   if (!classMatch.value) {
     uncertainties.push({
       field: "classId",
@@ -131,6 +250,7 @@ function interpretSegment(
   return {
     title,
     classId: classMatch.value?.id ?? null,
+    objectType: object.type,
     deadline: dateResult.deadline,
     minutes: durationResult.minutes,
     resources: resourceResult.resources,
@@ -140,6 +260,7 @@ function interpretSegment(
       deadline: dateResult.confidence,
       minutes: durationResult.minutes === null ? "low" : "high",
       resources: resourceResult.unsafe ? "low" : "high",
+      objectType: object.confidence,
     },
     uncertainties,
     provenance: {
@@ -181,7 +302,11 @@ function segment(text: string, classes: readonly Class[]): Segment[] {
   }));
 }
 
-function matchClass(text: string, classes: readonly Class[]) {
+function matchClass(
+  text: string,
+  classes: readonly Class[],
+  contextClassId?: string,
+) {
   const input = normalize(text);
   const inputTokens = new Set(tokens(input));
   const scored = classes
@@ -202,12 +327,22 @@ function matchClass(text: string, classes: readonly Class[]) {
     .sort(
       (a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name),
     );
-  if (!scored.length)
+  if (!scored.length) {
+    const contextual = contextClassId
+      ? classes.find((item) => item.id === contextClassId)
+      : undefined;
+    if (contextual)
+      return {
+        value: contextual,
+        confidence: "medium" as const,
+        candidates: [contextual],
+      };
     return {
       value: null,
       confidence: "low" as const,
       candidates: [] as Class[],
     };
+  }
   const best = scored[0]!;
   const tied = scored.filter(({ score }) => score === best.score);
   if (tied.length > 1)
@@ -223,6 +358,37 @@ function matchClass(text: string, classes: readonly Class[]) {
   };
 }
 
+function parseMonthDate(
+  match: RegExpMatchArray,
+  context: CaptureContext,
+): { date: string; explicit: boolean; requiresConfirmation: boolean } | null {
+  const monthText = match[1]?.toLocaleLowerCase("en-US");
+  const day = Number(match[2]);
+  if (!monthText || !Number.isInteger(day)) return null;
+  const monthNames = [
+    ["jan", "january"],
+    ["feb", "february"],
+    ["mar", "march"],
+    ["apr", "april"],
+    ["may"],
+    ["jun", "june"],
+    ["jul", "july"],
+    ["aug", "august"],
+    ["sep", "sept", "september"],
+    ["oct", "october"],
+    ["nov", "november"],
+    ["dec", "december"],
+  ];
+  const month = monthNames.findIndex((names) => names.includes(monthText));
+  if (month < 0) return null;
+  const year = Number(match[3] ?? zonedDate(context.now, context.timeZone).year);
+  if (!Number.isInteger(year)) return null;
+  const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  if (!isCalendarDate(date)) return null;
+  const hasYear = Boolean(match[3]);
+  return { date, explicit: hasYear, requiresConfirmation: !hasYear };
+}
+
 function extractDeadline(text: string, context: CaptureContext) {
   const evidence: DateEvidence[] = [];
   for (const match of text.matchAll(ISO_DATE_TIME_ALL)) {
@@ -233,7 +399,19 @@ function extractDeadline(text: string, context: CaptureContext) {
     if (isCalendarDate(match[1]!))
       evidence.push({ date: match[1]!, source: match[0], explicit: true });
   }
+  for (const match of text.matchAll(MONTH_DATE)) {
+    if (!hasCalendarCue(text, match[0], match.index ?? 0)) continue;
+    const parsed = parseMonthDate(match, context);
+    if (parsed)
+      evidence.push({
+        date: parsed.date,
+        source: match[0],
+        explicit: parsed.explicit,
+        requiresConfirmation: parsed.requiresConfirmation,
+      });
+  }
   for (const match of text.matchAll(RELATIVE_DATE)) {
+    if (!hasCalendarCue(text, match[0], match.index ?? 0)) continue;
     evidence.push({
       date: relativeDate(match[0], context.now, context.timeZone),
       source: match[0],
@@ -272,7 +450,10 @@ function extractDeadline(text: string, context: CaptureContext) {
       ] satisfies CaptureUncertainty[],
     };
 
-  const onlyRelative = evidence.every(({ explicit }) => !explicit);
+  const requiresConfirmation = evidence.some(
+    ({ explicit, requiresConfirmation: candidateNeedsConfirmation }) =>
+      !explicit || candidateNeedsConfirmation,
+  );
   const time = extractTime(text, context.timeZone);
   return {
     deadline: {
@@ -282,10 +463,10 @@ function extractDeadline(text: string, context: CaptureContext) {
       timeZone: time.timeZone,
       candidates: dates,
       sourceText: evidence.map(({ source }) => source),
-      requiresConfirmation: onlyRelative,
+      requiresConfirmation,
     },
-    confidence: onlyRelative ? ("low" as const) : ("high" as const),
-    uncertainties: onlyRelative
+    confidence: requiresConfirmation ? ("low" as const) : ("high" as const),
+    uncertainties: requiresConfirmation
       ? ([
           {
             field: "deadline",
@@ -295,6 +476,15 @@ function extractDeadline(text: string, context: CaptureContext) {
         ] satisfies CaptureUncertainty[])
       : [],
   };
+}
+
+function hasCalendarCue(text: string, source: string, index: number): boolean {
+  const nearby = text
+    .slice(Math.max(0, index - 48), index + source.length + 48)
+    .toLocaleLowerCase("en-US");
+  return /\b(?:due|deadline|submit|turn\s+in|by|on|test|quiz|exam|assessment|assignment|problem|essay|lab|homework|finish|complete)\b/.test(
+    nearby,
+  );
 }
 
 function extractTime(text: string, fallbackTimeZone: string) {
@@ -409,6 +599,7 @@ function extractTitle(text: string): string {
     .replace(URL_TOKEN, " ")
     .replace(ISO_DATE_TIME_ALL, " ")
     .replace(ISO_DATE, " ")
+    .replace(MONTH_DATE, " ")
     .replace(RELATIVE_DATE, " ")
     .replace(EXPLICIT_TIME, " ")
     .replace(DURATION, " ")

@@ -15,6 +15,7 @@ const api: DeskAPI = {
   exportCalendar: () => ipcRenderer.invoke("desk:calendar-export"),
   deleteLocalData: () => ipcRenderer.invoke("desk:data-delete"),
   canvas: (id) => ipcRenderer.invoke("desk:canvas", id),
+  search: (query) => ipcRenderer.invoke("desk:search", query),
   askLens: (input) => ipcRenderer.invoke("desk:ask-lens", input),
   browserContext: () => ipcRenderer.invoke("desk:browser-context"),
   onBrowserContext: (listener) => {
@@ -45,11 +46,30 @@ const api: DeskAPI = {
   importProviderKey: () => ipcRenderer.invoke("desk:provider-import"),
   removeProviderKey: () => ipcRenderer.invoke("desk:provider-remove"),
   captureScreen: () => ipcRenderer.invoke("desk:capture-screen"),
+  recordingStart: (canvasId, mimeType) => ipcRenderer.invoke("desk:recording-start", canvasId, mimeType),
+  recordingChunk: (recordingId, chunkIndex, data) => ipcRenderer.invoke("desk:recording-chunk", recordingId, chunkIndex, data),
+  recordingFinish: (recordingId) => ipcRenderer.invoke("desk:recording-finish", recordingId),
+  recordingURL: (recordingId) => ipcRenderer.invoke("desk:recording-url", recordingId),
   previewRebalance: () => ipcRenderer.invoke("desk:rebalance-preview"),
+  focusController: () => ipcRenderer.invoke("desk:focus-controller"),
   snapshot: () => ipcRenderer.invoke("desk:snapshot"),
   command: (value) => ipcRenderer.invoke("desk:command", value),
   openResource: (id) => ipcRenderer.invoke("desk:resource", id),
-  lens: () => ipcRenderer.invoke("desk:lens"),
+  lens: (input) => ipcRenderer.invoke("desk:lens", input),
+  lensContext: () => ipcRenderer.invoke("desk:lens-context"),
+  onLensContext: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, value: unknown) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return;
+      const context = value as { question?: unknown; activityKind?: unknown; sourceIds?: unknown };
+      listener({
+        ...(typeof context.question === "string" ? { question: context.question } : {}),
+        ...(typeof context.activityKind === "string" ? { activityKind: context.activityKind as import("../../../packages/study/activities").StudyActivityKind } : {}),
+        ...(Array.isArray(context.sourceIds) && context.sourceIds.every((id) => typeof id === "string") ? { sourceIds: context.sourceIds as string[] } : {}),
+      });
+    };
+    ipcRenderer.on("desk:lens-context", receive);
+    return () => ipcRenderer.removeListener("desk:lens-context", receive);
+  },
   dismiss: () => ipcRenderer.invoke("desk:dismiss"),
 };
 contextBridge.exposeInMainWorld("desk", api);

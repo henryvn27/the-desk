@@ -283,7 +283,8 @@ try {
     .getByRole("button", { name: "AP Statistics", exact: true })
     .click();
   await page
-    .getByText("Sampling distributions practice", { exact: true })
+    .getByRole("region", { name: "What’s next" })
+    .getByRole("heading", { name: "Sampling distributions practice", exact: true })
     .waitFor();
   await page.screenshot({ path: join(output, "offline-multi-class.png") });
 
@@ -309,7 +310,10 @@ try {
     "Offline restart must not contact cloud services",
   );
   await page.getByRole("button", { name: "English 12", exact: true }).click();
-  await page.getByText("Beloved passage analysis", { exact: true }).waitFor();
+  await page
+    .getByRole("region", { name: "What’s next" })
+    .getByRole("heading", { name: "Beloved passage analysis", exact: true })
+    .waitFor();
   assert.equal(await page.getByRole("alert").count(), 0);
 
   await close();

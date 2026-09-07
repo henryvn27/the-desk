@@ -65,13 +65,13 @@ try {
   await page.getByLabel("Earned points", { exact: true }).fill("8");
   await page.getByLabel("Possible points", { exact: true }).fill("10");
   await page.getByRole("button", { name: "Save score", exact: true }).click();
-  await page.getByText("64.0–84.0%", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "64.0–84.0%", exact: true }).waitFor();
   await page
     .getByRole("button", { name: "Correct score", exact: true })
     .click();
   await page.getByLabel("Earned points", { exact: true }).fill("9");
   await page.getByRole("button", { name: "Save score", exact: true }).click();
-  await page.getByText("72.0–92.0%", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "72.0–92.0%", exact: true }).waitFor();
   const saved = await page.evaluate(() => window.desk.snapshot());
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(output, "gradebook.png") });
@@ -142,7 +142,7 @@ try {
   await launch();
   await page.getByRole("button", { name: "Physics", exact: true }).click();
   await page.getByText("Gradebook", { exact: true }).click();
-  await page.getByText("72.0–92.0%", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "72.0–92.0%", exact: true }).waitFor();
   const restored = await page.evaluate(() => window.desk.snapshot());
   assert.deepEqual(restored.gradeCategories, saved.gradeCategories);
   assert.deepEqual(restored.gradeEntries, saved.gradeEntries);

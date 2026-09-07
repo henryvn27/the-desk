@@ -24,8 +24,8 @@ try {
   await page.getByRole("button", { name: "Physics", exact: true }).waitFor();
   await page.getByRole("button", { name: "Capture", exact: true }).click();
   const original = "- Physics: Forces due tomorrow\n- Read chapter 3";
-  await page.getByLabel("Paste an assignment or a few clear assignment lines").fill(original);
-  await page.getByRole("button", { name: "Interpret text", exact: true }).click();
+  await page.getByLabel("Paste a capture or a few clear assignment lines").fill(original);
+  await page.getByRole("button", { name: "Capture now", exact: true }).click();
   await page.getByRole("heading", { name: "Capture Inbox", exact: true }).waitFor();
   assert.equal((await snap()).tasks.length, 0);
   assert.equal((await snap()).studyBlocks.length, 0);

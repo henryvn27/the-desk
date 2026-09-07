@@ -8,8 +8,21 @@ import {
 import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
 import type { LensInput, LensResponse } from "../intelligence/lens-provider";
+import {
+  studyActivityKind,
+  studyMode,
+  studyResponseMode,
+  type StudyActivityState,
+  type StudySessionSummary,
+} from "../study/activities";
+import { practiceTaskMetadata } from "../study/practice";
 import { z } from "zod";
 import { canvasScene, type CanvasScene } from "../canvas/scene";
+import {
+  sourceAnnotationInput,
+  type SourceAnnotation,
+  type SourceRevisionSummary,
+} from "../sources/provenance";
 export type CanvasRecord = {
   id: string;
   taskId: string;
@@ -19,9 +32,24 @@ export type CanvasRecord = {
   revision: number;
   scene: CanvasScene;
 };
+export type SearchResult = {
+  kind: "task" | "source" | "annotation" | "note";
+  id: string;
+  title: string;
+  snippet: string;
+  taskId?: string;
+  blockId?: string;
+  annotationId?: string;
+  sourceId?: string;
+  sourceRevision?: number;
+  location?: import("../sources/provenance").SourceLocation;
+  updatedAt?: string;
+};
 const id = z.string().uuid();
 export const sourceInput = z.object({
   kind: sourceKind.optional(),
+  format: z.enum(["text", "pdf", "slides", "transcript", "web"]).optional(),
+  sourceUrl: z.string().url().max(2048).nullable().optional(),
   title: z.string().trim().min(1).max(500),
   text: z.string().min(1).max(200000),
   classIds: z.array(id).max(100),
@@ -33,6 +61,8 @@ export type Source = SourceInput & {
   id: string;
   createdAt: string;
   authority: "user-provided-text";
+  annotations?: SourceAnnotation[];
+  revisionHistory?: SourceRevisionSummary[];
 };
 export const gradeCategoryInput = z.object({
   classId: id,
@@ -327,6 +357,21 @@ export const taskInput = z.object({
       confidence: z
         .record(z.string(), z.enum(["high", "medium", "low"]))
         .optional(),
+      objectType: z
+        .enum([
+          "assignment",
+          "syllabus",
+          "worksheet",
+          "graded-assessment",
+          "rubric",
+          "lecture-slide",
+          "handwritten-note",
+          "timetable",
+          "teacher-message",
+          "web-page",
+          "unknown",
+        ])
+        .optional(),
       candidateDates: z.array(z.string()).max(100),
       uncertainties: z.array(z.string()).max(100),
     })
@@ -341,6 +386,8 @@ export const taskInput = z.object({
     .refine((v) => new URL(v).protocol === "https:", "Use an HTTPS resource")
     .nullable(),
   notes: z.string().max(20000),
+  /** Additive metadata for quality-gated practice generated from a mistake. */
+  practice: practiceTaskMetadata.optional(),
   deadlineConfirmed: z.boolean(),
 });
 export type TaskInput = z.infer<typeof taskInput>;
@@ -363,6 +410,9 @@ export type Task = TaskInput & {
   createdAt: string;
 };
 export type StudySession = {
+  /** Optional for legacy sessions; new sessions carry one shared activity plan. */
+  activityState?: StudyActivityState;
+  summary?: StudySessionSummary;
   evidenceAttemptIds?: string[];
   checklistAtEnd?: Pick<ChecklistItem, "id" | "title" | "completed">[];
   revision?: number;
@@ -391,6 +441,7 @@ export type StudySession = {
     reviewedAt: string;
     notes: string;
     remainingMinutes: number | null;
+    confidence?: ConfidenceCapture;
   };
 };
 export type Block = {
@@ -417,6 +468,7 @@ export type RebalancePreview = {
   id: string;
   createdAt: string;
   expiresAt: string;
+  reason?: string;
   replaced: StudyBlock[];
   added: StudyBlock[];
   kept: StudyBlock[];
@@ -541,6 +593,8 @@ export const conceptInput = z
   .object({
     classId: id,
     taskIds: z.array(id).max(100),
+    /** Optional additive edge in the existing concept graph. */
+    prerequisiteConceptIds: z.array(id).max(100).optional(),
     name: z.string().trim().min(1).max(300),
     status: conceptStatus,
     preparedness: preparednessState,
@@ -568,6 +622,14 @@ export type Concept = ConceptInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const confidenceCaptureInput = z.object({
+  rating: z.number().int().min(1).max(5),
+  conceptIds: z.array(id).min(1).max(100),
+});
+export type ConfidenceCaptureInput = z.infer<typeof confidenceCaptureInput>;
+export type ConfidenceCapture = ConfidenceCaptureInput & {
+  capturedAt: string;
+};
 export const attemptResult = z.enum([
   "correct",
   "incorrect",
@@ -584,6 +646,11 @@ export const attemptInput = z
     hintCount: z.number().int().min(0).max(10000),
     notes: z.string().trim().max(5000),
     attemptedAt: z.iso.datetime(),
+    activityId: z.string().trim().min(1).max(160).optional(),
+    activityKind: studyActivityKind.optional(),
+    responseMode: studyResponseMode.optional(),
+    difficulty: z.number().finite().min(0).max(1).optional(),
+    transferDistance: z.number().finite().min(0).max(1).optional(),
   })
   .superRefine((input, ctx) => {
     if (!input.unaided && input.hintCount === 0)
@@ -607,6 +674,11 @@ export const sessionAttemptInput = z
     unaided: z.boolean(),
     hintCount: z.number().int().min(0).max(10000),
     notes: z.string().trim().max(5000),
+    activityId: z.string().trim().min(1).max(160).optional(),
+    activityKind: studyActivityKind.optional(),
+    responseMode: studyResponseMode.optional(),
+    difficulty: z.number().finite().min(0).max(1).optional(),
+    transferDistance: z.number().finite().min(0).max(1).optional(),
   })
   .superRefine((input, ctx) => {
     if (!input.unaided && input.hintCount === 0)
@@ -682,6 +754,7 @@ export const command = z.discriminatedUnion("type", [
       .min(1)
       .max(10),
     timeZone: z.string().min(1).max(100),
+    contextClassId: id.optional(),
   }),
   z.object({
     type: z.literal("inbox.capture"),
@@ -691,6 +764,7 @@ export const command = z.discriminatedUnion("type", [
       .max(20000)
       .refine((value) => value.trim().length > 0, "Paste some text first."),
     timeZone: z.string().min(1).max(100),
+    contextClassId: id.optional(),
   }),
   z.object({
     type: z.literal("inbox.archive"),
@@ -957,10 +1031,38 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("source.create"), input: sourceInput }),
   z.object({
+    type: z.literal("source.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: sourceInput,
+  }),
+  z.object({
     type: z.literal("source.classify"),
     id,
     revision: z.number().int().nonnegative(),
     kind: sourceKind,
+  }),
+  z.object({
+    type: z.literal("source.annotate"),
+    sourceId: id,
+    input: sourceAnnotationInput,
+  }),
+  z.object({
+    type: z.literal("source.annotation.link"),
+    sourceId: id,
+    annotationId: id,
+    revision: z.number().int().nonnegative(),
+    noteRef: z.object({
+      canvasId: id,
+      blockId: z.string().min(1).max(120),
+    }),
+  }),
+  z.object({
+    type: z.literal("source.annotation.update"),
+    sourceId: id,
+    annotationId: id,
+    revision: z.number().int().nonnegative(),
+    comment: z.string().trim().max(5_000),
   }),
   z.object({
     type: z.literal("planning.preferences"),
@@ -978,10 +1080,16 @@ export const command = z.discriminatedUnion("type", [
     input: taskInput,
     deadlineChangeApproved: z.boolean(),
   }),
-  z.object({ type: z.literal("session.start"), taskId: id }),
+  z.object({ type: z.literal("session.start"), taskId: id, mode: studyMode.optional() }),
   z.object({ type: z.literal("session.pause") }),
   z.object({ type: z.literal("session.resume") }),
   z.object({ type: z.literal("session.end"), completed: z.boolean() }),
+  z.object({
+    type: z.literal("session.activity"),
+    activityId: z.string().trim().min(1).max(160),
+    action: z.enum(["start", "complete", "skip", "hint"]),
+    hintCount: z.number().int().min(0).max(100).optional(),
+  }),
   z.object({
     type: z.literal("session.correct"),
     id,
@@ -997,6 +1105,7 @@ export const command = z.discriminatedUnion("type", [
     notes: z.string().trim().max(20000),
     remainingMinutes: z.number().int().min(5).max(2400).nullable(),
     attempts: z.array(sessionAttemptInput).max(20).optional(),
+    confidence: confidenceCaptureInput.optional(),
   }),
 ]);
 export type Command = z.infer<typeof command>;
@@ -1007,8 +1116,25 @@ export type LensCapture = {
   displayId: string;
   capturedAt: string;
 };
+export type RecordingStart = {
+  recordingId: string;
+  startedAt: string;
+  mimeType: string;
+  sessionId?: string;
+};
+export type RecordingChunkResult = {
+  recordingId: string;
+  chunkIndex: number;
+  chunkCount: number;
+};
+export type RecordingFinish = {
+  recordingId: string;
+  endedAt: string;
+  chunkCount: number;
+};
 export interface DeskAPI {
   previewRebalance(): Promise<RebalancePreview>;
+  focusController(): Promise<void>;
   onEdit(listener: (action: "undo" | "redo") => void): () => void;
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
@@ -1016,6 +1142,7 @@ export interface DeskAPI {
   exportCalendar(): Promise<boolean>;
   deleteLocalData(): Promise<Snapshot>;
   canvas(id: string): Promise<CanvasRecord>;
+  search(query: string): Promise<SearchResult[]>;
   askLens(input: Omit<LensInput, "context">): Promise<LensResponse>;
   browserContext(): Promise<import("../integrations/browser-bridge").BrowserBridgeMessage | null>;
   onBrowserContext(
@@ -1044,9 +1171,15 @@ export interface DeskAPI {
   importCaptureFiles(): Promise<Snapshot | null>;
   removeProviderKey(): Promise<void>;
   captureScreen(): Promise<LensCapture>;
+  recordingStart(canvasId: string, mimeType?: string): Promise<RecordingStart>;
+  recordingChunk(recordingId: string, chunkIndex: number, data: Uint8Array): Promise<RecordingChunkResult>;
+  recordingFinish(recordingId: string): Promise<RecordingFinish>;
+  recordingURL(recordingId: string): Promise<string>;
   snapshot(): Promise<Snapshot>;
   command(value: Command): Promise<Snapshot>;
   openResource(taskId: string): Promise<void>;
-  lens(): Promise<void>;
+  lens(input?: { question?: string; activityKind?: import("../study/activities").StudyActivityKind; sourceIds?: string[] }): Promise<void>;
+  lensContext(): Promise<{ question?: string; activityKind?: import("../study/activities").StudyActivityKind; sourceIds?: string[] } | null>;
+  onLensContext(listener: (context: { question?: string; activityKind?: import("../study/activities").StudyActivityKind; sourceIds?: string[] }) => void): () => void;
   dismiss(): Promise<void>;
 }

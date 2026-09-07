@@ -2,8 +2,14 @@ import { durationMemories } from "../learning/memory";
 import { tutoringMode } from "../intelligence/tutoring";
 import { decideCapture } from "../intelligence/capture-policy";
 import { interpretCapture } from "../intelligence/capture";
-import { planWeek } from "../planner";
+import { chooseStableRepair, planWeek } from "../planner";
 import { startNotebook } from "../canvas/notebook";
+import { canvasScene } from "../canvas/scene";
+import { sourceAnnotation, sourceRevisionSummary, type SourceAnnotation } from "../sources/provenance";
+import { sourceSearch } from "../sources/reader";
+import { planStudyActivities } from "../study/activities";
+import { inferSessionSummary } from "../study/session-summary";
+import { metadataForMistake, validatePracticeCandidate } from "../study/practice";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
@@ -45,6 +51,7 @@ import {
   type SyncEnvelope,
   type SyncConflict,
   type SyncConflictInput,
+  type SearchResult,
 } from "./contracts";
 
 type RemoteSyncRow = Record<string, unknown>;
@@ -105,6 +112,67 @@ function payloadsEqual(left: string, right: string) {
   }
 }
 
+function searchSnippet(value: string, query: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  const offset = normalized.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+  if (offset < 0) return normalized.slice(0, 180);
+  const start = Math.max(0, offset - 70);
+  return `${start ? "…" : ""}${normalized.slice(start, offset + query.length + 110)}${offset + query.length + 110 < normalized.length ? "…" : ""}`;
+}
+
+function sceneText(scene: ReturnType<typeof canvasScene.parse>) {
+  const chunks: Array<{ text: string; blockId?: string }> = [];
+  if (scene.document) {
+    for (const block of scene.document.blocks) {
+      const text = (() => {
+        switch (block.type) {
+          case "paragraph":
+          case "heading":
+          case "list":
+          case "checkbox":
+          case "code":
+            return block.text;
+          case "math":
+            return [block.latex, block.expression, block.result?.expression].filter(Boolean).join(" ");
+          case "table":
+            return [block.columns.join(" "), ...block.rows.flat().map((cell) => cell === null ? "" : String(cell))].join(" ");
+          case "data":
+            return [block.columns.join(" "), ...(block.calculatedColumns ?? []).flatMap((column) => [column.name, column.expression]), ...block.rows.flat().map((cell) => cell === null ? "" : String(cell))].join(" ");
+          case "image":
+          case "file":
+            return [block.name, block.caption].filter(Boolean).join(" ");
+          case "freeform":
+            return block.title;
+          case "graph":
+            return block.expressions.map((item) => item.expression).join(" ");
+        }
+      })();
+      chunks.push({ text, blockId: block.id });
+    }
+    for (const capture of scene.document.captures ?? []) {
+      const mediaBlock = scene.document.blocks.find((block) =>
+        (block.type === "image" || block.type === "file") && block.captureId === capture.id,
+      );
+      const text = [capture.ocrText, capture.handwritingText, ...(capture.annotations ?? []).map((annotation) => annotation.text), ...(capture.mathExpressions ?? [])].filter(Boolean).join(" ");
+      if (text) chunks.push({ text, blockId: mediaBlock?.id });
+    }
+    for (const recording of scene.document.recordings ?? []) {
+      for (const segment of recording.transcript ?? [])
+        if (segment.text.trim()) chunks.push({ text: segment.text, blockId: segment.blockId });
+    }
+  }
+  for (const element of scene.notebook
+    ? scene.notebook.pages.flatMap((page) => page.elements)
+    : scene.elements) {
+    if (element.type === "text" && typeof element.text === "string")
+      chunks.push({ text: element.text });
+    const latex = element.customData?.deskMath;
+    if (latex && typeof latex === "object" && "latex" in latex && typeof latex.latex === "string")
+      chunks.push({ text: latex.latex });
+  }
+  return chunks;
+}
+
 function parseRemotePayload(
   serialized: string,
   entityId: string,
@@ -150,7 +218,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 38) {
+    if (version > 42) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -318,6 +386,36 @@ export class DeskStore {
         );
       this.db.exec("PRAGMA user_version=38; COMMIT;");
     }
+    // Schema 39 is a compatibility fence for the additive Notes document
+    // envelope. Older renderers can parse a Canvas scene but would silently
+    // drop document-flow blocks when saving it, so they must fail closed.
+    if (version <= 38) this.db.exec("BEGIN; PRAGMA user_version=39; COMMIT;");
+    // Schema 40 fences the additive Student Model prerequisite edges and
+    // optional session confidence captures from older writers.
+    if (version <= 39) this.db.exec("BEGIN; PRAGMA user_version=40; COMMIT;");
+    // Schema 41 fences additive StudyActivity state, assessment modes and
+    // quality-gated practice metadata so older writers cannot drop them.
+    if (version <= 40) this.db.exec("BEGIN; PRAGMA user_version=41; COMMIT;");
+    // Schema 42 adds connected source annotations and revision summaries. The
+    // source identity and current text remain in the original sources table.
+    if (version <= 41) {
+      const sourceColumns = new Set(
+        this.db
+          .prepare("PRAGMA table_info(sources)")
+          .all()
+          .map((row) => row.name as string),
+      );
+      this.db.exec("BEGIN;");
+      if (!sourceColumns.has("format"))
+        this.db.exec("ALTER TABLE sources ADD COLUMN format TEXT NOT NULL DEFAULT 'text';");
+      if (!sourceColumns.has("sourceUrl"))
+        this.db.exec("ALTER TABLE sources ADD COLUMN sourceUrl TEXT;");
+      if (!sourceColumns.has("annotations"))
+        this.db.exec("ALTER TABLE sources ADD COLUMN annotations TEXT NOT NULL DEFAULT '[]';");
+      if (!sourceColumns.has("revisionHistory"))
+        this.db.exec("ALTER TABLE sources ADD COLUMN revisionHistory TEXT NOT NULL DEFAULT '[]';");
+      this.db.exec("PRAGMA user_version=42; COMMIT;");
+    }
   }
   previewRebalance(now = new Date()): RebalancePreview {
     const state = this.snapshot();
@@ -329,19 +427,31 @@ export class DeskStore {
       (b) => !b.locked && Date.parse(b.start) > +planningStart,
     );
     const kept = live.filter((b) => !replaced.some((r) => r.id === b.id));
-    const result = planWeek(
+    const conservative = planWeek(
+      state.tasks,
+      planningStart,
+      state.planning,
+      live,
+      state,
+    );
+    const recalculated = planWeek(
       state.tasks,
       planningStart,
       state.planning,
       kept,
       state,
     );
+    const decision = chooseStableRepair(state.tasks, conservative, recalculated, replaced.length);
+    const result = decision.useRecalculated ? recalculated : conservative;
+    const selectedReplaced = decision.useRecalculated ? replaced : [];
+    const selectedKept = decision.useRecalculated ? kept : live;
     const preview: RebalancePreview = {
       id: randomUUID(),
       createdAt: now.toISOString(),
       expiresAt: new Date(+now + 120000).toISOString(),
-      replaced,
-      kept,
+      replaced: selectedReplaced,
+      kept: selectedKept,
+      reason: decision.reason,
       unscheduled: result.unscheduled,
       added: result.blocks.map((b) => ({
         ...b,
@@ -594,15 +704,43 @@ export class DeskStore {
       sources: this.db
         .prepare("SELECT * FROM sources")
         .all()
-        .map((r) => ({
-          ...r,
-          classIds: classLinks
-            .filter((l) => l.source_id === r.id)
-            .map((l) => l.class_id),
-          taskIds: taskLinks
-            .filter((l) => l.source_id === r.id)
-            .map((l) => l.task_id),
-        })) as Source[],
+        .map((r) => {
+          const annotations = (() => {
+            try {
+              const parsed: unknown = JSON.parse(String(r.annotations ?? "[]"));
+              return Array.isArray(parsed) ? parsed.map((item) => sourceAnnotation.parse(item)) : [];
+            } catch {
+              return [];
+            }
+          })();
+          const revisionHistory = (() => {
+            try {
+              const parsed: unknown = JSON.parse(String(r.revisionHistory ?? "[]"));
+              return Array.isArray(parsed) ? parsed.map((item) => sourceRevisionSummary.parse(item)) : [];
+            } catch {
+              return [];
+            }
+          })();
+          return {
+            id: r.id,
+            title: r.title,
+            text: r.text,
+            createdAt: r.createdAt,
+            authority: r.authority,
+            kind: r.kind,
+            revision: r.revision,
+            format: r.format ?? "text",
+            sourceUrl: r.sourceUrl ?? null,
+            annotations,
+            revisionHistory,
+            classIds: classLinks
+              .filter((l) => l.source_id === r.id)
+              .map((l) => l.class_id),
+            taskIds: taskLinks
+              .filter((l) => l.source_id === r.id)
+              .map((l) => l.task_id),
+          } as Source;
+        }),
       planning: settings
         ? planningPreferences.parse(JSON.parse(settings.data as string))
         : { ...defaultPlanningPreferences },
@@ -825,7 +963,7 @@ export class DeskStore {
       const taskIds = remoteIds(record, "taskIds");
       this.db
         .prepare(
-          "INSERT INTO sources(id,title,text,createdAt,authority,kind,revision) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,text=excluded.text,createdAt=excluded.createdAt,authority=excluded.authority,kind=excluded.kind,revision=excluded.revision",
+          "INSERT INTO sources(id,title,text,createdAt,authority,kind,revision,format,sourceUrl,annotations,revisionHistory) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,text=excluded.text,createdAt=excluded.createdAt,authority=excluded.authority,kind=excluded.kind,revision=excluded.revision,format=excluded.format,sourceUrl=excluded.sourceUrl,annotations=excluded.annotations,revisionHistory=excluded.revisionHistory",
         )
         .run(
           id,
@@ -837,6 +975,10 @@ export class DeskStore {
           typeof row.revision === "number" && Number.isInteger(row.revision)
             ? row.revision
             : 0,
+          typeof row.format === "string" ? row.format : "text",
+          row.sourceUrl === null || typeof row.sourceUrl === "string" ? row.sourceUrl : null,
+          typeof row.annotations === "string" ? remoteJsonString(row, "annotations", table) : "[]",
+          typeof row.revisionHistory === "string" ? remoteJsonString(row, "revisionHistory", table) : "[]",
         );
       this.replaceRemoteLinks("source_classes", "source_id", "class_id", id, classIds);
       this.replaceRemoteLinks("source_tasks", "source_id", "task_id", id, taskIds);
@@ -1180,12 +1322,20 @@ export class DeskStore {
           .run(JSON.stringify(c.mode));
       }
       if (c.type === "inbox.capture" || c.type === "inbox.import") {
-        const context = { classes: state.classes, now, timeZone: c.timeZone };
+        const context = {
+          classes: state.classes,
+          now,
+          timeZone: c.timeZone,
+          ...(c.contextClassId ? { contextClassId: c.contextClassId } : {}),
+        };
         const drafts =
           c.type === "inbox.capture"
             ? interpretCapture(c.text, context)
             : c.files.flatMap((file) =>
-                interpretCapture(file.text, context).map((draft) => ({
+                interpretCapture(file.text, {
+                  ...context,
+                  sourceName: file.name,
+                }).map((draft) => ({
                   ...draft,
                   provenance: {
                     ...draft.provenance,
@@ -2144,6 +2294,14 @@ export class DeskStore {
           if (!state.sources.some((source) => source.id === sourceId))
             throw Error("A linked source no longer exists.");
         }
+        for (const block of c.scene.document?.blocks ?? []) {
+          for (const provenance of block.provenance ?? []) {
+            const source = state.sources.find((candidate) => candidate.id === provenance.sourceId);
+            if (!source) throw Error("A Note citation points to a missing source.");
+            if (provenance.annotationId && !source.annotations?.some((annotation) => annotation.id === provenance.annotationId))
+              throw Error("A Note citation points to a missing source annotation.");
+          }
+        }
       }
       if (c.type === "canvas.recover") {
         const original = this.canvas(c.id);
@@ -2170,6 +2328,29 @@ export class DeskStore {
           throw Error(
             "This canvas changed elsewhere. Reopen it before saving.",
           );
+        const sourceAnnotations = new Map<string, Source["annotations"]>();
+        for (const block of c.scene.document?.blocks ?? []) {
+          for (const provenance of block.provenance ?? []) {
+            if (!provenance.annotationId) continue;
+            const source = state.sources.find((candidate) => candidate.id === provenance.sourceId);
+            if (!source) continue;
+            const annotations = sourceAnnotations.get(source.id) ?? source.annotations ?? [];
+            sourceAnnotations.set(source.id, annotations.map((annotation) =>
+              annotation.id === provenance.annotationId
+                ? {
+                    ...annotation,
+                    noteRefs: [...annotation.noteRefs, { canvasId: c.id, blockId: block.id }].filter(
+                      (ref, index, refs) => refs.findIndex((candidate) => candidate.canvasId === ref.canvasId && candidate.blockId === ref.blockId) === index,
+                    ),
+                  }
+                : annotation,
+            ));
+          }
+        }
+        for (const [sourceId, annotations] of sourceAnnotations) {
+          this.db.prepare("UPDATE sources SET annotations=? WHERE id=?").run(JSON.stringify(annotations), sourceId);
+          this.queue(sourceId, "source.annotation.link", timestamp);
+        }
         entityId = c.id;
       }
       if (c.type === "memory.inference" || c.type === "memory.clear-inferred") {
@@ -2248,13 +2429,15 @@ export class DeskStore {
             "This mistake changed elsewhere. Reopen it before practicing.",
           );
         const taskId = randomUUID();
+        const practiceMetadata = metadataForMistake(mistake);
         const practice: Task = {
           title: `Practice: ${mistake.concept}`,
           classId: mistake.classId,
           dueAt: null,
           minutes: 20,
           resource: null,
-          notes: `Practice generated from mistake ${mistake.id}.\n\nCorrection: ${mistake.correction}\nWhat went wrong: ${mistake.whatWentWrong}`,
+          notes: `Practice generated from mistake ${mistake.id}.\n\nCorrection: ${mistake.correction}\nWhat went wrong: ${mistake.whatWentWrong}\n\nThis is a ${practiceMetadata.intendedDifficulty} variation. Record a checked attempt before this practice updates learning evidence.`,
+          practice: practiceMetadata,
           deadlineConfirmed: true,
           workKind: "optional-review",
           importance: "high",
@@ -2263,6 +2446,9 @@ export class DeskStore {
           revision: 0,
           createdAt: timestamp,
         };
+        const quality = validatePracticeCandidate(practice, state.tasks);
+        if (!quality.accepted)
+          throw Error(`Practice generation was rejected: ${quality.issues.join(" ")}`);
         this.db
           .prepare("INSERT INTO tasks VALUES(?,?,?)")
           .run(taskId, practice.classId, JSON.stringify(practice));
@@ -2300,6 +2486,9 @@ export class DeskStore {
           if (!state.classes.some((course) => course.id === c.input.classId))
             throw Error("Choose an existing class for this concept.");
           const taskIds = [...new Set(c.input.taskIds)];
+          const prerequisiteConceptIds = [
+            ...new Set(c.input.prerequisiteConceptIds ?? []),
+          ];
           if (
             taskIds.some(
               (taskId) =>
@@ -2310,6 +2499,38 @@ export class DeskStore {
             )
           )
             throw Error("Every linked task must belong to the selected class.");
+          if (prerequisiteConceptIds.includes(entityId))
+            throw Error("A concept cannot be its own prerequisite.");
+          if (
+            prerequisiteConceptIds.some(
+              (prerequisiteId) =>
+                !state.concepts.some(
+                  (concept) =>
+                    concept.id === prerequisiteId &&
+                    concept.classId === c.input.classId,
+                ),
+            )
+          )
+            throw Error(
+              "Every prerequisite concept must belong to the selected class.",
+            );
+          const prerequisiteGraph = new Map(
+            state.concepts.map((concept) => [
+              concept.id,
+              [...(concept.prerequisiteConceptIds ?? [])],
+            ]),
+          );
+          prerequisiteGraph.set(entityId, prerequisiteConceptIds);
+          const reaches = (start: string, target: string, seen = new Set<string>()): boolean => {
+            if (start === target) return true;
+            if (seen.has(start)) return false;
+            seen.add(start);
+            return (prerequisiteGraph.get(start) ?? []).some((id) =>
+              reaches(id, target, seen),
+            );
+          };
+          if (prerequisiteConceptIds.some((id) => reaches(id, entityId)))
+            throw Error("Prerequisite concepts cannot contain a cycle.");
           if (
             state.concepts.some(
               (concept) =>
@@ -2324,6 +2545,7 @@ export class DeskStore {
           const concept: Concept = {
             ...c.input,
             taskIds,
+            prerequisiteConceptIds,
             id: entityId,
             revision: (previous?.revision ?? -1) + 1,
             createdAt: previous?.createdAt ?? timestamp,
@@ -2544,22 +2766,126 @@ export class DeskStore {
             .run(entityId, JSON.stringify(memory));
         }
       }
-      if (c.type === "source.classify") {
+      if (c.type === "source.update") {
+        const previous = state.sources.find((source) => source.id === c.id);
+        if (!previous || (previous.revision ?? 0) !== c.revision)
+          throw Error("This source changed elsewhere. Reopen it before saving.");
+        const history = [
+          ...(previous.revisionHistory ?? []),
+          {
+            revision: previous.revision ?? 0,
+            capturedAt: timestamp,
+            textLength: previous.text.length,
+            textHash: createHash("sha256").update(previous.text).digest("hex"),
+            excerpt: previous.text.slice(0, 240),
+          },
+        ].slice(-25);
         const result = this.db
           .prepare(
-            "UPDATE sources SET kind=?,revision=revision+1 WHERE id=? AND revision=?",
+            "UPDATE sources SET title=?,text=?,kind=?,format=?,sourceUrl=?,revision=revision+1,revisionHistory=? WHERE id=? AND revision=?",
           )
-          .run(c.kind, c.id, c.revision);
+          .run(
+            c.input.title,
+            c.input.text,
+            c.input.kind ?? "unspecified",
+            c.input.format ?? "text",
+            c.input.sourceUrl ?? null,
+            JSON.stringify(history),
+            c.id,
+            c.revision,
+          );
+        if (!result.changes)
+          throw Error("This source changed elsewhere. Reopen it before saving.");
+        this.db.prepare("DELETE FROM source_classes WHERE source_id=?").run(c.id);
+        this.db.prepare("DELETE FROM source_tasks WHERE source_id=?").run(c.id);
+        for (const classId of new Set(c.input.classIds))
+          this.db.prepare("INSERT INTO source_classes VALUES(?,?)").run(c.id, classId);
+        for (const taskId of new Set(c.input.taskIds))
+          this.db.prepare("INSERT INTO source_tasks VALUES(?,?)").run(c.id, taskId);
+        entityId = c.id;
+      }
+      if (c.type === "source.classify") {
+        const source = state.sources.find((candidate) => candidate.id === c.id);
+        const result = this.db
+          .prepare(
+            "UPDATE sources SET kind=?,revision=revision+1,annotations=? WHERE id=? AND revision=?",
+          )
+          .run(
+            c.kind,
+            JSON.stringify(
+              (source?.annotations ?? []).map((annotation) => ({
+                ...annotation,
+                sourceRevision: annotation.sourceRevision === c.revision ? c.revision + 1 : annotation.sourceRevision,
+              })),
+            ),
+            c.id,
+            c.revision,
+          );
         if (!result.changes)
           throw Error(
             "This source changed elsewhere. Reopen it before saving.",
           );
         entityId = c.id;
       }
+      if (c.type === "source.annotate") {
+        const source = state.sources.find((candidate) => candidate.id === c.sourceId);
+        if (!source) throw Error("This source no longer exists.");
+        if ((source.revision ?? 0) !== c.input.sourceRevision)
+          throw Error("This passage belongs to an older source revision. Reopen it before annotating.");
+        const annotation: SourceAnnotation = sourceAnnotation.parse({
+          ...c.input,
+          id: randomUUID(),
+          sourceId: source.id,
+          noteRefs: [],
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          revision: 0,
+        });
+        const annotations = [...(source.annotations ?? []), annotation].slice(-1_000);
+        this.db
+          .prepare("UPDATE sources SET annotations=? WHERE id=?")
+          .run(JSON.stringify(annotations), source.id);
+        entityId = source.id;
+      }
+      if (c.type === "source.annotation.link" || c.type === "source.annotation.update") {
+        const source = state.sources.find((candidate) => candidate.id === c.sourceId);
+        const annotation = source?.annotations?.find((candidate) => candidate.id === c.annotationId);
+        if (!source || !annotation || annotation.revision !== c.revision)
+          throw Error("This source annotation changed elsewhere. Reopen it before saving.");
+        let next: SourceAnnotation;
+        if (c.type === "source.annotation.link") {
+          const noteRefs = [...annotation.noteRefs, c.noteRef].filter(
+            (ref, index, refs) =>
+              refs.findIndex(
+                (candidate) =>
+                  candidate.canvasId === ref.canvasId &&
+                  candidate.blockId === ref.blockId,
+              ) === index,
+          );
+          next = sourceAnnotation.parse({
+            ...annotation,
+            noteRefs,
+            revision: annotation.revision + 1,
+            updatedAt: timestamp,
+          });
+        } else {
+          next = sourceAnnotation.parse({
+            ...annotation,
+            comment: c.comment,
+            revision: annotation.revision + 1,
+            updatedAt: timestamp,
+          });
+        }
+        const annotations = (source.annotations ?? []).map((candidate) =>
+          candidate.id === annotation.id ? next : candidate,
+        );
+        this.db.prepare("UPDATE sources SET annotations=? WHERE id=?").run(JSON.stringify(annotations), source.id);
+        entityId = source.id;
+      }
       if (c.type === "source.create") {
         entityId = randomUUID();
         this.db
-          .prepare("INSERT INTO sources VALUES(?,?,?,?,?,?,?)")
+          .prepare("INSERT INTO sources(id,title,text,createdAt,authority,kind,revision,format,sourceUrl,annotations,revisionHistory) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
           .run(
             entityId,
             c.input.title,
@@ -2568,6 +2894,10 @@ export class DeskStore {
             "user-provided-text",
             c.input.kind ?? "unspecified",
             0,
+            c.input.format ?? "text",
+            c.input.sourceUrl ?? null,
+            "[]",
+            "[]",
           );
         for (const classId of new Set(c.input.classIds))
           this.db
@@ -2786,6 +3116,12 @@ export class DeskStore {
         const task = state.tasks.find((t) => t.id === c.taskId);
         if (!task || task.completed) throw Error("Choose an unfinished task.");
         entityId = randomUUID();
+        const activityState = planStudyActivities(
+          task,
+          state,
+          c.mode ?? "standard",
+          now,
+        );
         const session: StudySession = {
           id: entityId,
           taskId: c.taskId,
@@ -2794,6 +3130,7 @@ export class DeskStore {
           pausedMs: 0,
           endedAt: null,
           actualMinutes: null,
+          activityState,
           estimateAtStart: {
             minutes: task.minutes,
             classId: task.classId,
@@ -2825,10 +3162,18 @@ export class DeskStore {
           );
           active.endedAt = timestamp;
           active.completionReported = c.completed;
+          active.activityState = active.activityState
+            ? {
+                ...active.activityState,
+                submittedAt: timestamp,
+                revision: active.activityState.revision + 1,
+              }
+            : active.activityState;
           const task = state.tasks.find((t) => t.id === active.taskId)!;
           active.checklistAtEnd = (task.checklist ?? [])
             .filter((item) => !item.archived)
             .map(({ id, title, completed }) => ({ id, title, completed }));
+          active.summary = inferSessionSummary(active, state.attempts, state.mistakes, now);
           // Completion is the student's explicit report, never a claim of submission or mastery.
           if (c.completed) {
             task.completed = true;
@@ -2846,6 +3191,37 @@ export class DeskStore {
             (t) => t.autoPlanPending,
           ))
             this.reserveCapturedTask(task, now);
+      }
+      if (c.type === "session.activity") {
+        if (!active) throw Error("No active study session.");
+        const activityState = active.activityState;
+        if (!activityState) throw Error("This legacy session has no activity plan.");
+        const index = activityState.activities.findIndex((item) => item.id === c.activityId);
+        if (index < 0) throw Error("This study activity is no longer available.");
+        const item = activityState.activities[index]!;
+        if (activityState.mode === "exam" && c.action === "hint")
+          throw Error("Exam mode does not provide hints before submission.");
+        if (c.action === "hint") {
+          item.hintCount = Math.min(100, item.hintCount + (c.hintCount ?? 1));
+          item.status = "active";
+        } else if (c.action === "start") {
+          item.status = "active";
+          item.startedAt = item.startedAt ?? timestamp;
+          activityState.currentId = item.id;
+        } else if (c.action === "complete") {
+          item.status = "completed";
+          item.completedAt = timestamp;
+          activityState.currentId = activityState.activities.find((candidate) => candidate.status === "queued")?.id ?? null;
+        } else {
+          item.status = "skipped";
+          item.completedAt = timestamp;
+          activityState.currentId = activityState.activities.find((candidate) => candidate.status === "queued")?.id ?? null;
+        }
+        activityState.revision += 1;
+        entityId = active.id;
+        this.db
+          .prepare("UPDATE sessions SET data=? WHERE id=?")
+          .run(JSON.stringify(active), active.id);
       }
       if (c.type === "session.correct") {
         const session = state.sessions.find((s) => s.id === c.id);
@@ -2885,6 +3261,7 @@ export class DeskStore {
           reviewedAt: timestamp,
           notes: c.notes,
           remainingMinutes: c.remainingMinutes,
+          confidence: session.review?.confidence,
         };
         session.revision = (session.revision ?? 0) + 1;
         task.completed = c.completed;
@@ -2928,6 +3305,26 @@ export class DeskStore {
           this.queue(task.id, "task.remaining-time", timestamp);
         }
         const evidence = c.attempts ?? [];
+        if (
+          c.confidence?.conceptIds.some(
+            (conceptId) =>
+              !state.concepts.some(
+                (concept) =>
+                  concept.id === conceptId && concept.classId === task.classId,
+              ),
+          )
+        )
+          throw Error("Every confidence concept must belong to the session class.");
+        if (
+          evidence.some(
+            (attempt) =>
+              attempt.activityId &&
+              !session.activityState?.activities.some(
+                (activity) => activity.id === attempt.activityId,
+              ),
+          )
+        )
+          throw Error("Every evidence attempt must reference a session activity.");
         if (evidence.length && (session.evidenceAttemptIds?.length ?? 0) > 0)
           throw Error(
             "Learning evidence is already recorded for this session. Edit the saved attempt instead.",
@@ -2944,7 +3341,16 @@ export class DeskStore {
           reviewedAt: timestamp,
           notes: c.notes,
           remainingMinutes: c.remainingMinutes,
+          confidence: c.confidence
+            ? { ...c.confidence, capturedAt: timestamp }
+            : session.review?.confidence,
         };
+        session.summary = inferSessionSummary(
+          session,
+          this.snapshot().attempts,
+          this.snapshot().mistakes,
+          now,
+        );
         entityId = session.id;
         this.db
           .prepare("UPDATE sessions SET data=? WHERE id=?")
@@ -3101,6 +3507,9 @@ export class DeskStore {
               capturedAt: item.draft.provenance.capturedAt,
               authority: item.draft.provenance.authority,
               confidence: item.draft.confidence,
+              ...(item.draft.objectType
+                ? { objectType: item.draft.objectType }
+                : {}),
               candidateDates: item.draft.deadline?.candidates ?? [],
               uncertainties: item.draft.uncertainties.map((u) => u.message),
             },
@@ -3159,7 +3568,7 @@ export class DeskStore {
       ["sessions", "SELECT id,task_id,data,active FROM sessions WHERE id=?"],
       [
         "sources",
-        "SELECT id,title,text,createdAt,authority,kind,revision FROM sources WHERE id=?",
+        "SELECT id,title,text,createdAt,authority,kind,revision,format,sourceUrl,annotations,revisionHistory FROM sources WHERE id=?",
       ],
       ["canvases", "SELECT id,taskId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
       ["study_blocks", "SELECT id,task_id,data FROM study_blocks WHERE id=?"],
@@ -3209,6 +3618,86 @@ export class DeskStore {
       return JSON.stringify({ entityId, operation, record });
     }
     return JSON.stringify({ entityId, operation, deleted: true });
+  }
+  search(query: string): SearchResult[] {
+    const needle = query.trim().slice(0, 200);
+    if (!needle) return [];
+    const results: SearchResult[] = [];
+    for (const row of this.db.prepare("SELECT id,data FROM tasks").all()) {
+      try {
+        const task = JSON.parse(row.data as string) as Task;
+        const value = `${task.title}\n${task.notes}`;
+        if (value.toLocaleLowerCase().includes(needle.toLocaleLowerCase()))
+          results.push({
+            kind: "task",
+            id: task.id,
+            title: task.title,
+            snippet: searchSnippet(value, needle),
+            taskId: task.id,
+          });
+      } catch {
+        // A malformed legacy row is left for the store's normal recovery path.
+      }
+    }
+    for (const source of this.snapshot().sources) {
+      const value = `${source.title}\n${source.text}`;
+      if (value.toLocaleLowerCase().includes(needle.toLocaleLowerCase()))
+        {
+          const exact = sourceSearch(source.text, needle)[0];
+          results.push({
+            kind: "source",
+            id: source.id,
+            title: source.title,
+            snippet: searchSnippet(value, needle),
+            taskId: source.taskIds[0],
+            location: exact
+              ? { startOffset: exact.startOffset, endOffset: exact.endOffset }
+              : undefined,
+            updatedAt: source.createdAt,
+          });
+        }
+      for (const annotation of source.annotations ?? []) {
+        const annotationValue = `${annotation.text}\n${annotation.comment}`;
+        if (!annotationValue.toLocaleLowerCase().includes(needle.toLocaleLowerCase())) continue;
+        results.push({
+          kind: "annotation",
+          id: annotation.id,
+          annotationId: annotation.id,
+          sourceId: source.id,
+          title: `${source.title} · annotation`,
+          snippet: searchSnippet(annotationValue, needle),
+          sourceRevision: annotation.sourceRevision,
+          location: annotation.location,
+          taskId: source.taskIds[0],
+          updatedAt: annotation.updatedAt,
+        });
+      }
+    }
+    for (const row of this.db
+      .prepare("SELECT id,taskId,title,updatedAt,scene FROM canvases ORDER BY updatedAt DESC")
+      .all()) {
+      let scene: ReturnType<typeof canvasScene.parse>;
+      try {
+        scene = canvasScene.parse(JSON.parse(row.scene as string));
+      } catch {
+        continue;
+      }
+      const chunks = sceneText(scene);
+      const hit = chunks.find((chunk) =>
+        chunk.text.toLocaleLowerCase().includes(needle.toLocaleLowerCase()),
+      );
+      if (!hit) continue;
+      results.push({
+        kind: "note",
+        id: row.id as string,
+        title: row.title as string,
+        snippet: searchSnippet(hit.text, needle),
+        taskId: row.taskId as string,
+        blockId: hit.blockId,
+        updatedAt: row.updatedAt as string,
+      });
+    }
+    return results.slice(0, 100);
   }
   canvas(id: string): CanvasRecord {
     const row = this.db.prepare("SELECT * FROM canvases WHERE id=?").get(id);

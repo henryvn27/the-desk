@@ -8,6 +8,14 @@ const output = resolve("artifacts/session-kit");
 await mkdir(output, { recursive: true });
 let app, page;
 const errors = [];
+async function waitForController() {
+  for (let i = 0; i < 100; i++) {
+    const controller = app.windows().find((window) => window.url().endsWith("#controller"));
+    if (controller) return controller;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Controller did not open");
+}
 async function launch() {
   app = await electron.launch({
     args: process.env.DESK_EXECUTABLE ? [] : ["."],
@@ -128,9 +136,11 @@ try {
   await page
     .getByRole("button", { name: "Start session →", exact: true })
     .click();
-  await page
+  const controller = await waitForController();
+  await controller
     .getByRole("button", { name: "End · keep unfinished", exact: true })
     .click();
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor();
   await page.getByRole("button", { name: "Add details", exact: true }).click();
   await page
     .getByLabel("What did you work on")
@@ -139,12 +149,12 @@ try {
   await page
     .getByRole("region", { name: "Session wrap-up" })
     .waitFor({ state: "hidden" });
-  await page
-    .getByRole("button", { name: "Start session →", exact: true })
-    .click();
+  // The Session Kit lives in the Home preview while the compact controller
+  // owns an active session. Inspect the persisted kit before starting again.
+  await page.getByText("Preview study materials", { exact: true }).click();
   await kit.getByText("Assignment notes", { exact: true }).click();
   await kit.getByText("Vector worksheet", { exact: true }).click();
-  await kit.getByText("Class reference (1)", { exact: true }).click();
+  await kit.getByText("Relevant class reference (1)", { exact: true }).click();
   await kit.getByText("Physics reference", { exact: true }).click();
   await kit
     .locator("summary")
@@ -155,15 +165,14 @@ try {
       exact: true,
     })
     .waitFor();
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
   await page
-    .locator("section.session")
-    .screenshot({ path: join(output, "session-kit.png") });
-  assert.deepEqual(
-    await app.evaluate(() => globalThis.kitOpened),
-    Array(3).fill("https://example.com/vectors"),
-  );
+    .getByRole("button", { name: "Start session →", exact: true })
+    .click();
+  const activeController = await waitForController();
+  await activeController.getByRole("button", { name: "Resource", exact: true }).click();
+  await activeController.getByRole("button", { name: "Pause", exact: true }).click();
+  await activeController.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await activeController.screenshot({ path: join(output, "session-kit.png") });
   const video = page.video();
   await app.close();
   app = undefined;
@@ -173,7 +182,16 @@ try {
       join(output, "session-kit-operated.webm"),
     );
   await launch();
-  await page.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  const restoredController = await waitForController();
+  await restoredController.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await restoredController.getByRole("button", { name: "Resource", exact: true }).click();
+  await restoredController
+    .getByRole("button", { name: "End · keep unfinished", exact: true })
+    .click();
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor();
+  await page.getByRole("button", { name: "Looks right", exact: true }).click();
+  await page.getByRole("region", { name: "Session wrap-up" }).waitFor({ state: "hidden" });
+  await page.getByText("Preview study materials", { exact: true }).click();
   const restored = page.getByRole("region", {
     name: "Session kit",
     exact: true,
@@ -191,6 +209,10 @@ try {
   assert.equal(
     await restored.getByText("Other lab source", { exact: true }).count(),
     0,
+  );
+  assert.deepEqual(
+    await app.evaluate(() => globalThis.kitOpened),
+    ["https://example.com/vectors"],
   );
   assert.deepEqual(errors, []);
   console.log(

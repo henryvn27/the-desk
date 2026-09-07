@@ -12,6 +12,11 @@ import type {
   Track,
   Unit,
 } from "../domain/contracts";
+import {
+  createStudentModel,
+  type ConceptState,
+} from "../intelligence/student-model";
+import { planStudyActivities } from "./activities";
 
 /** Explicit associations only; class-wide notes are distinct from assignment sources. */
 export function sessionKit(
@@ -27,6 +32,7 @@ export function sessionKit(
     teacherEvidence?: TeacherEvidence[];
     tracks?: Track[];
     units?: Unit[];
+    tasks?: Task[];
   },
 ) {
   const linkedSources = state.sources.filter((source) =>
@@ -53,27 +59,72 @@ export function sessionKit(
           (b.reviewDue ? Date.parse(b.reviewDue) : Infinity) ||
         b.createdAt.localeCompare(a.createdAt),
     );
+  const model = createStudentModel({
+    concepts: state.concepts ?? [],
+    attempts: state.attempts ?? [],
+    mistakes: state.mistakes ?? [],
+    sessions: state.sessions,
+    assessments: state.assessments ?? [],
+    teacherEvidence: state.teacherEvidence ?? [],
+    tasks: [task, ...(state.tasks ?? [])],
+  });
+  const conceptStates = new Map<string, ConceptState>();
+  for (const concept of state.concepts ?? []) {
+    const derived = model.getConceptState(concept.id);
+    if (derived) conceptStates.set(concept.id, derived);
+  }
   const concepts = [...(state.concepts ?? [])]
     .filter((concept) => {
       if (concept.classId !== task.classId) return false;
       const linked = concept.taskIds.includes(task.id);
+      const derived = conceptStates.get(concept.id);
       const weak =
-        concept.preparedness === "not-ready" ||
-        concept.preparedness === "developing" ||
+        derived?.preparedness === "not-ready" ||
+        derived?.preparedness === "developing" ||
         concept.status === "review-due";
-      const due =
-        concept.reviewDue !== null &&
-        Date.parse(concept.reviewDue) <= Date.now();
+      const due = model.getReviewDue(concept.id).status === "due";
       return linked || weak || due;
     })
     .sort(
       (a, b) =>
         Number(b.taskIds.includes(task.id)) -
           Number(a.taskIds.includes(task.id)) ||
-        (a.reviewDue ? Date.parse(a.reviewDue) : Infinity) -
-          (b.reviewDue ? Date.parse(b.reviewDue) : Infinity) ||
+        (model.getReviewDue(a.id).dueAt
+          ? Date.parse(model.getReviewDue(a.id).dueAt!)
+          : Infinity) -
+          (model.getReviewDue(b.id).dueAt
+            ? Date.parse(model.getReviewDue(b.id).dueAt!)
+            : Infinity) ||
         a.name.localeCompare(b.name),
     );
+  const objective = model.recommendLearningObjective({ taskId: task.id });
+  const searchText = `${task.title} ${task.notes} ${objective?.title ?? ""}`.toLocaleLowerCase();
+  const referenceSources = [...classSources]
+    .map((source) => {
+      const sourceText = `${source.title} ${source.text}`.toLocaleLowerCase();
+      const lexicalMatches = searchText
+        .split(/\s+/)
+        .filter((term) => term.length >= 4 && sourceText.includes(term)).length;
+      return { source, score: lexicalMatches * 2 + (source.taskIds.includes(task.id) ? 10 : 0) };
+    })
+    .sort((a, b) => b.score - a.score || a.source.title.localeCompare(b.source.title))
+    .slice(0, 8)
+    .map(({ source }) => source);
+  const recommendedActivities = planStudyActivities(
+    task,
+    {
+      sources: state.sources,
+      sessions: state.sessions,
+      assessments: state.assessments ?? [],
+      concepts: state.concepts ?? [],
+      attempts: state.attempts ?? [],
+      mistakes: state.mistakes ?? [],
+      teacherEvidence: state.teacherEvidence ?? [],
+      tasks: state.tasks ?? [task],
+    },
+    "standard",
+    new Date(0),
+  ).activities;
   const attempts = [...(state.attempts ?? [])]
     .filter(
       (attempt) =>
@@ -134,6 +185,7 @@ export function sessionKit(
   return {
     linkedSources,
     classSources,
+    referenceSources,
     previousReviews,
     mistakes,
     concepts,
@@ -145,5 +197,10 @@ export function sessionKit(
     teacherEvidence,
     tracks,
     units,
+    conceptStates: concepts
+      .map((concept) => conceptStates.get(concept.id))
+      .filter((concept): concept is ConceptState => Boolean(concept)),
+    objective,
+    recommendedActivities,
   };
 }

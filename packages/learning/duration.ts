@@ -12,6 +12,15 @@ export type DurationObservation = {
   classId: string;
   workKind: NonNullable<TaskInput["workKind"]>;
 };
+
+export type DurationRangeSuggestion = {
+  lowerMinutes: number;
+  likelyMinutes: number;
+  upperMinutes: number;
+  ratio: number;
+  samples: number;
+  confidence: "emerging" | "calibrated";
+};
 /** Conservative local evidence: a reviewed, unchanged task finished in one session. */
 export function durationEvidence(
   tasks: Task[],
@@ -87,4 +96,46 @@ export function durationSuggestion(
     Math.min(2400, Math.round((input.minutes * ratio) / 5) * 5),
   );
   return { minutes, ratio, samples: ratios.length };
+}
+
+function quantile(values: readonly number[], position: number) {
+  if (!values.length) return 0;
+  const index = (values.length - 1) * position;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return values[lower]!;
+  const weight = index - lower;
+  return values[lower]! + (values[upper]! - values[lower]!) * weight;
+}
+
+/**
+ * Converts the same reviewed V1 duration evidence used by the memory system
+ * into a bounded planning range. It stays derived and local; no new persisted
+ * estimate or planner-specific score is introduced.
+ */
+export function durationRangeSuggestion(
+  tasks: Task[],
+  sessions: StudySession[],
+  input: Pick<TaskInput, "classId" | "workKind" | "minutes">,
+): DurationRangeSuggestion | null {
+  if (!Number.isFinite(input.minutes) || input.minutes < 5 || input.minutes > 2400)
+    return null;
+  const ratios = durationEvidence(tasks, sessions, input)
+    .map((item) => item.ratio)
+    .filter((ratio) => Number.isFinite(ratio) && ratio > 0)
+    .sort((a, b) => a - b);
+  if (ratios.length < 3) return null;
+  const lowerRatio = quantile(ratios, 0.25);
+  const likelyRatio = quantile(ratios, 0.5);
+  const upperRatio = quantile(ratios, 0.75);
+  const round = (value: number) =>
+    Math.max(5, Math.min(2400, Math.round((input.minutes * value) / 5) * 5));
+  return {
+    lowerMinutes: round(lowerRatio),
+    likelyMinutes: round(likelyRatio),
+    upperMinutes: round(Math.max(likelyRatio, upperRatio)),
+    ratio: likelyRatio,
+    samples: ratios.length,
+    confidence: ratios.length >= 5 ? "calibrated" : "emerging",
+  };
 }

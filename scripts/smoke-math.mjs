@@ -25,11 +25,12 @@ async function launch() {
 }
 async function open() {
   await page.getByRole("button", { name: "Library", exact: true }).click();
-  await page.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Open Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Freeform canvas", exact: true }).click();
   await page.locator(".excalidraw canvas").first().waitFor();
 }
 async function save() {
-  await page.getByRole("button", { name: "Save canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page
     .locator(".canvas-header [role=status]")
     .getByText("Saved", { exact: true })
@@ -165,7 +166,7 @@ try {
     "Edit-menu Redo must reach Canvas",
   );
   await page.screenshot({ path: join(output, "canvas-math.png") });
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   await app.close();
   await page.video().saveAs(join(output, "canvas-math-insert.webm"));
   await launch();
@@ -229,7 +230,7 @@ try {
   assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   await copyFile(exported, join(output, "canvas-math-export.png"));
 
-  await page.getByRole("button", { name: "Close canvas", exact: true }).click();
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   await app.close();
   await page.video().saveAs(join(output, "canvas-math-edit.webm"));
   await launch();
