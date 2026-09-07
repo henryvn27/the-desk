@@ -526,23 +526,8 @@ function App() {
     <div className="shell">
       <aside>
         <div className="brand">The Desk</div>
-        <nav aria-label="Main">
-          {[
-            "Home",
-            "Plan",
-            "Library",
-            "Capture Inbox",
-            "Memory",
-            "Mistakes",
-            "Concepts",
-            "Attempts",
-            "Assessments",
-            "Evidence",
-            "Authority",
-            "Teachers",
-            "Units",
-            "Academic context",
-          ].map((p) => (
+        <nav className="primary-nav" aria-label="Main">
+          {["Home", "Plan", "Library", "Capture Inbox"].map((p) => (
             <button
               key={p}
               aria-current={page === p ? "page" : undefined}
@@ -552,41 +537,74 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="eyebrow">Classes</div>
-        {data.classes.map((c) => (
-          <button
-            className="class-link"
-            key={c.id}
-            onClick={() => setPage(c.id)}
+        <section className="sidebar-group" aria-labelledby="study-nav-title">
+          <div className="sidebar-group-title" id="study-nav-title">Study</div>
+          <nav className="secondary-nav" aria-label="Study">
+            {["Memory", "Mistakes", "Concepts", "Attempts", "Assessments"].map((p) => (
+              <button
+                key={p}
+                aria-current={page === p ? "page" : undefined}
+                onClick={() => setPage(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </nav>
+        </section>
+        <section className="sidebar-group" aria-labelledby="academic-nav-title">
+          <div className="sidebar-group-title" id="academic-nav-title">Academic details</div>
+          <nav className="secondary-nav" aria-label="Academic details">
+            {["Evidence", "Authority", "Teachers", "Units", "Academic context"].map((p) => (
+              <button
+                key={p}
+                aria-current={page === p ? "page" : undefined}
+                onClick={() => setPage(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </nav>
+        </section>
+        <section className="sidebar-classes" aria-labelledby="classes-nav-title">
+          <div className="sidebar-group-title" id="classes-nav-title">Classes</div>
+          <div className="class-list">
+            {data.classes.map((c) => (
+              <button
+                className="class-link"
+                key={c.id}
+                aria-current={page === c.id ? "page" : undefined}
+                onClick={() => setPage(c.id)}
+              >
+                <span className="dot" />
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = e.currentTarget;
+              const name = new FormData(f).get("name") as string;
+              void act({ type: "class.create", name }).then((s) => {
+                if (s) f.reset();
+              });
+            }}
           >
-            <span className="dot" />
-            {c.name}
-          </button>
-        ))}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const f = e.currentTarget;
-            const name = new FormData(f).get("name") as string;
-            void act({ type: "class.create", name }).then((s) => {
-              if (s) f.reset();
-            });
-          }}
-        >
-          <label className="sr-only" htmlFor="class">
-            Class name
-          </label>
-          <input
-            id="class"
-            name="name"
-            placeholder="Add a class…"
-            required
-            maxLength={100}
-          />
-          <button disabled={busy} type="submit">
-            Add class
-          </button>
-        </form>
+            <label className="sr-only" htmlFor="class">
+              Class name
+            </label>
+            <input
+              id="class"
+              name="name"
+              placeholder="Add a class…"
+              required
+              maxLength={100}
+            />
+            <button disabled={busy} type="submit">
+              Add class
+            </button>
+          </form>
+        </section>
         <div className="sidebar-bottom">
           <button onClick={() => setCapture(true)}>＋ Capture</button>
           <button onClick={() => setPage("Settings")}>Settings</button>
@@ -595,14 +613,34 @@ function App() {
       </aside>
       <main>
         <header>
-          <div className="eyebrow">
-            {new Date(tick).toLocaleDateString(undefined, {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
+          <div className="header-context">
+            <div className="eyebrow">
+              {new Date(tick).toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+            {page !== "Home" && (
+              <span className="header-location">
+                {data.classes.find((course) => course.id === page)?.name ?? page}
+              </span>
+            )}
           </div>
-          <button onClick={() => setCapture(true)}>Capture</button>
+          <div className="header-actions">
+            <button
+              className="command-trigger"
+              type="button"
+              onClick={() => {
+                setPage("Library");
+                setFocusSearch(true);
+              }}
+            >
+              <span>Search Library</span>
+              <kbd>⌘K</kbd>
+            </button>
+            <button onClick={() => setCapture(true)}>Capture</button>
+          </div>
         </header>
         {(workspaceError || error) && (
           <p className="error" role="alert">

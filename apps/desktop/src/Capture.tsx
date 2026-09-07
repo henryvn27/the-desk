@@ -124,10 +124,22 @@ export function Capture({
       <div className="capture-shell">
         <section className="capture-main">
           <header className="capture-header">
-            <p className="capture-kicker">The Desk</p>
-            <h2 id="capture-title">
-              {existing ? "Edit assignment" : "Quick capture"}
-            </h2>
+            <div className="capture-heading-row">
+              <div>
+                <p className="capture-kicker">The Desk</p>
+                <h2 id="capture-title">
+                  {existing ? "Edit assignment" : "Quick capture"}
+                </h2>
+              </div>
+              <button
+                className="dialog-close"
+                type="button"
+                aria-label="Close capture"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            </div>
             <p className="capture-lede">
               {existing
                 ? "Keep the assignment accurate before it returns to your plan."

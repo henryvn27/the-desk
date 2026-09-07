@@ -71,10 +71,12 @@
     "directories": {
       "output": "release"
     },
+    "icon": "assets/the-desk-icon.png",
     "files": [
       "dist/**",
       "dist-electron/**",
       "dist-extension/**",
+      "assets/**",
       "package.json"
     ],
     "mac": {

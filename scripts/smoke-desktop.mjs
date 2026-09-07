@@ -86,6 +86,11 @@ try {
   }
   assert.ok(lens, "Lens window opened");
   await lens.getByLabel("Draw a freehand selection", { exact: true }).waitFor();
+  await lens.locator(".lens[data-selection=\"waiting\"]").waitFor();
+  assert.match(
+    (await lens.locator(".lens-stage-hint").innerText()).trim(),
+    /Select the part of your screen you want help with/,
+  );
   await lens.mouse.move(200, 200);
   await lens.mouse.down();
   for (let angle = 0; angle <= Math.PI * 2; angle += 0.2)
@@ -107,6 +112,11 @@ try {
     await lens.screenshot({ path: join(output, "lens-failure.png") });
   }
   assert.equal(await drawnPaths.count(), 1);
+  await lens.locator(".lens[data-selection=\"ready\"]").waitFor();
+  assert.match(
+    (await lens.locator(".lens-stage-hint").innerText()).trim(),
+    /Selection ready · ask Lens when you are ready/,
+  );
   await lens
     .getByLabel("Ask The Desk", { exact: true })
     .fill("Why does friction point this way?");

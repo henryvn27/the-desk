@@ -65,6 +65,7 @@ export function Lens({
   const [showMistake, setShowMistake] = useState(false);
   const [scopeIds, setScopeIds] = useState<string[]>([]);
   const scopedSources = sources.filter((source) => scopeIds.includes(source.id));
+  const hasSelection = paths.some((path) => path.length > 0);
   useEffect(() => {
     const applyContext = (context: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] } | null) => {
       if (!context) return;
@@ -162,8 +163,19 @@ export function Lens({
     }
   }
   return (
-    <div className="lens">
+    <div
+      className={`lens ${hasSelection ? "lens-has-selection" : "lens-awaiting-selection"}`}
+      data-selection={hasSelection ? "ready" : "waiting"}
+    >
+      <div className="lens-stage-hint" role="status" aria-live="polite">
+        <span className="lens-stage-dot" />
+        {hasSelection
+          ? "Selection ready · ask Lens when you are ready"
+          : "Select the part of your screen you want help with"}
+        <kbd>Esc</kbd>
+      </div>
       <svg
+        className="lens-selection-surface"
         aria-label="Draw a freehand selection"
         onPointerDown={(e) => {
           if (paths.length >= 8) {
@@ -266,36 +278,50 @@ export function Lens({
           );
         })}
       </svg>
-      <section className="lens-panel">
-        <div className="eyebrow">Lens · {className || "Library"}</div>
-        <h2>{title}</h2>
-        <p>Circle one or more areas, or ask about your current task.</p>
-        {!!scopedSources.length && (
-          <section className="source-scope" aria-label="Selected Library sources">
-            <strong>Grounded in selected Library sources</strong>
-            <p className="muted">Desk will keep this question scoped to these saved revisions.</p>
-            <ul>
-              {scopedSources.map((source) => <li key={source.id}>{source.title} <span className="muted">· rev {source.revision ?? 0} · {source.kind ?? "unspecified"}</span></li>)}
-            </ul>
-          </section>
-        )}
-        {browserContext && (
-          <div className="source" role="status">
-            <strong>Browser context attached</strong>
-            <p>
-              {browserContext.context.title || "Untitled page"}
-              <br />
-              <span className="muted">{browserContext.context.url}</span>
-            </p>
-            <button
-              type="button"
-              onClick={() => void clearBrowserContext()}
-            >
-              Clear browser context
-            </button>
+      <section className="lens-panel" data-selection={hasSelection ? "ready" : "waiting"}>
+        <div className="lens-panel-header">
+          <div>
+            <div className="eyebrow">Lens · {className || "Library"}</div>
+            <strong>{hasSelection ? "Selection ready" : "Select, then ask"}</strong>
           </div>
+          <span className="lens-context-label">{title}</span>
+        </div>
+        <p className="lens-instruction">
+          {hasSelection
+            ? "Your work stays visible. Ask a question or choose a study action."
+            : "Drag a circle, rectangle, or point over the work you want Lens to understand."}
+        </p>
+        {(scopedSources.length > 0 || browserContext) && (
+          <details className="lens-context-details" open>
+            <summary>Attached context</summary>
+            {!!scopedSources.length && (
+              <section className="source-scope" aria-label="Selected Library sources">
+                <strong>Grounded in selected Library sources</strong>
+                <p className="muted">Desk will keep this question scoped to these saved revisions.</p>
+                <ul>
+                  {scopedSources.map((source) => <li key={source.id}>{source.title} <span className="muted">· rev {source.revision ?? 0} · {source.kind ?? "unspecified"}</span></li>)}
+                </ul>
+              </section>
+            )}
+            {browserContext && (
+              <div className="source" role="status">
+                <strong>Browser context attached</strong>
+                <p>
+                  {browserContext.context.title || "Untitled page"}
+                  <br />
+                  <span className="muted">{browserContext.context.url}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void clearBrowserContext()}
+                >
+                  Clear browser context
+                </button>
+              </div>
+            )}
+          </details>
         )}
-        <div className="actions" aria-label="Selection mode">
+        <div className="actions lens-tools" aria-label="Selection mode">
           {(["freehand", "box", "click"] as const).map((m) => (
             <button
               key={m}
@@ -325,46 +351,49 @@ export function Lens({
             </button>
           ))}
         </div>
-        <button
-          disabled={busy}
-          onClick={() =>
-            void window.desk
-              .captureScreen()
-              .then((c) => {
-                setImage(c.image);
-                setShare(false);
-                setHistory([]);
-                setAnswer("");
-                setMarks([]);
-                setStatus(
-                  "Screen captured for this interaction only. Review it before sharing.",
-                );
-              })
-              .catch((e) => setStatus(userError(e)))
-          }
-        >
-          Capture this screen
-        </button>
-        {image && (
-          <>
-            <details>
-              <summary>Review captured screen</summary>
-              <img
-                className="capture-preview"
-                src={image}
-                alt="Screen captured for this Lens interaction"
-              />
-            </details>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={share}
-                onChange={(e) => setShare(e.target.checked)}
-              />
-              Include this captured screen with my question
-            </label>
-          </>
-        )}
+        <details className="lens-more-controls" open={Boolean(image)}>
+          <summary>Screen context</summary>
+          <button
+            disabled={busy}
+            onClick={() =>
+              void window.desk
+                .captureScreen()
+                .then((c) => {
+                  setImage(c.image);
+                  setShare(false);
+                  setHistory([]);
+                  setAnswer("");
+                  setMarks([]);
+                  setStatus(
+                    "Screen captured for this interaction only. Review it before sharing.",
+                  );
+                })
+                .catch((e) => setStatus(userError(e)))
+            }
+          >
+            Capture this screen
+          </button>
+          {image && (
+            <>
+              <details>
+                <summary>Review captured screen</summary>
+                <img
+                  className="capture-preview"
+                  src={image}
+                  alt="Screen captured for this Lens interaction"
+                />
+              </details>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={share}
+                  onChange={(e) => setShare(e.target.checked)}
+                />
+                Include this captured screen with my question
+              </label>
+            </>
+          )}
+        </details>
         {answer && (
           <div className="lens-answer" aria-live="polite">
             <div className="lens-answer-text">{answer}</div>
@@ -558,49 +587,51 @@ export function Lens({
             )}
           </div>
         )}
-        <form
+        <form className="lens-question-form"
           onSubmit={(e) => {
             e.preventDefault();
             void ask();
           }}
         >
-          <label>
-            Study action
-            <select
-              aria-label="Study action"
-              value={activity}
-              onChange={(event) => setActivity(event.target.value as StudyActivityKind)}
-            >
-              {studyActivityKind.options.map((kind) => (
-                <option key={kind} value={kind}>{activityLabel(kind)}</option>
-              ))}
-            </select>
-          </label>
+          <div className="lens-select-grid">
+            <label>
+              Study action
+              <select
+                aria-label="Study action"
+                value={activity}
+                onChange={(event) => setActivity(event.target.value as StudyActivityKind)}
+              >
+                {studyActivityKind.options.map((kind) => (
+                  <option key={kind} value={kind}>{activityLabel(kind)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Tutoring mode
+              <select
+                aria-label="Tutoring mode"
+                value={tutoringMode}
+                disabled={busy || savingMode}
+                onChange={async (e) => {
+                  setSavingMode(true);
+                  setStatus("");
+                  try {
+                    await saveTutoringMode(e.target.value as TutoringMode);
+                    setStatus("Tutoring mode saved.");
+                  } catch (error) {
+                    setStatus(userError(error));
+                  } finally {
+                    setSavingMode(false);
+                  }
+                }}
+              >
+                <option value="guide">Guide me</option>
+                <option value="balanced">Balanced</option>
+                <option value="direct">Explain directly</option>
+              </select>
+            </label>
+          </div>
           <p className="muted">{activityInstruction(activity, tutoringMode)}</p>
-          <label>
-            Tutoring mode
-            <select
-              aria-label="Tutoring mode"
-              value={tutoringMode}
-              disabled={busy || savingMode}
-              onChange={async (e) => {
-                setSavingMode(true);
-                setStatus("");
-                try {
-                  await saveTutoringMode(e.target.value as TutoringMode);
-                  setStatus("Tutoring mode saved.");
-                } catch (error) {
-                  setStatus(userError(error));
-                } finally {
-                  setSavingMode(false);
-                }
-              }}
-            >
-              <option value="guide">Guide me</option>
-              <option value="balanced">Balanced</option>
-              <option value="direct">Explain directly</option>
-            </select>
-          </label>
           <label>
             Ask The Desk
             <input

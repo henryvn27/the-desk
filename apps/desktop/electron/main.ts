@@ -45,7 +45,9 @@ protocol.registerSchemesAsPrivileged([
     privileges: { standard: true, secure: true, supportFetchAPI: true },
   },
 ]);
-app.setName("The Desk V1");
+app.setName("The Desk");
+if (process.platform === "darwin" && app.dock)
+  app.dock.setIcon(join(app.getAppPath(), "assets", "the-desk-icon.png"));
 if (process.env.DESK_DATA_DIR)
   app.setPath("userData", resolve(process.env.DESK_DATA_DIR));
 if (!app.requestSingleInstanceLock()) app.exit(0);
@@ -96,7 +98,12 @@ function makeWindow(kind: "main" | "lens" | "controller") {
     }),
     minWidth: kind === "main" ? 760 : undefined,
     minHeight: kind === "main" ? 580 : undefined,
-    title: "The Desk",
+    title:
+      kind === "lens"
+        ? "Lens · The Desk"
+        : kind === "controller"
+          ? "Study · The Desk"
+          : "The Desk",
     backgroundColor: kind === "lens" ? "#00000000" : "#F7F4ED",
     transparent: kind === "lens",
     frame: kind !== "lens",
@@ -172,7 +179,24 @@ async function saveRecordingManifest(recordingId: string, manifest: RecordingMan
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
+      ...(process.platform === "darwin"
+        ? [
+            {
+              label: "The Desk",
+              submenu: [
+                { role: "about" as const, label: "About The Desk" },
+                { type: "separator" as const },
+                { role: "services" as const },
+                { type: "separator" as const },
+                { role: "hide" as const, label: "Hide The Desk" },
+                { role: "hideOthers" as const },
+                { role: "unhide" as const },
+                { type: "separator" as const },
+                { role: "quit" as const, label: "Quit The Desk" },
+              ],
+            },
+          ]
+        : []),
       { role: "fileMenu" },
       {
         label: "Edit",
