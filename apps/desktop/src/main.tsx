@@ -130,6 +130,7 @@ function App() {
     useState<BrowserBridgeMessage | null>(null);
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
   const [activeChatThreadId, setActiveChatThreadId] = useState<string | null>(null);
+  const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
   const [lensHotkeyStatus, setLensHotkeyStatus] = useState<LensHotkeyStatus>({
     available: false,
     source: "unavailable",
@@ -156,6 +157,20 @@ function App() {
     return () => {
       active = false;
       window.clearInterval(timer);
+    };
+  }, []);
+  useEffect(() => {
+    let mounted = true;
+    void window.desk
+      .providerStatus()
+      .then((status) => {
+        if (mounted) setProviderConfigured(status.configured);
+      })
+      .catch(() => {
+        if (mounted) setProviderConfigured(false);
+      });
+    return () => {
+      mounted = false;
     };
   }, []);
   async function openCanvas(taskId: string, canvasId?: string, blockId?: string) {
@@ -809,6 +824,7 @@ function App() {
           <ChatWorkspace
             data={data}
             intelligence={intelligence}
+            providerConfigured={providerConfigured}
             busy={busy}
             page={page}
             threads={chatThreads}

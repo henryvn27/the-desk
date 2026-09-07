@@ -31,6 +31,7 @@ export type ChatThread = {
 type Props = {
   data: Snapshot;
   intelligence?: DeskIntelligence;
+  providerConfigured: boolean | null;
   busy: boolean;
   page: string;
   threads: ChatThread[];
@@ -138,6 +139,7 @@ function Artifact({ artifact, onAction }: { artifact: ChatArtifact; onAction: (a
 export function ChatWorkspace({
   data,
   intelligence,
+  providerConfigured,
   busy,
   page,
   threads,
@@ -225,6 +227,9 @@ export function ChatWorkspace({
           <div className="eyebrow">Your academic workspace</div>
           <h1>What are you working on?</h1>
           <p className="chat-subtitle">Ask The Desk to help you decide, understand, or continue.</p>
+          <div className={`chat-provider-status ${providerConfigured === false ? "chat-provider-status-offline" : ""}`} role="status">
+            <span aria-hidden="true">●</span> {providerConfigured === false ? "AI needs a provider key in Settings" : providerConfigured === true ? "AI connected · Luna" : "Checking AI connection…"}
+          </div>
         </div>
         <button type="button" className="chat-new-button" onClick={onNewChat}>New chat</button>
       </div>

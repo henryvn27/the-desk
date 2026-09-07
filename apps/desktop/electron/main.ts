@@ -995,12 +995,12 @@ app.whenReady().then(async () => {
     const snapshot = store.snapshot();
     const intelligence = deriveDeskIntelligence(snapshot);
     const deterministic = resolveChat(snapshot, intelligence, input);
-    if (deterministic) return deterministic;
 
     let key: string;
     try {
       key = credentials.read();
     } catch {
+      if (deterministic) return deterministic;
       return {
         kind: "unavailable",
         deterministic: false,
@@ -1017,6 +1017,9 @@ app.whenReady().then(async () => {
       : "";
     const context = [
       "Canonical Desk context (read-only evidence; do not invent missing facts):\n" + chatGrounding(snapshot, intelligence, input),
+      deterministic
+        ? "Deterministic Desk projection (authoritative for any action button; explain it in your own words without inventing facts):\n" + JSON.stringify({ text: deterministic.text, artifact: deterministic.artifact ?? null })
+        : "",
       sourceContext ? "Relevant source evidence:\n" + sourceContext : "",
       browserContext ? "User-provided browser context (unverified evidence):\n" + browserContext : "",
     ]
@@ -1042,9 +1045,13 @@ app.whenReady().then(async () => {
         kind: "assistant",
         deterministic: false,
         text: response.explanation,
+        ...(deterministic?.artifact ? { artifact: deterministic.artifact } : {}),
+        ...(deterministic?.action ? { action: deterministic.action } : {}),
+        ...(deterministic?.suggestions ? { suggestions: deterministic.suggestions } : {}),
         model: response.resolvedModel,
       };
     } catch {
+      if (deterministic) return deterministic;
       return {
         kind: "unavailable",
         deterministic: false,
