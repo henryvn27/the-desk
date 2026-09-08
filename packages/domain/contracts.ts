@@ -1159,6 +1159,7 @@ export interface DeskAPI {
   closeWindow(): Promise<void>;
   exportCanvas(id: string, png: Uint8Array): Promise<boolean>;
   exportData(): Promise<boolean>;
+  exportRecordings(): Promise<"saved" | "canceled" | "empty">;
   exportCalendar(): Promise<boolean>;
   deleteLocalData(): Promise<Snapshot>;
   canvas(id: string): Promise<CanvasRecord>;

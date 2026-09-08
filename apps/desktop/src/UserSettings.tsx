@@ -11,11 +11,13 @@ export function UserSettings({
   user,
   save,
   exportData,
+  exportRecordings,
   deleteData,
 }: {
   user: User | null;
   save: (command: Command) => Promise<unknown>;
   exportData: () => Promise<boolean>;
+  exportRecordings: () => Promise<"saved" | "canceled" | "empty">;
   deleteData: () => Promise<unknown>;
 }) {
   const [editing, setEditing] = useState(user !== null);
@@ -58,6 +60,24 @@ export function UserSettings({
       await deleteData();
       setEditing(false);
       setStatus("Local data deleted.");
+    } catch (caught) {
+      setStatus(userError(caught));
+    } finally {
+      setDataBusy(false);
+    }
+  }
+  async function exportLectureRecordings() {
+    setDataBusy(true);
+    setStatus("");
+    try {
+      const result = await exportRecordings();
+      setStatus(
+        result === "saved"
+          ? "Lecture recordings exported."
+          : result === "empty"
+            ? "No lecture recordings to export."
+            : "Export canceled.",
+      );
     } catch (caught) {
       setStatus(userError(caught));
     } finally {
@@ -174,13 +194,20 @@ export function UserSettings({
       <section>
         <h2>Local data</h2>
         <p>
-          Export a JSON copy of the local SQLite snapshot, or delete this
-          computer's local academic workspace after an explicit confirmation.
-          Provider keys and credentials are not part of the export.
+          Export a JSON copy of the local SQLite snapshot, or save lecture
+          audio separately before deleting this computer's local academic
+          workspace. Provider keys and credentials are never part of either
+          export.
         </p>
         <div className="actions">
           <button disabled={dataBusy} onClick={() => void exportLocalData()}>
             Export local data
+          </button>
+          <button
+            disabled={dataBusy}
+            onClick={() => void exportLectureRecordings()}
+          >
+            Export lecture recordings
           </button>
           <button
             disabled={dataBusy}

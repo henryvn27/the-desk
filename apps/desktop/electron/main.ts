@@ -45,6 +45,7 @@ import {
   recoverNoteRecording,
   type RecordingManifest,
 } from "../../../packages/canvas/recording-recovery";
+import { exportRecordingStorage } from "../../../packages/canvas/recording-export";
 import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
@@ -987,6 +988,10 @@ app.whenReady().then(async () => {
           format: "the-desk-local-export",
           version: 1,
           exportedAt: new Date().toISOString(),
+          recordings: {
+            included: false,
+            exportSeparately: true,
+          },
           snapshot: store.snapshot(),
         },
         null,
@@ -995,6 +1000,27 @@ app.whenReady().then(async () => {
       "utf8",
     );
     return true;
+  });
+  ipcMain.handle("desk:recording-export", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to export lecture recordings.");
+    const result = await dialog.showOpenDialog(main, {
+      title: "Choose a folder for lecture recordings",
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) return "canceled" as const;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const destination = join(result.filePaths[0], `the-desk-recordings-${stamp}`);
+    try {
+      const summary = await exportRecordingStorage(
+        join(app.getPath("userData"), "note-recordings"),
+        destination,
+      );
+      return summary.recordingCount ? "saved" as const : "empty" as const;
+    } catch {
+      throw Error("Lecture recording export failed. Choose another folder and try again.");
+    }
   });
   ipcMain.handle("desk:calendar-export", async (event) => {
     check(event);
@@ -1023,7 +1049,7 @@ app.whenReady().then(async () => {
       title: "Delete local Desk data?",
       message: "Delete the local academic workspace from this Mac?",
       detail:
-        "This removes classes, tasks, sources, sessions, settings and local sync history. Export first if you may need a copy.",
+        "This removes classes, tasks, sources, sessions, settings, local sync history and lecture audio. The JSON export does not include lecture audio; export lecture recordings separately first if you may need them.",
       buttons: ["Cancel", "Delete local data"],
       defaultId: 0,
       cancelId: 0,

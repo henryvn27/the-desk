@@ -1,10 +1,11 @@
 import { _electron as electron } from "playwright";
-import { mkdtemp, mkdir, rm, copyFile, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, copyFile, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 const data = await mkdtemp(join(tmpdir(), "desk-user-ui-"));
+const recordingExportParent = await mkdtemp(join(tmpdir(), "desk-recording-export-ui-"));
 const output = resolve("artifacts/user");
 await mkdir(output, { recursive: true });
 let app;
@@ -83,7 +84,36 @@ try {
   assert.equal(exported.snapshot.user.displayName, "Henry");
   assert.equal(exported.snapshot.classes[0].name, "Physics");
   assert.equal(exported.snapshot.tasks[0].title, "Export proof");
+  assert.deepEqual(exported.recordings, { included: false, exportSeparately: true });
   assert.equal(JSON.stringify(exported).includes("OPENROUTER_API_KEY"), false);
+
+  const recordingId = "00000000-0000-4000-8000-000000000217";
+  const recordingDirectory = join(data, "note-recordings", recordingId);
+  await mkdir(recordingDirectory, { recursive: true });
+  await writeFile(
+    join(recordingDirectory, "manifest.json"),
+    JSON.stringify({
+      version: 1,
+      canvasId: "00000000-0000-4000-8000-000000000001",
+      startedAt: "2026-09-08T10:00:00.000Z",
+      endedAt: "2026-09-08T10:03:00.000Z",
+      mimeType: "audio/webm",
+      chunkCount: 1,
+      status: "interrupted",
+    }),
+  );
+  await writeFile(join(recordingDirectory, "000000.chunk"), "isolated recording fixture");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, recordingExportParent);
+  await page.getByRole("button", { name: "Export lecture recordings", exact: true }).click();
+  await page.getByText("Lecture recordings exported.", { exact: true }).waitFor();
+  const recordingExportFolder = (await readdir(recordingExportParent))[0];
+  assert.ok(recordingExportFolder);
+  assert.equal(
+    await readFile(join(recordingExportParent, recordingExportFolder, recordingId, "000000.chunk"), "utf8"),
+    "isolated recording fixture",
+  );
   await page.screenshot({ path: join(output, "user.png") });
   const firstVideo = page.video();
   await app.close();
@@ -110,16 +140,7 @@ try {
     .waitFor();
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.user, null);
-  const recordingFile = join(
-    data,
-    "note-recordings",
-    "00000000-0000-4000-8000-000000000217",
-    "000000.chunk",
-  );
-  await mkdir(join(data, "note-recordings", "00000000-0000-4000-8000-000000000217"), {
-    recursive: true,
-  });
-  await writeFile(recordingFile, "isolated recording fixture");
+  const recordingFile = join(recordingDirectory, "000000.chunk");
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = async () => ({ response: 1 });
   });
@@ -144,4 +165,5 @@ try {
 } finally {
   if (app) await app.close();
   await rm(data, { recursive: true, force: true });
+  await rm(recordingExportParent, { recursive: true, force: true });
 }

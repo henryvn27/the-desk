@@ -1138,6 +1138,7 @@ function App() {
               user={data.user}
               save={(c) => act(c, true)}
               exportData={() => window.desk.exportData()}
+              exportRecordings={() => window.desk.exportRecordings()}
               deleteData={async () => {
                 const next = await window.desk.deleteLocalData();
                 setData(next);
