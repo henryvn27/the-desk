@@ -110,8 +110,14 @@ try {
   await page.getByText("Lecture recordings exported.", { exact: true }).waitFor();
   const recordingExportFolder = (await readdir(recordingExportParent))[0];
   assert.ok(recordingExportFolder);
+  const exportedRecordingChunk = join(
+    recordingExportParent,
+    recordingExportFolder,
+    recordingId,
+    "000000.chunk",
+  );
   assert.equal(
-    await readFile(join(recordingExportParent, recordingExportFolder, recordingId, "000000.chunk"), "utf8"),
+    await readFile(exportedRecordingChunk, "utf8"),
     "isolated recording fixture",
   );
   await page.screenshot({ path: join(output, "user.png") });
@@ -151,6 +157,10 @@ try {
   assert.deepEqual(snapshot.classes, []);
   assert.deepEqual(snapshot.tasks, []);
   await assert.rejects(readFile(recordingFile), /ENOENT/);
+  assert.equal(
+    await readFile(exportedRecordingChunk, "utf8"),
+    "isolated recording fixture",
+  );
   await app.close();
   app = undefined;
   await launch();
