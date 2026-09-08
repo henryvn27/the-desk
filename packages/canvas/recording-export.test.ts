@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { exportRecordingStorage } from "./recording-export";
@@ -26,7 +27,7 @@ async function writeRecording(root: string, id: string, value: RecordingManifest
 }
 
 test("exports every valid recording state, including active and zero-chunk recordings", async () => {
-  const root = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "desk-recording-export-"));
+  const root = await mkdtemp(join(tmpdir(), "desk-recording-export-"));
   try {
     const source = join(root, "note-recordings");
     const destination = join(root, "saved", "the-desk-recordings");
@@ -49,7 +50,7 @@ test("exports every valid recording state, including active and zero-chunk recor
 });
 
 test("fails closed for unsafe entries and never leaves a partial export", async () => {
-  const root = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "desk-recording-export-boundary-"));
+  const root = await mkdtemp(join(tmpdir(), "desk-recording-export-boundary-"));
   try {
     const source = join(root, "note-recordings");
     const destination = join(root, "saved", "the-desk-recordings");
@@ -65,7 +66,7 @@ test("fails closed for unsafe entries and never leaves a partial export", async 
 });
 
 test("empty recording storage is a truthful no-op", async () => {
-  const root = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "desk-recording-export-empty-"));
+  const root = await mkdtemp(join(tmpdir(), "desk-recording-export-empty-"));
   try {
     const result = await exportRecordingStorage(join(root, "missing"), join(root, "saved"));
     assert.deepEqual(result, { recordingCount: 0, fileCount: 0, byteCount: 0 });
