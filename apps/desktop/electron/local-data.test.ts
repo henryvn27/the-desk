@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { join, parse } from "node:path";
 import { clearDeskRecordingStorage, deskRecordingStoragePath } from "./local-data";
 
 test("local-data cleanup removes all Desk recordings and preserves siblings", async () => {
-  const userDataPath = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "desk-local-data-"));
+  const userDataPath = await mkdtemp(join(tmpdir(), "desk-local-data-"));
   try {
     const recordings = deskRecordingStoragePath(userDataPath);
     await mkdir(join(recordings, "recording-a"), { recursive: true });
@@ -28,7 +29,7 @@ test("local-data cleanup removes all Desk recordings and preserves siblings", as
 test("local-data cleanup refuses the filesystem root and propagates an unusable boundary", async () => {
   assert.throws(() => deskRecordingStoragePath(parse(process.cwd()).root), /outside Desk local data/);
 
-  const directory = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "desk-local-data-boundary-"));
+  const directory = await mkdtemp(join(tmpdir(), "desk-local-data-boundary-"));
   const fileBoundary = join(directory, "not-a-directory");
   try {
     await writeFile(fileBoundary, "do not remove");
