@@ -12,6 +12,7 @@ import {
 import { evaluateExpression, evaluateExpressions } from "../../../packages/canvas/semantic-math";
 import { graphPath, intersections, panViewport, roots, sampleGraph, zoomViewport } from "../../../packages/canvas/graph";
 import { boxplot, calculatedRows, dataColumnAliases, histogram, linearRegression, numericColumn, summarize } from "../../../packages/canvas/data";
+import { RecordingChunkQueue } from "../../../packages/canvas/recording-upload";
 
 const newId = () => crypto.randomUUID();
 const paragraph = (): Extract<NoteBlock, { type: "paragraph" }> => ({ id: newId(), type: "paragraph", text: "" });
@@ -247,8 +248,7 @@ function RecordingControls({
   const stream = useRef<MediaStream | undefined>(undefined);
   const documentRef = useRef(document);
   const startedAt = useRef(0);
-  const chunkIndex = useRef(0);
-  const pendingChunks = useRef(Promise.resolve());
+
   documentRef.current = document;
   const current = recordingId ? document.recordings?.find((item) => item.id === recordingId) : undefined;
   useEffect(() => {
@@ -259,7 +259,7 @@ function RecordingControls({
     if (!recordingId) return;
     const next = document.recordings?.find((item) => item.id === recordingId);
     setTranscriptText(next?.transcript?.map((segment) => segment.text).join("\n") ?? "");
-    if (next?.status === "complete" || next?.status === "interrupted") {
+    if (next?.status === "complete" || next?.status === "interrupted" || next?.status === "failed") {
       let active = true;
       void window.desk.recordingURL(recordingId)
         .then((url) => { if (active) setAudioURL(url); })
@@ -322,27 +322,35 @@ function RecordingControls({
     onChange(documentRef.current);
     stream.current = localStream;
     startedAt.current = Date.parse(started.startedAt);
-    chunkIndex.current = 0;
-    pendingChunks.current = Promise.resolve();
+    const queue = new RecordingChunkQueue(
+      0,
+      (index, bytes) => window.desk.recordingChunk(started.recordingId, index, bytes),
+    );
+    let pendingData = Promise.resolve();
+    let dataReadFailed = false;
     nextRecorder.ondataavailable = (event) => {
       if (!event.data.size) return;
-      pendingChunks.current = pendingChunks.current.then(async () => {
-        const index = chunkIndex.current;
-        const bytes = new Uint8Array(await event.data.arrayBuffer());
-        const result = await window.desk.recordingChunk(started.recordingId, index, bytes);
-        chunkIndex.current = result.chunkCount;
+      pendingData = pendingData.then(async () => {
+        const value = await event.data.arrayBuffer();
+        queue.enqueue(new Uint8Array(value));
+        const result = await queue.flush();
         update(started.recordingId, { chunkCount: result.chunkCount });
+        if (result.failure)
+          setStatus(`Recording is incomplete after chunk ${result.failure.chunkIndex + 1} could not be saved.`);
       }).catch(() => {
-        setStatus("A recording chunk could not be saved. Earlier chunks remain on this Mac.");
+        dataReadFailed = true;
+        setStatus("A recording chunk could not be read. Earlier chunks remain on this Mac.");
       });
     };
     nextRecorder.onerror = () => setStatus("Recording stopped unexpectedly. Saved audio remains available.");
     nextRecorder.onstop = () => {
-      void pendingChunks.current.then(async () => {
+      void pendingData.then(() => queue.flush()).then(async (result) => {
         try {
-          const finish = await window.desk.recordingFinish(started.recordingId);
-          update(started.recordingId, { status: "complete", endedAt: finish.endedAt, durationMs: Math.max(0, Date.parse(finish.endedAt) - startedAt.current) });
-          setStatus("Recording saved in timestamped chunks.");
+          const failure = result.failure ?? (dataReadFailed ? { chunkIndex: result.chunkCount, attempts: 1, message: "The audio data could not be read." } : undefined);
+          const finish = await window.desk.recordingFinish(started.recordingId, failure ? "failed" : "complete");
+          const status = failure ? "failed" : "complete";
+          update(started.recordingId, { status, endedAt: finish.endedAt, durationMs: Math.max(0, Date.parse(finish.endedAt) - startedAt.current), chunkCount: finish.chunkCount });
+          setStatus(failure ? `Recording incomplete after chunk ${failure.chunkIndex + 1} could not be saved. Earlier chunks remain on this Mac.` : "Recording saved in timestamped chunks.");
         } catch {
           update(started.recordingId, { status: "interrupted", endedAt: new Date().toISOString(), durationMs: Math.max(0, Date.now() - startedAt.current) });
           setStatus("Recording ended before its manifest could be finalized. Saved chunks remain on this Mac.");

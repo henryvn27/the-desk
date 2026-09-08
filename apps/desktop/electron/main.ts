@@ -1349,16 +1349,18 @@ app.whenReady().then(async () => {
     await saveRecordingManifest(recordingId, next);
     return { recordingId, chunkIndex, chunkCount: next.chunkCount };
   });
-  ipcMain.handle("desk:recording-finish", async (event, rawId) => {
+  ipcMain.handle("desk:recording-finish", async (event, rawId, rawStatus) => {
     check(event);
     if (event.sender !== main?.webContents || !main)
       throw Error("Open Notes in the main Desk window to finish recording.");
     const recordingId = z.string().uuid().parse(rawId);
+    const requestedStatus = z.enum(["complete", "interrupted", "failed"]).optional().parse(rawStatus) ?? "complete";
     const manifest = await loadRecordingManifest(recordingId);
     const endedAt = new Date().toISOString();
+    const status = manifest.status === "recording" ? requestedStatus : manifest.status;
     if (manifest.status === "recording")
-      await saveRecordingManifest(recordingId, { ...manifest, status: "complete", endedAt });
-    return { recordingId, endedAt: manifest.endedAt ?? endedAt, chunkCount: manifest.chunkCount };
+      await saveRecordingManifest(recordingId, { ...manifest, status, endedAt });
+    return { recordingId, endedAt: manifest.endedAt ?? endedAt, chunkCount: manifest.chunkCount, status };
   });
   ipcMain.handle("desk:recording-url", async (event, rawId) => {
     check(event);

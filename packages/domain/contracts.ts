@@ -1150,6 +1150,7 @@ export type RecordingFinish = {
   recordingId: string;
   endedAt: string;
   chunkCount: number;
+  status: "complete" | "interrupted" | "failed";
 };
 export interface DeskAPI {
   previewRebalance(): Promise<RebalancePreview>;
@@ -1204,7 +1205,7 @@ export interface DeskAPI {
   captureScreen(): Promise<LensCapture>;
   recordingStart(canvasId: string, mimeType?: string): Promise<RecordingStart>;
   recordingChunk(recordingId: string, chunkIndex: number, data: Uint8Array): Promise<RecordingChunkResult>;
-  recordingFinish(recordingId: string): Promise<RecordingFinish>;
+  recordingFinish(recordingId: string, status?: RecordingFinish["status"]): Promise<RecordingFinish>;
   recordingURL(recordingId: string): Promise<string>;
   snapshot(): Promise<Snapshot>;
   command(value: Command): Promise<Snapshot>;
