@@ -11,17 +11,35 @@ const output = resolve("artifacts/cloud-sync");
 await mkdir(output, { recursive: true });
 const requests = [];
 const remote = [];
+const authGrants = [];
+const syncTokens = [];
+let refreshCount = 0;
+let refreshMode = "success";
 const server = createServer(async (request, response) => {
   let body = "";
   for await (const chunk of request) body += chunk;
   requests.push({ method: request.method, path: request.url });
   if (request.url?.startsWith("/auth/v1/token")) {
+    const grant = new URL(request.url, "http://127.0.0.1").searchParams.get("grant_type");
+    authGrants.push(grant);
+    const refresh = grant === "refresh_token";
+    if (refresh) refreshCount += 1;
+    if (refresh && refreshMode === "transient") {
+      response.writeHead(503).end();
+      return;
+    }
+    if (refresh && refreshMode === "invalid") {
+      response.writeHead(401).end();
+      return;
+    }
     response.writeHead(200, { "content-type": "application/json" });
     response.end(
       JSON.stringify({
-        access_token: "cloud-access-token",
-        refresh_token: "cloud-refresh-token",
-        expires_in: 3600,
+        access_token: refresh ? `cloud-refresh-access-${refreshCount}` : "cloud-access-token",
+        refresh_token: refresh ? `cloud-refresh-token-${refreshCount}` : "cloud-refresh-token",
+        // Keep the fixture short-lived so the trusted refresh path is exercised
+        // on the next local operation and after an app restart.
+        expires_in: 1,
         user: {
           id: "00000000-0000-4000-8000-000000000010",
           email: JSON.parse(body).email,
@@ -36,6 +54,7 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (request.url?.startsWith("/rest/v1/desk_sync_operations")) {
+    if (request.headers.authorization) syncTokens.push(request.headers.authorization);
     if (request.method === "GET") {
       const query = new URL(request.url, "http://127.0.0.1").searchParams;
       const entityFilter = query.get("entity_id")?.replace(/^eq\./, "");
@@ -141,7 +160,69 @@ try {
     (await page.evaluate(() => window.desk.snapshot())).classes.at(-1)?.name,
     "Cloud Physics",
   );
-  assert.equal(remote.length, 1);
+  const second = await page.evaluate(() =>
+    window.desk.command({ type: "class.create", name: "Cloud Chemistry" }),
+  );
+  assert.ok(second.classes.at(-1)?.id);
+  await waitFor(
+    async () => remote.some((operation) => operation.entity_id === second.classes.at(-1)?.id),
+    "Supabase sync did not resume after the short-lived access token expired",
+  );
+  assert.equal(remote.length, 2);
+  assert.equal(authGrants.filter((grant) => grant === "password").length, 1);
+  assert.ok(
+    authGrants.filter((grant) => grant === "refresh_token").length >= 1,
+    "Supabase refresh-token grant was not used",
+  );
+  assert.ok(
+    syncTokens.some((token) => token.includes("cloud-refresh-access-")),
+    "rotated access token was not used for a subsequent sync",
+  );
+
+  // A transient refresh failure must leave the outbox queued and recover
+  // without re-entering credentials or regenerating local work.
+  await new Promise((resolve) => setTimeout(resolve, 1_200));
+  refreshMode = "transient";
+  const transient = await page.evaluate(() =>
+    window.desk.command({ type: "class.create", name: "Cloud Biology" }),
+  );
+  await waitFor(
+    async () => (await page.evaluate(() => window.desk.syncStatus())).phase === "error",
+    "transient account refresh failure was not surfaced",
+  );
+  const transientStatus = await page.evaluate(() => window.desk.syncStatus());
+  assert.match(transientStatus.lastError ?? "", /Local changes are safe/);
+  assert.ok(
+    (await page.evaluate(() => window.desk.snapshot())).outbox.some(
+      (operation) => operation.entityId === transient.classes.at(-1)?.id && operation.status !== "synced",
+    ),
+  );
+
+  refreshMode = "success";
+  const recoveredStatus = await page.evaluate(() => window.desk.syncNow());
+  assert.equal(recoveredStatus.phase, "synced");
+  assert.equal(recoveredStatus.queued, 0);
+  assert.equal(remote.length, 3);
+
+  // A revoked refresh token must not be retried forever or mark local data as
+  // synced. The renderer receives an actionable reauthentication state.
+  await new Promise((resolve) => setTimeout(resolve, 1_200));
+  refreshMode = "invalid";
+  const invalid = await page.evaluate(() =>
+    window.desk.command({ type: "class.create", name: "Cloud Chemistry Lab" }),
+  );
+  await waitFor(
+    async () => (await page.evaluate(() => window.desk.syncStatus())).phase === "error",
+    "invalid account refresh failure was not surfaced",
+  );
+  const invalidStatus = await page.evaluate(() => window.desk.syncStatus());
+  assert.match(invalidStatus.lastError ?? "", /Reconnect the Desk account/);
+  assert.equal(remote.length, 3);
+  assert.ok(
+    (await page.evaluate(() => window.desk.snapshot())).outbox.some(
+      (operation) => operation.entityId === invalid.classes.at(-1)?.id && operation.status !== "synced",
+    ),
+  );
   assert.deepEqual(errors, []);
   console.log(
     "PASS: authenticated main-process Supabase sync appends an account-scoped operation, marks the local outbox synced, persists across restart, and keeps SQLite authoritative.",

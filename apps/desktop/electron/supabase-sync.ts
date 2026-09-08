@@ -7,7 +7,9 @@ import {
 } from "../../../packages/integrations/supabase-sync";
 import type { SupabaseAccount } from "./supabase";
 
-type SyncAccountBoundary = Pick<SupabaseAccount, "status" | "syncContext">;
+type SyncAccountBoundary = Pick<SupabaseAccount, "status" | "syncContext"> & {
+  syncContextAsync?: () => Promise<ReturnType<SupabaseAccount["syncContext"]>>;
+};
 
 export type SupabaseSyncCoordinatorOptions = {
   retryDelayMs?: number;
@@ -66,7 +68,9 @@ export class SupabaseSyncCoordinator {
       (conflict) => conflict.resolution === "unresolved",
     ).length;
     const phase =
-      account.configured && account.authenticated
+      this.phase === "error" && this.lastError
+        ? "error"
+        : account.configured && account.authenticated
         ? unresolvedConflicts > 0 && (this.phase === "disabled" || this.phase === "idle")
           ? "conflict"
           : this.phase
@@ -99,7 +103,20 @@ export class SupabaseSyncCoordinator {
 
   private async run() {
     this.uploaded = 0;
-    const context = this.account.syncContext();
+    let context: ReturnType<SupabaseAccount["syncContext"]>;
+    try {
+      context = this.account.syncContextAsync
+        ? await this.account.syncContextAsync()
+        : this.account.syncContext();
+    } catch (error) {
+      this.lastError = error instanceof Error
+        ? error.message
+        : "Desk account session could not be refreshed.";
+      this.phase = "error";
+      if (error instanceof Error && "retryable" in error && error.retryable === true)
+        this.scheduleRetry();
+      return;
+    }
     if (!context) {
       this.phase = "disabled";
       this.lastError = null;

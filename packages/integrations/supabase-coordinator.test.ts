@@ -96,6 +96,48 @@ test("sync coordinator records transport failures and retries without false succ
   }
 });
 
+test("sync coordinator exposes account reauthentication failures without disabling queued work", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "desk-sync-coordinator-refresh-error-"));
+  const database = join(directory, "desk.sqlite");
+  const { server, url } = await listen((request, response) => {
+    if (request.method === "GET") response.writeHead(200).end("[]");
+    else response.writeHead(201).end();
+  });
+  const store = new DeskStore(database);
+  let refreshError: Error | undefined = Error(
+    "Desk account session expired. Reconnect the Desk account.",
+  );
+  let authenticated = false;
+  const base = fakeAccount(url);
+  const account = {
+    ...base,
+    status: () => ({ ...base.status(), authenticated }),
+    syncContextAsync: async () => {
+      if (refreshError) throw refreshError;
+      return base.syncContext();
+    },
+  };
+  try {
+    store.execute({ type: "class.create", name: "Refresh Physics" });
+    const coordinator = new SupabaseSyncCoordinator(() => store, account);
+    const failed = await coordinator.syncNow();
+    assert.equal(failed.phase, "error");
+    assert.equal(failed.queued, 1);
+    assert.match(failed.lastError ?? "", /Reconnect the Desk account/);
+
+    refreshError = undefined;
+    authenticated = true;
+    const recovered = await coordinator.syncNow();
+    assert.equal(recovered.phase, "synced");
+    assert.equal(recovered.queued, 0);
+    coordinator.close();
+  } finally {
+    store.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("sync coordinator retries a transient failure without another manual sync", async () => {
   const directory = await mkdtemp(join(tmpdir(), "desk-sync-coordinator-reconnect-"));
   const database = join(directory, "desk.sqlite");

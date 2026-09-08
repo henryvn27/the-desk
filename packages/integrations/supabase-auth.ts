@@ -66,6 +66,7 @@ export function supabaseAuthUrl(baseUrl: string, path: string) {
 
 export function sessionFromAuthResponse(
   response: z.infer<typeof supabaseAuthResponse>,
+  now = Date.now(),
 ): SupabaseSession {
   if (!response.user?.id) throw Error("Supabase did not return an account identity.");
   return {
@@ -74,7 +75,28 @@ export function sessionFromAuthResponse(
     userId: response.user.id,
     email: response.user.email ?? null,
     expiresAt: response.expires_in
-      ? Date.now() + response.expires_in * 1000
+      ? now + response.expires_in * 1000
       : null,
   };
+}
+
+/**
+ * Refresh responses may omit the user object even though the session identity
+ * remains unchanged. Keep that canonical identity while accepting rotated
+ * access and refresh tokens from the provider.
+ */
+export function sessionFromRefreshResponse(
+  response: z.infer<typeof supabaseAuthResponse>,
+  previous: SupabaseSession,
+  now = Date.now(),
+): SupabaseSession {
+  if (response.expires_in === undefined)
+    throw Error("Supabase refresh did not return an access-token lifetime.");
+  return sessionFromAuthResponse(
+    {
+      ...response,
+      user: response.user ?? { id: previous.userId, email: previous.email },
+    },
+    now,
+  );
 }
