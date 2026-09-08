@@ -18,7 +18,7 @@ try {
     recordVideo: { dir: output },
   });
   page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   // Electron can emit a transient beforeunload event while the Notes modal
   // flushes its last revision. Leave that protocol event untouched; the app
   // owns the save-and-close path.
