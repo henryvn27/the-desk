@@ -185,20 +185,18 @@ function App() {
       mounted = false;
     };
   }, []);
-  async function openCanvas(taskId: string, canvasId?: string, blockId?: string) {
+  async function openCanvas(taskId: string | null, canvasId?: string, blockId?: string) {
     try {
       // Search deep-links carry the canonical canvas id. Read it directly so
       // a just-created or just-updated Note cannot be missed by the React
       // snapshot refresh cadence and accidentally forked into a blank canvas.
       if (canvasId) {
         const direct = await window.desk.canvas(canvasId);
-        if (direct.taskId !== taskId) throw Error("That Note is linked to a different task.");
+        if (taskId && direct.taskId !== taskId) throw Error("That Note is linked to a different task.");
         setCanvas(blockId ? { ...direct, initialBlockId: blockId } : direct);
         return;
       }
-      const existing = data.canvases.find(
-        (c) => c.taskId === taskId,
-      );
+      const existing = taskId ? data.canvases.find((c) => c.taskId === taskId) : undefined;
       const id =
         existing?.id ??
         (await act({ type: "canvas.create", taskId }, true))?.canvases.at(-1)
@@ -211,10 +209,10 @@ function App() {
       setError(userError(e));
     }
   }
-  async function newNotebook(taskId: string) {
+  async function newNotebook(taskId: string | null, classId?: string | null) {
     try {
       const created = await act(
-        { type: "canvas.create", taskId, notebook: true },
+        { type: "canvas.create", taskId, classId, notebook: true },
         true,
       );
       const id = created?.canvases.at(-1)?.id;
@@ -1109,7 +1107,7 @@ function App() {
             )}
           </>
         ) : page === "Notes" ? (
-          <NotesHub data={data} openCanvas={openCanvas} newNotebook={newNotebook} />
+          <NotesHub data={data} openCanvas={openCanvas} newNotebook={newNotebook} save={(c) => act(c, true)} />
         ) : page === "Memory" ? (
           <Memory data={data} save={(c) => act(c, true)} />
         ) : page === "Mistakes" ? (
@@ -1347,11 +1345,14 @@ function NotesHub({
   data,
   openCanvas,
   newNotebook,
+  save,
 }: {
   data: Snapshot;
-  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
-  newNotebook: (taskId: string) => Promise<void>;
+  openCanvas: (taskId: string | null, canvasId?: string, blockId?: string) => Promise<void>;
+  newNotebook: (taskId: string | null, classId?: string | null) => Promise<void>;
+  save: (command: Command) => Promise<Snapshot | undefined>;
 }) {
+  const [contextError, setContextError] = useState("");
   const notes = data.canvases
     .map((note) => ({
       note,
@@ -1366,16 +1367,41 @@ function NotesHub({
           <h1 id="notes-title">Notes</h1>
           <p className="page-lede">Your typed notes and freeform thinking, together.</p>
         </div>
-        <span className="muted">{notes.length} {notes.length === 1 ? "note" : "notes"}</span>
+        <div className="actions">
+          <button type="button" className="primary" onClick={() => void newNotebook(null)}>New note</button>
+          <span className="muted">{notes.length} {notes.length === 1 ? "note" : "notes"}</span>
+        </div>
       </div>
       {notes.length ? (
         <div className="notes-list">
+          {contextError && <p className="error" role="alert">{contextError}</p>}
           {notes.map(({ note, task }) => (
             <article className="notes-list-row" key={note.id}>
               <div>
-                <div className="eyebrow">{task ? data.classes.find((item) => item.id === task.classId)?.name ?? "Class note" : "Note"}</div>
+                <div className="eyebrow">{task ? data.classes.find((item) => item.id === task.classId)?.name ?? "Class note" : note.classId ? data.classes.find((item) => item.id === note.classId)?.name ?? "Class note" : "No class yet"}</div>
                 <h2>{note.title || task?.title || "Untitled note"}</h2>
                 <p className="muted">Updated {new Date(note.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
+                {!task && (
+                  <label className="note-context-picker">
+                    <span className="sr-only">Class for {note.title || "this note"}</span>
+                    <select
+                      aria-label={`Class for ${note.title || "this note"}`}
+                      value={note.classId ?? ""}
+                      onChange={(event) => {
+                        setContextError("");
+                        void save({
+                          type: "canvas.context",
+                          id: note.id,
+                          revision: note.revision,
+                          input: { classId: event.target.value || null },
+                        }).catch((value) => setContextError(userError(value)));
+                      }}
+                    >
+                      <option value="">No class</option>
+                      {data.classes.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+                    </select>
+                  </label>
+                )}
               </div>
               <button type="button" className="primary" onClick={() => void openCanvas(note.taskId, note.id)}>Open note</button>
             </article>
@@ -1385,16 +1411,22 @@ function NotesHub({
         <section className="empty-state">
           <div className="empty-state-mark">N</div>
           <h2>Start with a note</h2>
-          <p>Open a task from a class to create a note that stays connected to your work.</p>
-          {data.tasks.length > 0 ? (
-            <div className="empty-state-actions">
-              {data.tasks.slice(0, 3).map((task) => (
-                <button key={task.id} type="button" onClick={() => void newNotebook(task.id)}>
-                  New note · {task.title}
-                </button>
-              ))}
-            </div>
-          ) : <p className="muted">Capture an assignment first, then your note will have a place to live.</p>}
+          <p>Start writing now. Add a class or connect a source whenever it becomes useful.</p>
+          <div className="empty-state-actions">
+            <button type="button" className="primary" onClick={() => void newNotebook(null)}>New note</button>
+            {data.tasks.length > 0 && (
+              <details>
+                <summary>Start from an assignment</summary>
+                <div className="empty-state-actions">
+                  {data.tasks.slice(0, 3).map((task) => (
+                    <button key={task.id} type="button" onClick={() => void newNotebook(task.id)}>
+                      New note · {task.title}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
         </section>
       )}
     </section>
@@ -1427,8 +1459,8 @@ function Library({
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
   saveCommand: (command: Command) => Promise<Snapshot | undefined>;
-  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
-  newNotebook: (taskId: string) => Promise<void>;
+  openCanvas: (taskId: string | null, canvasId?: string, blockId?: string) => Promise<void>;
+  newNotebook: (taskId: string | null, classId?: string | null) => Promise<void>;
   navigate: (page: string) => void;
   startTask: (taskId: string) => void;
 }) {
@@ -1484,7 +1516,7 @@ function Library({
           <div className="eyebrow">Everywhere in your Desk</div>
           {indexed.length ? indexed.map((result) => (
             <button key={`${result.kind}-${result.id}-${result.blockId ?? ""}`} className="search-result" type="button" onClick={() => {
-              if (result.kind === "note" && result.taskId) void openCanvas(result.taskId, result.id, result.blockId);
+              if (result.kind === "note") void openCanvas(result.taskId ?? null, result.id, result.blockId);
               else if (result.kind === "source") setReaderTarget({ sourceId: result.id, location: result.location });
               else if (result.kind === "annotation" && result.sourceId) setReaderTarget({ sourceId: result.sourceId, location: result.location });
             }}>

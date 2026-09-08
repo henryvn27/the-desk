@@ -109,7 +109,7 @@ export default function SourceReader({
     [currentSource.text, query],
   );
   const linkedCanvases = useMemo(
-    () => data.canvases.filter((canvas) => currentSource.taskIds.includes(canvas.taskId)),
+    () => data.canvases.filter((canvas) => canvas.taskId !== null && currentSource.taskIds.includes(canvas.taskId)),
     [currentSource.taskIds, data.canvases],
   );
   const sourceRevision = currentSource.revision ?? 0;

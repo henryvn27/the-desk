@@ -392,8 +392,8 @@ export default function Canvas({
           kind: "class-material",
           title: `${record.title} paper capture`,
           text: value,
-          classIds: [],
-          taskIds: [record.taskId],
+          classIds: record.classId ? [record.classId] : [],
+          taskIds: record.taskId ? [record.taskId] : [],
         },
       });
       const source = next.sources.at(-1);

@@ -166,8 +166,8 @@ const evidenceConfidenceRank: Record<"insufficient" | "low" | "medium" | "high",
   high: 3,
 };
 
-function taskFor(tasks: readonly Task[], id: string) {
-  return tasks.find((task) => task.id === id);
+function taskFor(tasks: readonly Task[], id: string | null) {
+  return id ? tasks.find((task) => task.id === id) : undefined;
 }
 
 function taskUnitId(units: readonly Unit[], taskId: string) {
@@ -518,16 +518,22 @@ function noteViews(snapshot: Snapshot, classId: string, tasks: Task[]) {
     }
   }
   return snapshot.canvases
-    .filter((canvas) => taskMap.has(canvas.taskId))
+    .filter((canvas) => canvas.taskId !== null && taskMap.has(canvas.taskId))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .map((canvas): ClassNoteView => ({
-      id: canvas.id,
-      title: canvas.title,
-      taskId: canvas.taskId,
-      taskTitle: taskMap.get(canvas.taskId)!.title,
-      updatedAt: canvas.updatedAt,
-      ...(noteRefs.has(canvas.id) ? { blockId: noteRefs.get(canvas.id) } : {}),
-    }));
+    .map((canvas) => {
+      if (!canvas.taskId) return undefined;
+      const task = taskMap.get(canvas.taskId);
+      if (!task) return undefined;
+      return {
+        id: canvas.id,
+        title: canvas.title,
+        taskId: canvas.taskId,
+        taskTitle: task.title,
+        updatedAt: canvas.updatedAt,
+        ...(noteRefs.has(canvas.id) ? { blockId: noteRefs.get(canvas.id) } : {}),
+      } satisfies ClassNoteView;
+    })
+    .filter((item): item is ClassNoteView => item !== undefined);
 }
 
 function attentionViews(snapshot: Snapshot, classId: string, tasks: Task[]) {

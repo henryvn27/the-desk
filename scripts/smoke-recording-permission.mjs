@@ -37,11 +37,21 @@ try {
     const summary = snapshot.canvases[0];
     if (!summary) return null;
     const canvas = await window.desk.canvas(summary.id);
-    return canvas.scene.document?.recordings?.at(-1) ?? null;
+    return {
+      taskId: summary.taskId,
+      classId: summary.classId ?? null,
+      recording: canvas.scene.document?.recordings?.at(-1) ?? null,
+    };
   });
-  assert.equal(result?.status, "complete");
-  assert.ok((result?.chunkCount ?? 0) > 0, "fake audio produced a durable chunk");
-  console.log(JSON.stringify({ result: "PASS", status: result.status, chunkCount: result.chunkCount }));
+  assert.equal(result?.taskId, null, "fresh Notes should not require an assignment");
+  assert.equal(result?.classId, null, "fresh Notes should not require a class");
+  assert.ok(result?.recording, "saved Note should keep its recording marker");
+  assert.equal(result?.recording.status, "complete");
+  assert.ok((result?.recording.chunkCount ?? 0) > 0, "fake audio produced a durable chunk");
+  await dialog.getByRole("button", { name: "Close notes", exact: true }).click();
+  await page.getByRole("button", { name: "Open note", exact: true }).click();
+  await page.getByRole("dialog", { name: "Study notes" }).waitFor();
+  console.log(JSON.stringify({ result: "PASS", taskId: result.taskId, classId: result.classId, status: result.recording.status, chunkCount: result.recording.chunkCount }));
 } finally {
   if (app) await app.close().catch(() => {});
   await rm(data, { recursive: true, force: true });

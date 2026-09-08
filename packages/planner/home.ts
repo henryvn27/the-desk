@@ -72,8 +72,8 @@ function blockKey(block: Pick<Block, "taskId" | "start" | "end">) {
   return `${block.taskId}:${block.start}:${block.end}`;
 }
 
-function taskFor(snapshot: Snapshot, taskId: string) {
-  return snapshot.tasks.find((task) => task.id === taskId);
+function taskFor(snapshot: Snapshot, taskId: string | null | undefined) {
+  return taskId ? snapshot.tasks.find((task) => task.id === taskId) : undefined;
 }
 
 function liveBlocks(snapshot: Snapshot, now: Date, plan: ReturnType<typeof planWeek>) {

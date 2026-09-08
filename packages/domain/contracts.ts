@@ -29,7 +29,9 @@ import type { AcademicInference, InferenceRequest } from "../intelligence/infere
 import type { ChatRequest, ChatResponse } from "../intelligence/chat";
 export type CanvasRecord = {
   id: string;
-  taskId: string;
+  /** A Note can start before the student has a task or class context. */
+  taskId: string | null;
+  classId?: string | null;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -962,8 +964,18 @@ export const command = z.discriminatedUnion("type", [
 
   z.object({
     type: z.literal("canvas.create"),
-    taskId: id,
+    taskId: id.nullable().optional(),
+    classId: id.nullable().optional(),
     notebook: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal("canvas.context"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: z.object({
+      classId: id.nullable().optional(),
+      taskId: id.nullable().optional(),
+    }).strict(),
   }),
   z.object({ type: z.literal("canvas.recover"), id, scene: canvasScene }),
   z.object({

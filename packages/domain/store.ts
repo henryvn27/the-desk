@@ -79,6 +79,14 @@ function requiredRemoteString(row: RemoteSyncRow, key: string, table: string) {
   return value;
 }
 
+function nullableRemoteString(row: RemoteSyncRow, key: string, table: string) {
+  const value = row[key];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || value.length === 0)
+    throw Error(`Remote ${table} row has an invalid ${key}.`);
+  return value;
+}
+
 function remoteInteger(row: RemoteSyncRow, key: string, table: string) {
   const value = row[key];
   if (typeof value !== "number" || !Number.isInteger(value))
@@ -218,7 +226,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 42) {
+    if (version > 43) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -415,6 +423,28 @@ export class DeskStore {
       if (!sourceColumns.has("revisionHistory"))
         this.db.exec("ALTER TABLE sources ADD COLUMN revisionHistory TEXT NOT NULL DEFAULT '[]';");
       this.db.exec("PRAGMA user_version=42; COMMIT;");
+    }
+    // Schema 43 makes Notes first-class before academic organization. Existing
+    // task-backed notes keep their task link; new notes may start unassigned.
+    if (version <= 42) {
+      this.db.exec(`BEGIN;
+        ALTER TABLE canvases RENAME TO canvases_legacy;
+        CREATE TABLE canvases(
+          id TEXT PRIMARY KEY,
+          taskId TEXT REFERENCES tasks(id),
+          classId TEXT REFERENCES classes(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          scene TEXT NOT NULL
+        );
+        INSERT INTO canvases(id,taskId,classId,title,createdAt,updatedAt,revision,scene)
+          SELECT canvases_legacy.id,canvases_legacy.taskId,tasks.class_id,canvases_legacy.title,canvases_legacy.createdAt,canvases_legacy.updatedAt,canvases_legacy.revision,canvases_legacy.scene
+          FROM canvases_legacy LEFT JOIN tasks ON tasks.id=canvases_legacy.taskId;
+        DROP TABLE canvases_legacy;
+        PRAGMA user_version=43;
+        COMMIT;`);
     }
   }
   previewRebalance(now = new Date()): RebalancePreview {
@@ -722,7 +752,7 @@ export class DeskStore {
         ),
       canvases: this.db
         .prepare(
-          "SELECT id,taskId,title,createdAt,updatedAt,revision FROM canvases",
+          "SELECT id,taskId,classId,title,createdAt,updatedAt,revision FROM canvases",
         )
         .all() as Omit<CanvasRecord, "scene">[],
       sources: this.db
@@ -1009,13 +1039,16 @@ export class DeskStore {
       return;
     }
     if (table === "canvases") {
+      const taskId = nullableRemoteString(row, "taskId", table);
+      const classId = nullableRemoteString(row, "classId", table);
       this.db
         .prepare(
-          "INSERT INTO canvases(id,taskId,title,createdAt,updatedAt,revision,scene) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET taskId=excluded.taskId,title=excluded.title,createdAt=excluded.createdAt,updatedAt=excluded.updatedAt,revision=excluded.revision,scene=excluded.scene",
+          "INSERT INTO canvases(id,taskId,classId,title,createdAt,updatedAt,revision,scene) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET taskId=excluded.taskId,classId=excluded.classId,title=excluded.title,createdAt=excluded.createdAt,updatedAt=excluded.updatedAt,revision=excluded.revision,scene=excluded.scene",
         )
         .run(
           id,
-          requiredRemoteString(row, "taskId", table),
+          taskId,
+          classId,
           requiredRemoteString(row, "title", table),
           requiredRemoteString(row, "createdAt", table),
           requiredRemoteString(row, "updatedAt", table),
@@ -2290,8 +2323,15 @@ export class DeskStore {
           .run(entityId, taskId, JSON.stringify(block));
       }
       if (c.type === "canvas.create") {
-        const task = state.tasks.find((t) => t.id === c.taskId);
-        if (!task) throw Error("Assignment no longer exists.");
+        const task = c.taskId
+          ? state.tasks.find((t) => t.id === c.taskId)
+          : undefined;
+        if (c.taskId && !task) throw Error("Assignment no longer exists.");
+        const classId = c.classId ?? task?.classId ?? null;
+        if (classId && !state.classes.some((course) => course.id === classId))
+          throw Error("Class no longer exists.");
+        if (task && classId && task.classId !== classId)
+          throw Error("A Note cannot link a task from a different class.");
         entityId = randomUUID();
         const blank = {
           engine: "excalidraw" as const,
@@ -2302,16 +2342,46 @@ export class DeskStore {
         };
         const scene = c.notebook ? startNotebook(blank, randomUUID()) : blank;
         this.db
-          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
+          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?,?)")
           .run(
             entityId,
-            task.id,
-            c.notebook ? `${task.title} notebook` : task.title,
+            task?.id ?? null,
+            classId,
+            c.notebook
+              ? task?.title
+                ? `${task.title} notebook`
+                : "Untitled note"
+              : task?.title ?? "Untitled note",
             timestamp,
             timestamp,
             0,
             JSON.stringify(scene),
           );
+      }
+      if (c.type === "canvas.context") {
+        const current = this.canvas(c.id);
+        if (current.revision !== c.revision)
+          throw Error("This Note changed elsewhere. Reopen it before updating its context.");
+        const taskId: string | null = c.input.taskId === undefined
+          ? current.taskId
+          : c.input.taskId ?? null;
+        const task = taskId
+          ? state.tasks.find((candidate) => candidate.id === taskId)
+          : undefined;
+        if (taskId && !task) throw Error("Assignment no longer exists.");
+        const classId: string | null = c.input.classId === undefined
+          ? current.classId ?? task?.classId ?? null
+          : c.input.classId ?? null;
+        if (classId && !state.classes.some((course) => course.id === classId))
+          throw Error("Class no longer exists.");
+        if (task && classId && task.classId !== classId)
+          throw Error("A Note cannot link a task from a different class.");
+        const result = this.db
+          .prepare("UPDATE canvases SET taskId=?,classId=?,revision=revision+1,updatedAt=? WHERE id=? AND revision=?")
+          .run(taskId, classId, timestamp, c.id, c.revision);
+        if (!result.changes)
+          throw Error("This Note changed elsewhere. Reopen it before updating its context.");
+        entityId = c.id;
       }
       if (c.type === "canvas.save" || c.type === "canvas.recover") {
         for (const sourceId of c.scene.sourceIds ?? []) {
@@ -2331,10 +2401,11 @@ export class DeskStore {
         const original = this.canvas(c.id);
         entityId = randomUUID();
         this.db
-          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
+          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?,?)")
           .run(
             entityId,
             original.taskId,
+            original.classId ?? null,
             original.title + " (recovery copy)",
             timestamp,
             timestamp,
@@ -3594,7 +3665,7 @@ export class DeskStore {
         "sources",
         "SELECT id,title,text,createdAt,authority,kind,revision,format,sourceUrl,annotations,revisionHistory FROM sources WHERE id=?",
       ],
-      ["canvases", "SELECT id,taskId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
+      ["canvases", "SELECT id,taskId,classId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
       ["study_blocks", "SELECT id,task_id,data FROM study_blocks WHERE id=?"],
       ["plan_changes", "SELECT id,appliedAt,data FROM plan_changes WHERE id=?"],
       ["grade_categories", "SELECT id,class_id,data FROM grade_categories WHERE id=?"],
@@ -3716,7 +3787,7 @@ export class DeskStore {
         id: row.id as string,
         title: row.title as string,
         snippet: searchSnippet(hit.text, needle),
-        taskId: row.taskId as string,
+        ...(row.taskId ? { taskId: row.taskId as string } : {}),
         blockId: hit.blockId,
         updatedAt: row.updatedAt as string,
       });
