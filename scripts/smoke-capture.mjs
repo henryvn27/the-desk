@@ -21,7 +21,19 @@ try {
     recordVideo: { dir: output },
   });
   const page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
+  await page.evaluate(async () => {
+    await window.desk.command({
+      type: "user.create",
+      input: {
+        displayName: "Timezone student",
+        email: null,
+        timeZone: "America/New_York",
+      },
+    });
+  });
+  await page.reload();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   await page.evaluate(async () => {
     await window.desk.command({ type: "class.create", name: "AP Physics C" });
   });
@@ -30,16 +42,22 @@ try {
   await page.getByRole("heading", { name: "Quick capture", exact: true }).waitFor();
   await page
     .getByLabel("Paste a capture or a few clear assignment lines", { exact: true })
-    .fill("AP Physics C: Problem Set 4 due 2026-09-08T22:00:00Z, 45 minutes");
+    .fill("AP Physics C: Problem Set 4 due 2026-09-08 at 6 PM, 45 minutes");
   await page.screenshot({ path: join(output, "capture-quick.png") });
   await page.keyboard.press(`${modifier}+Enter`);
   await page.getByRole("heading", { name: "Capture Inbox", exact: true }).waitFor();
   const state = await page.evaluate(() => window.desk.snapshot());
-  assert.equal(state.tasks.length, 1);
-  assert.equal(state.captureInbox.at(-1).status, "accepted");
+  assert.equal(state.tasks.length, 0);
+  assert.equal(state.captureInbox.at(-1).status, "pending");
   assert.equal(
-    state.tasks.at(-1).captureEvidence.originalText,
-    "AP Physics C: Problem Set 4 due 2026-09-08T22:00:00Z, 45 minutes",
+    state.captureInbox.at(-1).draft.provenance.originalText,
+    "AP Physics C: Problem Set 4 due 2026-09-08 at 6 PM, 45 minutes",
+  );
+  assert.equal(state.captureInbox.at(-1).draft.deadline.date, "2026-09-08");
+  assert.equal(state.captureInbox.at(-1).draft.deadline.time, "18:00");
+  assert.equal(
+    state.captureInbox.at(-1).draft.deadline.timeZone,
+    "America/New_York",
   );
   await page.screenshot({ path: join(output, "capture-quick-saved.png") });
   const video = page.video();

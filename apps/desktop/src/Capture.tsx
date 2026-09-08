@@ -18,6 +18,11 @@ import {
   type AcademicInference,
   type InferenceRequest,
 } from "../../../packages/intelligence/inference";
+import {
+  formatDateTimeLocal,
+  parseDateTimeLocal,
+  resolveTimeZone,
+} from "../../../packages/domain/time-zone";
 export function Capture({
   classes,
   gradeCategories,
@@ -31,6 +36,7 @@ export function Capture({
   initialDraft,
   initialText,
   contextClassId,
+  timeZone,
   onQueue,
   onImport,
   onInfer,
@@ -39,6 +45,7 @@ export function Capture({
   initialDraft?: CaptureDraft;
   initialText?: string;
   contextClassId?: string;
+  timeZone?: string | null;
   onQueue?: (text: string, contextClassId?: string) => Promise<void>;
   onImport?: () => Promise<void>;
   onInfer?: (input: InferenceRequest) => Promise<AcademicInference>;
@@ -64,6 +71,7 @@ export function Capture({
   const [error, setError] = useState("");
   const [inferenceBusy, setInferenceBusy] = useState(false);
   const draft = drafts[index];
+  const profileTimeZone = resolveTimeZone(timeZone);
   const formKey = index + ":" + (draft?.title ?? "manual");
   const [estimateInput, setEstimateInput] = useState<{
     key: string;
@@ -87,13 +95,12 @@ export function Capture({
   const suggestion = durationSuggestion(tasks, sessions, estimate);
   const instantValue = existing?.dueAt ?? draft?.deadline?.instant;
   const instant = instantValue ? new Date(instantValue) : null;
-  const two = (n: number) => String(n).padStart(2, "0");
-  const localDate = instant
-    ? `${instant.getFullYear()}-${two(instant.getMonth() + 1)}-${two(instant.getDate())}`
-    : (draft?.deadline?.date ?? "");
-  const localTime = instant
-    ? `${two(instant.getHours())}:${two(instant.getMinutes())}:${two(instant.getSeconds())}`
-    : (draft?.deadline?.time ?? "");
+  const zonedDateTime = instant
+    ? formatDateTimeLocal(instant, profileTimeZone, { includeSeconds: true })
+    : "";
+  const [localDate = "", localTime = ""] = zonedDateTime
+    ? zonedDateTime.split("T")
+    : [draft?.deadline?.date ?? "", draft?.deadline?.time ?? ""];
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -111,7 +118,7 @@ export function Capture({
         interpretCapture(paste, {
           classes,
           now: new Date(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timeZone: profileTimeZone,
         }),
       );
       setIndex(0);
@@ -305,10 +312,14 @@ export function Capture({
               );
               return;
             }
-            const dateTime = date && time ? new Date(`${date}T${time}`) : null;
-            if (dateTime && !Number.isFinite(+dateTime)) {
-              setError("Check the due date and time.");
-              return;
+            let dueAt: string | null = null;
+            if (date && time) {
+              try {
+                dueAt = parseDateTimeLocal(`${date}T${time}`, profileTimeZone);
+              } catch {
+                setError("Check the due date and time.");
+                return;
+              }
             }
             void onSave(
               {
@@ -325,7 +336,7 @@ export function Capture({
                 ) as TaskInput["importance"],
                 classId: String(f.get("classId")),
                 minutes: Number(f.get("minutes")),
-                dueAt: dateTime?.toISOString() ?? null,
+                dueAt,
                 deadlineConfirmed: confirmed,
                 resource: String(f.get("resource")) || null,
                 notes: String(f.get("notes")),

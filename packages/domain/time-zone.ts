@@ -198,12 +198,16 @@ function timeZoneOffsets(naive: Date, timeZone: string): number[] {
 export function formatDateTimeLocal(
   value: string | Date | null | undefined,
   timeZone?: string | null,
+  options?: { includeSeconds?: boolean },
 ): string {
   if (value == null || value === "") return "";
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(+date)) return "";
   const parts = partsForInstant(date, resolveTimeZone(timeZone));
-  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+  const result = `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+  return options?.includeSeconds
+    ? `${result}:${String(parts.second).padStart(2, "0")}`
+    : result;
 }
 
 /**

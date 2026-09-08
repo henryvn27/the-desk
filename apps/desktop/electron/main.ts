@@ -38,6 +38,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { DeskStore } from "../../../packages/domain/store";
+import { resolveTimeZone } from "../../../packages/domain/time-zone";
 import { ensureNoteDocument } from "../../../packages/canvas/notes";
 import {
   recordingManifest,
@@ -608,7 +609,7 @@ app.whenReady().then(async () => {
     return store.execute({
       type: "inbox.import",
       files,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: resolveTimeZone(store.snapshot().user?.timeZone),
     });
   });
   ipcMain.handle("desk:provider-status", (event) => {

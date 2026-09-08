@@ -14,6 +14,7 @@ import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
+import { resolveTimeZone } from "../../../packages/domain/time-zone";
 import React, { useEffect, useMemo, useState } from "react";
 const Canvas = React.lazy(() => import("./Canvas"));
 import { createRoot } from "react-dom/client";
@@ -1224,6 +1225,7 @@ function App() {
       {editing && (
         <Capture
           policy={data.capturePolicy}
+          timeZone={data.user?.timeZone}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
@@ -1251,6 +1253,7 @@ function App() {
         <Capture
           key={reviewingCapture.id}
           policy={data.capturePolicy}
+          timeZone={data.user?.timeZone}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
           tasks={data.tasks}
@@ -1279,6 +1282,7 @@ function App() {
         <Capture
           initialText={captureText}
           contextClassId={captureContextClassId}
+          timeZone={data.user?.timeZone}
           policy={data.capturePolicy}
           classes={data.classes}
           gradeCategories={data.gradeCategories}
@@ -1308,7 +1312,7 @@ function App() {
               {
                 type: "inbox.capture",
                 text,
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timeZone: resolveTimeZone(data.user?.timeZone),
                 ...(contextClassId ? { contextClassId } : {}),
               },
               true,
