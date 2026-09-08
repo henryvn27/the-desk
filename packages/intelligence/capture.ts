@@ -1,4 +1,5 @@
 import type { Class } from "../domain/contracts";
+import { addDays, formatDate, zonedDate } from "../domain/time-zone";
 
 export type CaptureConfidence = "high" | "medium" | "low";
 export type CaptureObjectType =
@@ -648,36 +649,4 @@ function relativeDate(value: string, now: Date, timeZone: string): string {
   let offset = (weekday - currentWeekday + 7) % 7;
   if (offset === 0 && !normalized.startsWith("this ")) offset = 7;
   return formatDate(addDays(current, offset));
-}
-
-function zonedDate(now: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US-u-ca-gregory", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value);
-  return { year: value("year"), month: value("month"), day: value("day") };
-}
-
-function addDays(
-  date: { year: number; month: number; day: number },
-  days: number,
-) {
-  const result = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
-  return {
-    year: result.getUTCFullYear(),
-    month: result.getUTCMonth() + 1,
-    day: result.getUTCDate(),
-  };
-}
-
-function formatDate(date: {
-  year: number;
-  month: number;
-  day: number;
-}): string {
-  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 }

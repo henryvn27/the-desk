@@ -70,7 +70,7 @@ function messageHistory(messages: ChatMessage[]) {
     .map((message) => ({ role: message.role, content: message.content }));
 }
 
-function Artifact({ artifact, onAction }: { artifact: ChatArtifact; onAction: (action: ChatAction) => void }) {
+function Artifact({ artifact, onAction, profileTimeZone }: { artifact: ChatArtifact; onAction: (action: ChatAction) => void; profileTimeZone?: string | null }) {
   if (artifact.kind === "next")
     return (
       <section className="chat-artifact chat-artifact-next" aria-label="Next action">
@@ -106,7 +106,7 @@ function Artifact({ artifact, onAction }: { artifact: ChatArtifact; onAction: (a
         {artifact.items.map((item) => (
           <div className="chat-list-row" key={item.taskId}>
             <strong>{item.title}</strong>
-            <span>{formatUpcoming(item)}</span>
+            <span>{formatUpcoming(item, artifact.timeZone ?? profileTimeZone)}</span>
           </div>
         ))}
       </section>
@@ -275,7 +275,7 @@ export function ChatWorkspace({
               <article className={`chat-message chat-message-${message.role}`} key={message.id}>
                 <div className="chat-message-body">
                   <p>{message.content}</p>
-                  {message.artifact && <Artifact artifact={message.artifact} onAction={onAction} />}
+                  {message.artifact && <Artifact artifact={message.artifact} onAction={onAction} profileTimeZone={data.user?.timeZone} />}
                   {message.action && !message.artifact && (
                     <Button variant="primary" size="compact" className="chat-artifact-action" onPress={() => onAction(message.action!)}>Open</Button>
                   )}

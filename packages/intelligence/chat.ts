@@ -3,6 +3,12 @@ import type { Snapshot } from "../domain/contracts";
 import { deriveHome, type HomeProjection } from "../planner/home";
 import { packAvailableTime, type AvailableTimePlan } from "./learning-loop";
 import type { DeskIntelligence } from "./desk-intelligence";
+import {
+  calendarDayDistance,
+  formatInstant,
+  resolveTimeZone,
+  zonedDate,
+} from "../domain/time-zone";
 
 const historyTurn = z
   .object({
@@ -59,7 +65,7 @@ export type ChatArtifact =
       taskId: string;
       action: ChatAction;
     }
-  | { kind: "upcoming"; items: ChatUpcomingItem[] }
+  | { kind: "upcoming"; items: ChatUpcomingItem[]; timeZone?: string }
   | { kind: "attention"; items: Array<{ title: string; detail: string; taskId?: string }> }
   | {
       kind: "time-plan";
@@ -86,11 +92,8 @@ function taskFor(snapshot: Snapshot, taskId: string | undefined) {
   return taskId ? snapshot.tasks.find((task) => task.id === taskId) : undefined;
 }
 
-function shortDate(value: string) {
-  const date = new Date(value);
-  return Number.isFinite(+date)
-    ? date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
-    : "an unknown date";
+function profileTimeZone(snapshot: Snapshot) {
+  return resolveTimeZone(snapshot.user?.timeZone);
 }
 
 function nextResponse(snapshot: Snapshot, intelligence: DeskIntelligence, home: HomeProjection): ChatResponse {
@@ -134,14 +137,60 @@ function upcomingResponse(snapshot: Snapshot, home: HomeProjection): ChatRespons
     return {
       kind: "deterministic",
       deterministic: true,
-      text: "Nothing with a confirmed deadline needs attention in the next two weeks.",
+      text: "Nothing currently curated for attention is coming up in the next two weeks.",
       suggestions: ["What should I do now?", "I have 25 minutes"],
     };
   return {
     kind: "deterministic",
     deterministic: true,
     text: `Here are the next ${items.length} confirmed deadlines.`,
-    artifact: { kind: "upcoming", items },
+    artifact: { kind: "upcoming", items, timeZone: profileTimeZone(snapshot) },
+  };
+}
+
+
+/** Literal confirmed deadlines in the next seven local calendar days. */
+export function deadlinePeriodItems(snapshot: Snapshot, now: Date, days = 7) {
+  const timeZone = profileTimeZone(snapshot);
+  const start = zonedDate(now, timeZone);
+  const assessmentByTask = new Map<string, string>();
+  for (const assessment of snapshot.assessments) {
+    for (const taskId of assessment.taskIds) assessmentByTask.set(taskId, assessment.title);
+  }
+  const items = snapshot.tasks
+    .filter((task) => {
+      if (task.completed || !task.deadlineConfirmed || !task.dueAt) return false;
+      const due = new Date(task.dueAt);
+      if (!Number.isFinite(+due) || +due <= +now) return false;
+      const dayOffset = calendarDayDistance(start, zonedDate(due, timeZone));
+      return dayOffset >= 0 && dayOffset <= days;
+    })
+    .sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!) || a.title.localeCompare(b.title))
+    .slice(0, 10)
+    .map((task) => ({
+      taskId: task.id,
+      title: assessmentByTask.get(task.id) ?? task.title,
+      className: className(snapshot, task.classId) ?? "Unassigned class",
+      dueAt: task.dueAt!,
+      kind: task.workKind === "assessment" || assessmentByTask.has(task.id) ? "assessment" as const : "deadline" as const,
+    }));
+  return { items, timeZone };
+}
+
+function deadlinePeriodResponse(snapshot: Snapshot, now: Date): ChatResponse {
+  const { items, timeZone } = deadlinePeriodItems(snapshot, now);
+  if (!items.length)
+    return {
+      kind: "deterministic",
+      deterministic: true,
+      text: "There are no confirmed deadlines in the next seven days.",
+      suggestions: ["What should I do now?", "I have 25 minutes"],
+    };
+  return {
+    kind: "deterministic",
+    deterministic: true,
+    text: `Here are the confirmed deadlines in the next seven days (${timeZone}).`,
+    artifact: { kind: "upcoming", items, timeZone },
   };
 }
 
@@ -239,7 +288,7 @@ export function deriveChatSuggestions(snapshot: Snapshot, intelligence: DeskInte
   if (active && task) suggestions.push(`Continue ${task.title}`);
   else if (intelligence.nextAction.kind === "start-task") suggestions.push(`Start ${intelligence.nextAction.title}`);
   if (home.attention.length) suggestions.push("What needs my attention?");
-  if (home.upcoming.length) suggestions.push("What’s due this week?");
+  if (deadlinePeriodItems(snapshot, now).items.length) suggestions.push("What’s due this week?");
   if (!suggestions.length) suggestions.push("What should I do now?");
   suggestions.push("I have 25 minutes");
   return [...new Set(suggestions)].slice(0, 4);
@@ -260,12 +309,14 @@ export function resolveChat(
 
   const direct = directTaskStart(snapshot, question);
   if (direct) return direct;
-  if (/\b(?:what should i do|what do i do|what now|next move|next action|where do i start|start me)\b/.test(normalized))
+  if (/\b(?:what should i do|what do i do|what now|next move|next action|what(?:'|’)?s next|where do i start|start me)\b/.test(normalized))
     return nextResponse(snapshot, intelligence, home);
   if (/\b(?:continue|resume|where i left|pick up|unfinished)\b/.test(normalized))
     return continueResponse(snapshot, home);
-  if (/\b(?:due|upcoming|deadline|deadlines|this week|what's next)\b/.test(normalized))
+  if (/\bupcoming\b/.test(normalized))
     return upcomingResponse(snapshot, home);
+  if (/\b(?:due|deadline|deadlines|this week)\b/.test(normalized))
+    return deadlinePeriodResponse(snapshot, now);
   if (/\b(?:attention|urgent|conflict|problem|needs? a decision|overloaded)\b/.test(normalized))
     return attentionResponse(home);
   if (/\b(?:why|explain this|why this)\b/.test(normalized)) {
@@ -325,6 +376,6 @@ export function chatGrounding(snapshot: Snapshot, intelligence: DeskIntelligence
   return JSON.stringify(payload).slice(0, 14_000);
 }
 
-export function formatUpcoming(item: ChatUpcomingItem) {
-  return `${item.title} · ${item.className} · ${shortDate(item.dueAt)}`;
+export function formatUpcoming(item: ChatUpcomingItem, timeZone?: string | null) {
+  return `${item.title} · ${item.className} · ${formatInstant(item.dueAt, timeZone)}`;
 }
