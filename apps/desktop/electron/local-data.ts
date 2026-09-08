@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { rm, stat } from "node:fs/promises";
 import { basename, dirname, parse, resolve, sep } from "node:path";
 
 const RECORDING_DIRECTORY_NAME = "note-recordings";
@@ -27,7 +27,10 @@ export function deskRecordingStoragePath(userDataPath: string): string {
 
 /** Remove Desk-owned lecture recordings while preserving every sibling file. */
 export async function clearDeskRecordingStorage(userDataPath: string): Promise<void> {
-  await rm(deskRecordingStoragePath(userDataPath), {
+  const parent = resolve(userDataPath);
+  const info = await stat(parent);
+  if (!info.isDirectory()) throw new Error("Refusing to delete outside Desk local data.");
+  await rm(deskRecordingStoragePath(parent), {
     recursive: true,
     force: true,
   });
