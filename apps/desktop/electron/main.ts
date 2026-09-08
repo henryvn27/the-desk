@@ -34,7 +34,7 @@ import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { DeskStore } from "../../../packages/domain/store";
@@ -51,6 +51,10 @@ import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
 import { shouldAllowDeskMediaPermission } from "./permission-policy";
+import {
+  deleteDeskLocalData,
+  recoverPendingDeskRecordingStorage,
+} from "./local-data";
 import { SupabaseAccount } from "./supabase";
 import { SupabaseSyncCoordinator } from "./supabase-sync";
 import {
@@ -531,6 +535,13 @@ app.whenReady().then(async () => {
       }),
   );
   mkdirSync(app.getPath("userData"), { recursive: true });
+  const pendingRecordingRecovery = await recoverPendingDeskRecordingStorage(
+    app.getPath("userData"),
+  );
+  if (pendingRecordingRecovery === "restored")
+    console.warn("Recovered lecture recordings from an interrupted local-data deletion.");
+  if (pendingRecordingRecovery === "conflict")
+    console.warn("Found recoverable lecture recordings beside the active recording directory.");
   databasePath = join(app.getPath("userData"), "desk.sqlite");
   store = new DeskStore(databasePath);
   const recordingRecovery = await recoverInterruptedRecordingManifests(
@@ -1057,27 +1068,22 @@ app.whenReady().then(async () => {
       noLink: true,
     });
     if (result.response !== 1) return store.snapshot();
-    // Recording chunks live beside SQLite under the app's user-data path.
-    // Remove that exact Desk-owned directory before closing the store so a
-    // filesystem failure leaves the workspace open and the UI can report it.
-    const { clearDeskRecordingStorage } = await import("./local-data");
-    await clearDeskRecordingStorage(app.getPath("userData"));
-    recordingSessions.clear();
-    store.close();
-    try {
-      await Promise.all([
-        rm(databasePath, { force: true }),
-        rm(`${databasePath}-wal`, { force: true }),
-        rm(`${databasePath}-shm`, { force: true }),
-      ]);
-    } catch (error) {
-      // Restore a usable store if SQLite cleanup fails after the recording
-      // directory has already been removed. The IPC rejection prevents the
-      // renderer from claiming the wipe completed.
-      store = new DeskStore(databasePath);
-      throw error;
-    }
-    store = new DeskStore(databasePath);
+    await deleteDeskLocalData({
+      userDataPath: app.getPath("userData"),
+      clearRecordingSessions: () => recordingSessions.clear(),
+      closeStore: () => store.close(),
+      reopenStore: () => {
+        store = new DeskStore(databasePath);
+      },
+      removeDatabase: async () => {
+        const { rm } = await import("node:fs/promises");
+        await Promise.all([
+          rm(databasePath, { force: true }),
+          rm(`${databasePath}-wal`, { force: true }),
+          rm(`${databasePath}-shm`, { force: true }),
+        ]);
+      },
+    });
     sync.schedule();
     return store.snapshot();
   });
