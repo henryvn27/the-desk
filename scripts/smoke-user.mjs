@@ -1,5 +1,5 @@
 import { _electron as electron } from "playwright";
-import { mkdtemp, mkdir, rm, copyFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, copyFile, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -110,6 +110,16 @@ try {
     .waitFor();
   snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.user, null);
+  const recordingFile = join(
+    data,
+    "note-recordings",
+    "00000000-0000-4000-8000-000000000217",
+    "000000.chunk",
+  );
+  await mkdir(join(data, "note-recordings", "00000000-0000-4000-8000-000000000217"), {
+    recursive: true,
+  });
+  await writeFile(recordingFile, "isolated recording fixture");
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = async () => ({ response: 1 });
   });
@@ -119,6 +129,7 @@ try {
   assert.equal(snapshot.user, null);
   assert.deepEqual(snapshot.classes, []);
   assert.deepEqual(snapshot.tasks, []);
+  await assert.rejects(readFile(recordingFile), /ENOENT/);
   await app.close();
   app = undefined;
   await launch();

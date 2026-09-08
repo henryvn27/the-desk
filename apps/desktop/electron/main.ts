@@ -998,12 +998,26 @@ app.whenReady().then(async () => {
       noLink: true,
     });
     if (result.response !== 1) return store.snapshot();
+    // Recording chunks live beside SQLite under the app's user-data path.
+    // Remove that exact Desk-owned directory before closing the store so a
+    // filesystem failure leaves the workspace open and the UI can report it.
+    const { clearDeskRecordingStorage } = await import("./local-data");
+    await clearDeskRecordingStorage(app.getPath("userData"));
+    recordingSessions.clear();
     store.close();
-    await Promise.all([
-      rm(databasePath, { force: true }),
-      rm(`${databasePath}-wal`, { force: true }),
-      rm(`${databasePath}-shm`, { force: true }),
-    ]);
+    try {
+      await Promise.all([
+        rm(databasePath, { force: true }),
+        rm(`${databasePath}-wal`, { force: true }),
+        rm(`${databasePath}-shm`, { force: true }),
+      ]);
+    } catch (error) {
+      // Restore a usable store if SQLite cleanup fails after the recording
+      // directory has already been removed. The IPC rejection prevents the
+      // renderer from claiming the wipe completed.
+      store = new DeskStore(databasePath);
+      throw error;
+    }
     store = new DeskStore(databasePath);
     sync.schedule();
     return store.snapshot();
