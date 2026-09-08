@@ -127,7 +127,20 @@ test("recovered Note metadata survives the canonical canvas store restart", asyn
   let store: DeskStore | undefined;
   try {
     store = new DeskStore(databasePath);
-    const created = store.execute({ type: "canvas.create" });
+    let created = store.execute({ type: "class.create", name: "Recovery physics" });
+    created = store.execute({
+      type: "task.create",
+      input: {
+        title: "Interrupted lecture",
+        classId: created.classes[0]!.id,
+        dueAt: null,
+        minutes: 30,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: false,
+      },
+    });
+    created = store.execute({ type: "canvas.create", taskId: created.tasks[0]!.id });
     const canvasId = created.canvases.at(-1)!.id;
     const recordingId = crypto.randomUUID();
     const current = store.canvas(canvasId);
