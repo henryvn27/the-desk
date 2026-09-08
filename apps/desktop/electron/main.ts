@@ -38,6 +38,13 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { DeskStore } from "../../../packages/domain/store";
+import { ensureNoteDocument } from "../../../packages/canvas/notes";
+import {
+  recordingManifest,
+  recoverInterruptedRecordingManifests,
+  recoverNoteRecording,
+  type RecordingManifest,
+} from "../../../packages/canvas/recording-recovery";
 import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
@@ -127,24 +134,6 @@ type LensCaptureWithBounds = {
   capturedAt: string;
   bounds: { x: number; y: number; width: number; height: number };
 };
-type RecordingManifest = {
-  version: 1;
-  canvasId: string;
-  startedAt: string;
-  endedAt?: string;
-  mimeType: string;
-  chunkCount: number;
-  status: "recording" | "complete" | "interrupted" | "failed";
-};
-const recordingManifest = z.strictObject({
-  version: z.literal(1),
-  canvasId: z.string().uuid(),
-  startedAt: z.iso.datetime(),
-  endedAt: z.iso.datetime().optional(),
-  mimeType: z.string().trim().max(80),
-  chunkCount: z.number().int().min(0).max(100_000),
-  status: z.enum(["recording", "complete", "interrupted", "failed"]),
-});
 const recordingSessions = new Map<string, RecordingManifest>();
 const windows = new Set<BrowserWindow>();
 function virtualScreenBounds() {
@@ -542,6 +531,33 @@ app.whenReady().then(async () => {
   mkdirSync(app.getPath("userData"), { recursive: true });
   databasePath = join(app.getPath("userData"), "desk.sqlite");
   store = new DeskStore(databasePath);
+  const recordingRecovery = await recoverInterruptedRecordingManifests(
+    join(app.getPath("userData"), "note-recordings"),
+    async (recordingId, manifest, next) => {
+      let canvas;
+      try {
+        canvas = store.canvas(manifest.canvasId);
+      } catch (error) {
+        // A deleted Note cannot retain a playable UI reference, but its
+        // durable manifest can still be made terminal without blocking launch.
+        if (error instanceof Error && error.message === "Canvas no longer exists.") return;
+        throw error;
+      }
+      const document = ensureNoteDocument(canvas.scene.document);
+      const recovered = recoverNoteRecording(document, recordingId, next);
+      if (!recovered.changed) return;
+      store.execute({
+        type: "canvas.save",
+        id: canvas.id,
+        revision: canvas.revision,
+        scene: { ...canvas.scene, document: recovered.document },
+      });
+    },
+  );
+  for (const item of recordingRecovery.recovered)
+    recordingSessions.set(item.recordingId, item.manifest);
+  if (recordingRecovery.failed.length)
+    console.warn("Some lecture recordings will retry recovery on the next launch.", recordingRecovery.failed.map((item) => item.recordingId));
   const check = (event: Electron.IpcMainInvokeEvent) => {
     if (
       ![...windows].some((w) => w.webContents === event.sender) ||
