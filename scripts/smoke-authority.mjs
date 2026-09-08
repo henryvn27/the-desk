@@ -19,7 +19,7 @@ async function launch() {
       ...process.env,
       DESK_DATA_DIR: data,
       DESK_ENABLE_DEVELOPMENT_KEY: "0",
-      TZ: "UTC",
+      TZ: "America/New_York",
     },
     recordVideo: { dir: output },
   });
@@ -30,12 +30,21 @@ async function launch() {
   }
   assert.ok(page, "Main Desk window opened");
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.getByText("More tools", { exact: true }).click();
   await page.getByRole("button", { name: "Authority", exact: true }).waitFor();
 }
 
 try {
   await launch();
   const ids = await page.evaluate(async () => {
+    await window.desk.command({
+      type: "user.create",
+      input: {
+        displayName: "Timezone student",
+        email: null,
+        timeZone: "America/New_York",
+      },
+    });
     const createdClass = await window.desk.command({
       type: "class.create",
       name: "AP Physics C",
@@ -74,7 +83,7 @@ try {
     .selectOption("syllabus");
   await page
     .getByLabel("Reported due date", { exact: true })
-    .fill("2026-09-09T23:00");
+    .fill("2026-09-09T19:00");
   await page
     .getByLabel("Claim confidence", { exact: true })
     .selectOption("high");
@@ -94,7 +103,7 @@ try {
     .selectOption("live-lms");
   await page
     .getByLabel("Reported due date", { exact: true })
-    .fill("2026-09-08T23:00");
+    .fill("2026-09-08T19:00");
   await page
     .getByLabel("Claim confidence", { exact: true })
     .selectOption("medium");
@@ -109,6 +118,25 @@ try {
   let snapshot = await page.evaluate(() => window.desk.snapshot());
   assert.equal(snapshot.authorityClaims.length, 2);
   assert.equal(snapshot.tasks[0].dueAt, null);
+  const originalClaims = snapshot.authorityClaims.map((claim) => ({
+    id: claim.id,
+    value: claim.value,
+    capturedAt: claim.capturedAt,
+  }));
+
+  await page
+    .getByRole("button", { name: "Edit claim", exact: true })
+    .first()
+    .click();
+  await page.getByLabel("Claim details", { exact: true }).fill("Wednesday updated");
+  await page.getByRole("button", { name: "Save claim", exact: true }).click();
+  await page.getByText("Wednesday updated", { exact: true }).waitFor();
+  snapshot = await page.evaluate(() => window.desk.snapshot());
+  for (const original of originalClaims) {
+    const current = snapshot.authorityClaims.find((claim) => claim.id === original.id);
+    assert.equal(current?.value, original.value);
+    assert.equal(current?.capturedAt, original.capturedAt);
+  }
 
   await page
     .getByRole("button", { name: "Use this due date", exact: true })

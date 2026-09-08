@@ -19,7 +19,7 @@ async function launch() {
       ...process.env,
       DESK_DATA_DIR: data,
       DESK_ENABLE_DEVELOPMENT_KEY: "0",
-      TZ: "UTC",
+      TZ: "America/New_York",
     },
     recordVideo: { dir: output },
   });
@@ -30,6 +30,7 @@ async function launch() {
   }
   assert.ok(page, "Main Desk window opened");
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.getByText("More tools", { exact: true }).click();
   await page
     .getByRole("button", { name: "Assessments", exact: true })
     .waitFor();
@@ -38,6 +39,14 @@ async function launch() {
 try {
   await launch();
   const ids = await page.evaluate(async () => {
+    await window.desk.command({
+      type: "user.create",
+      input: {
+        displayName: "Timezone student",
+        email: null,
+        timeZone: "America/New_York",
+      },
+    });
     const createdClass = await window.desk.command({
       type: "class.create",
       name: "AP Physics C",
@@ -88,7 +97,7 @@ try {
     .selectOption(ids.taskId);
   await page
     .getByLabel("Assessment due", { exact: true })
-    .fill("2026-09-08T09:00");
+    .fill("2026-09-08T05:00");
   await page
     .getByLabel("Assessment grade category", { exact: true })
     .selectOption(ids.categoryId);
@@ -104,6 +113,8 @@ try {
   assert.equal(assessment.kind, "test");
   assert.deepEqual(assessment.taskIds, [ids.taskId]);
   assert.equal(assessment.gradeCategoryId, ids.categoryId);
+  assert.equal(assessment.dueAt, "2026-09-08T09:00:00.000Z");
+  const originalDueAt = assessment.dueAt;
 
   await page
     .getByRole("button", { name: "Edit assessment", exact: true })
@@ -122,6 +133,7 @@ try {
   assessment = snapshot.assessments[0];
   assert.equal(assessment.revision, 1);
   assert.equal(assessment.kind, "midterm");
+  assert.equal(assessment.dueAt, originalDueAt);
   await page.screenshot({ path: join(output, "assessments.png") });
 
   const firstVideo = page.video();

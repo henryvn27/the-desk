@@ -12,10 +12,11 @@ import {
   authorityPriority,
 } from "../../../packages/intelligence/authority";
 import { userError } from "./errors";
-
-function localDateTime(value: string | null | undefined) {
-  return value ? new Date(value).toISOString().slice(0, 16) : "";
-}
+import {
+  formatDateTimeLocal,
+  parseDateTimeLocal,
+  resolveTimeZone,
+} from "../../../packages/domain/time-zone";
 
 function displayDue(value: string | null) {
   return value ? new Date(value).toLocaleString() : "No due date recorded";
@@ -203,6 +204,7 @@ function AuthorityForm({
   const [classId, setClassId] = useState(
     existing?.classId ?? data.classes[0]?.id ?? "",
   );
+  const timeZone = resolveTimeZone(data.user?.timeZone);
   const tasks = data.tasks.filter((task) => task.classId === classId);
   const selectedTaskId = existing?.taskId ?? tasks[0]?.id ?? "";
   const linkedSources = data.sources.filter(
@@ -227,16 +229,17 @@ function AuthorityForm({
             classId: String(values.get("classId")),
             taskId: String(values.get("taskId")),
             fact: "due-date",
-            value: value ? new Date(value).toISOString() : null,
+            value: value ? parseDateTimeLocal(value, timeZone) : null,
             authorityKind: String(values.get("authorityKind")),
             confidence: String(values.get("confidence")),
             sourceLabel: String(values.get("sourceLabel")),
             details: String(values.get("details")),
             sourceId: String(values.get("sourceId")) || null,
             evidenceId: String(values.get("evidenceId")) || null,
-            capturedAt: new Date(
+            capturedAt: parseDateTimeLocal(
               String(values.get("capturedAt")),
-            ).toISOString(),
+              timeZone,
+            ),
           }),
         );
       }}
@@ -302,7 +305,7 @@ function AuthorityForm({
           name="value"
           aria-label="Reported due date"
           type="datetime-local"
-          defaultValue={localDateTime(existing?.value)}
+          defaultValue={formatDateTimeLocal(existing?.value, timeZone)}
         />
       </label>
       <label>
@@ -375,8 +378,8 @@ function AuthorityForm({
           type="datetime-local"
           required
           defaultValue={
-            localDateTime(existing?.capturedAt) ||
-            localDateTime(new Date().toISOString())
+            formatDateTimeLocal(existing?.capturedAt, timeZone) ||
+            formatDateTimeLocal(new Date(), timeZone)
           }
         />
       </label>

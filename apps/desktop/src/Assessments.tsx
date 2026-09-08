@@ -8,6 +8,11 @@ import {
 } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
 import { createStudentModel } from "../../../packages/intelligence/student-model";
+import {
+  formatDateTimeLocal,
+  parseDateTimeLocal,
+  resolveTimeZone,
+} from "../../../packages/domain/time-zone";
 
 const kindLabels: Record<Assessment["kind"], string> = {
   quiz: "Quiz",
@@ -22,10 +27,6 @@ const kindLabels: Record<Assessment["kind"], string> = {
   "standardized-test": "Standardized test",
   other: "Other",
 };
-
-function localDateTime(value: string | null) {
-  return value ? new Date(value).toISOString().slice(0, 16) : "";
-}
 
 export function Assessments({
   data,
@@ -170,6 +171,7 @@ function AssessmentForm({
   const [classId, setClassId] = useState(
     existing?.classId ?? data.classes[0]?.id ?? "",
   );
+  const timeZone = resolveTimeZone(data.user?.timeZone);
   const tasks = data.tasks.filter((task) => task.classId === classId);
   const categories = data.gradeCategories.filter(
     (category) => category.classId === classId,
@@ -187,7 +189,7 @@ function AssessmentForm({
             title: String(values.get("title")),
             kind: String(values.get("kind")),
             taskIds: values.getAll("taskIds").map(String),
-            dueAt: due ? new Date(due).toISOString() : null,
+            dueAt: due ? parseDateTimeLocal(due, timeZone) : null,
             gradeCategoryId: String(values.get("gradeCategoryId")) || null,
             notes: String(values.get("notes")),
           }),
@@ -259,7 +261,7 @@ function AssessmentForm({
           name="dueAt"
           aria-label="Assessment due"
           type="datetime-local"
-          defaultValue={localDateTime(existing?.dueAt ?? null)}
+          defaultValue={formatDateTimeLocal(existing?.dueAt ?? null, timeZone)}
         />
       </label>
       <label>

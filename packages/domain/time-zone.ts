@@ -66,3 +66,194 @@ export function formatInstant(value: string, timeZone?: string | null): string {
     day: "numeric",
   });
 }
+
+type DateTimeLocalParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+};
+
+const dateTimeLocalPattern =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
+
+function dateTimeLocalParts(value: string): DateTimeLocalParts {
+  const match = dateTimeLocalPattern.exec(value);
+  if (!match) throw new RangeError(`Invalid local date-time: ${value}`);
+  const [
+    yearText,
+    monthText,
+    dayText,
+    hourText,
+    minuteText,
+    secondText = "0",
+    millisecondsText = "0",
+  ] = match.slice(1);
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const millisecond = Number(millisecondsText.padEnd(3, "0"));
+  const candidate = new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second, millisecond),
+  );
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day ||
+    candidate.getUTCHours() !== hour ||
+    candidate.getUTCMinutes() !== minute ||
+    candidate.getUTCSeconds() !== second ||
+    candidate.getUTCMilliseconds() !== millisecond
+  ) {
+    throw new RangeError(`Invalid local date-time: ${value}`);
+  }
+  return { year, month, day, hour, minute, second, millisecond };
+}
+
+function dateTimeLocalKey(parts: DateTimeLocalParts): string {
+  return [
+    parts.year,
+    String(parts.month).padStart(2, "0"),
+    String(parts.day).padStart(2, "0"),
+    String(parts.hour).padStart(2, "0"),
+    String(parts.minute).padStart(2, "0"),
+    String(parts.second).padStart(2, "0"),
+    String(parts.millisecond).padStart(3, "0"),
+  ].join("-");
+}
+
+function dateTimeLocalMilliseconds(parts: DateTimeLocalParts): number {
+  return Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    parts.millisecond,
+  );
+}
+
+function dateTimeLocalFormatter(timeZone: string) {
+  return new Intl.DateTimeFormat("en-US-u-ca-gregory", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+function partsForInstant(value: Date, timeZone: string): DateTimeLocalParts {
+  const parts = dateTimeLocalFormatter(timeZone).formatToParts(value);
+  const number = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return {
+    year: number("year"),
+    month: number("month"),
+    day: number("day"),
+    hour: number("hour"),
+    minute: number("minute"),
+    second: number("second"),
+    millisecond: value.getUTCMilliseconds(),
+  };
+}
+
+function offsetAt(value: Date, timeZone: string): number {
+  const parts = partsForInstant(value, timeZone);
+  const displayed = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    parts.millisecond,
+  );
+  return displayed - value.getTime();
+}
+
+function timeZoneOffsets(naive: Date, timeZone: string): number[] {
+  const offsets = new Set<number>();
+  for (let hours = -48; hours <= 48; hours += 6) {
+    offsets.add(offsetAt(new Date(naive.getTime() + hours * 3_600_000), timeZone));
+  }
+  return [...offsets];
+}
+
+/**
+ * Format an ISO instant for a datetime-local input in the persisted profile
+ * zone. The result intentionally has no offset because that is the HTML
+ * input's wall-clock contract.
+ */
+export function formatDateTimeLocal(
+  value: string | Date | null | undefined,
+  timeZone?: string | null,
+): string {
+  if (value == null || value === "") return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(+date)) return "";
+  const parts = partsForInstant(date, resolveTimeZone(timeZone));
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
+
+/**
+ * Convert a datetime-local wall clock into an ISO instant in an explicit
+ * IANA profile zone. Ambiguous fall-back times choose the earlier instant;
+ * nonexistent spring-forward times normalize forward to the nearest valid
+ * wall clock, without consulting the host process timezone.
+ */
+export function parseDateTimeLocal(
+  value: string,
+  timeZone?: string | null,
+): string {
+  const parts = dateTimeLocalParts(value);
+  const resolved = resolveTimeZone(timeZone);
+  const naive = new Date(
+    Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+      parts.millisecond,
+    ),
+  );
+  const requestedKey = dateTimeLocalKey(parts);
+  const candidates = timeZoneOffsets(naive, resolved)
+    .map((offset) => new Date(naive.getTime() - offset))
+    .filter(
+      (candidate) =>
+        dateTimeLocalKey(partsForInstant(candidate, resolved)) === requestedKey,
+    )
+    .sort((left, right) => left.getTime() - right.getTime());
+  if (candidates[0]) return candidates[0].toISOString();
+
+  // A spring-forward wall clock does not exist. Pick the nearest represented
+  // wall clock and prefer the forward side when the distance is tied.
+  const nearest = timeZoneOffsets(naive, resolved)
+    .map((offset) => new Date(naive.getTime() - offset))
+    .sort((left, right) => {
+      const leftDistance = Math.abs(
+        dateTimeLocalMilliseconds(partsForInstant(left, resolved)) -
+          dateTimeLocalMilliseconds(parts),
+      );
+      const rightDistance = Math.abs(
+        dateTimeLocalMilliseconds(partsForInstant(right, resolved)) -
+          dateTimeLocalMilliseconds(parts),
+      );
+      return leftDistance - rightDistance || right.getTime() - left.getTime();
+    })[0];
+  if (!nearest) throw new RangeError(`Unable to resolve local date-time: ${value}`);
+  return nearest.toISOString();
+}
