@@ -41,6 +41,7 @@ import { DeskStore } from "../../../packages/domain/store";
 import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
+import { shouldAllowDeskMediaPermission } from "./permission-policy";
 import { SupabaseAccount } from "./supabase";
 import { SupabaseSyncCoordinator } from "./supabase-sync";
 import {
@@ -517,11 +518,26 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(file).toString());
   });
   session.defaultSession.setPermissionRequestHandler(
-    (web, permission, callback) =>
-      callback(permission === "media" && web === lens?.webContents),
+    (web, permission, callback, details) =>
+      callback(shouldAllowDeskMediaPermission({
+        permission,
+        trustedWindow: web === main?.webContents || web === lens?.webContents,
+        isMainFrame: details.isMainFrame,
+        requestingUrl: details.requestingUrl,
+        securityOrigin: "securityOrigin" in details ? details.securityOrigin : undefined,
+        mediaTypes: "mediaTypes" in details ? details.mediaTypes : undefined,
+      })),
   );
   session.defaultSession.setPermissionCheckHandler(
-    (web, permission) => permission === "media" && web === lens?.webContents,
+    (web, permission, requestingOrigin, details) =>
+      shouldAllowDeskMediaPermission({
+        permission,
+        trustedWindow: web === main?.webContents || web === lens?.webContents,
+        isMainFrame: details.isMainFrame,
+        requestingUrl: details.requestingUrl ?? requestingOrigin,
+        securityOrigin: details.securityOrigin ?? requestingOrigin,
+        mediaTypes: details.mediaType ? [details.mediaType] : undefined,
+      }),
   );
   mkdirSync(app.getPath("userData"), { recursive: true });
   databasePath = join(app.getPath("userData"), "desk.sqlite");
