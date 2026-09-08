@@ -13,6 +13,7 @@ import { evaluateExpression, evaluateExpressions } from "../../../packages/canva
 import { graphPath, intersections, panViewport, roots, sampleGraph, zoomViewport } from "../../../packages/canvas/graph";
 import { boxplot, calculatedRows, dataColumnAliases, histogram, linearRegression, numericColumn, summarize } from "../../../packages/canvas/data";
 import { RecordingChunkQueue } from "../../../packages/canvas/recording-upload";
+import { RecordingSessionRegistry } from "../../../packages/canvas/recording-session";
 
 const newId = () => crypto.randomUUID();
 const paragraph = (): Extract<NoteBlock, { type: "paragraph" }> => ({ id: newId(), type: "paragraph", text: "" });
@@ -241,14 +242,17 @@ function RecordingControls({
 }) {
   const [recordingId, setRecordingId] = useState<string>();
   const [recorder, setRecorder] = useState<MediaRecorder>();
+  const [starting, setStarting] = useState(false);
   const [status, setStatus] = useState("");
   const [transcriptText, setTranscriptText] = useState("");
   const [audioURL, setAudioURL] = useState("");
   const audioRef = useRef<HTMLAudioElement>(null);
-  const stream = useRef<MediaStream | undefined>(undefined);
+  const sessions = useRef(new RecordingSessionRegistry());
+  const startingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const startGeneration = useRef(0);
   const documentRef = useRef(document);
   const startedAt = useRef(0);
-
   documentRef.current = document;
   const current = recordingId ? document.recordings?.find((item) => item.id === recordingId) : undefined;
   useEffect(() => {
@@ -268,10 +272,15 @@ function RecordingControls({
     }
     setAudioURL("");
   }, [document.recordings, recordingId, current?.status, current?.chunkCount]);
-  useEffect(() => () => {
-    recorder?.stop();
-    stream.current?.getTracks().forEach((track) => track.stop());
-  }, [recorder]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      startGeneration.current += 1;
+      startingRef.current = false;
+      sessions.current.disposeCurrent();
+    };
+  }, []);
 
   function update(id: string, change: Partial<NoteRecording>) {
     try {
@@ -284,9 +293,20 @@ function RecordingControls({
   }
 
   async function start() {
+    if (startingRef.current || sessions.current.hasActive()) return;
+    startingRef.current = true;
+    const generation = startGeneration.current + 1;
+    startGeneration.current = generation;
+    const stillStarting = () => mountedRef.current && startGeneration.current === generation;
+    const finishStarting = () => {
+      if (startGeneration.current === generation) startingRef.current = false;
+      if (stillStarting()) setStarting(false);
+    };
+    setStarting(true);
     setStatus("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setStatus("Audio recording is unavailable in this environment.");
+      finishStarting();
       return;
     }
     let localStream: MediaStream;
@@ -294,6 +314,12 @@ function RecordingControls({
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       setStatus("Microphone permission is required to record. No audio was saved.");
+      finishStarting();
+      return;
+    }
+    if (!stillStarting()) {
+      localStream.getTracks().forEach((track) => track.stop());
+      finishStarting();
       return;
     }
     const preferred = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -307,6 +333,13 @@ function RecordingControls({
     } catch (error) {
       localStream.getTracks().forEach((track) => track.stop());
       setStatus(error instanceof Error ? error.message : "Unable to start recording.");
+      finishStarting();
+      return;
+    }
+    if (!stillStarting()) {
+      await window.desk.recordingFinish(started.recordingId, "interrupted").catch(() => {});
+      localStream.getTracks().forEach((track) => track.stop());
+      finishStarting();
       return;
     }
     let nextRecorder: MediaRecorder;
@@ -315,17 +348,41 @@ function RecordingControls({
     } catch {
       localStream.getTracks().forEach((track) => track.stop());
       setStatus("This device cannot encode the selected audio format.");
+      await window.desk.recordingFinish(started.recordingId, "failed").catch(() => {});
+      finishStarting();
+      return;
+    }
+    if (!stillStarting()) {
+      await window.desk.recordingFinish(started.recordingId, "interrupted").catch(() => {});
+      localStream.getTracks().forEach((track) => track.stop());
+      finishStarting();
       return;
     }
     const meta: NoteRecording = { id: started.recordingId, status: "recording", ...(started.sessionId ? { sessionId: started.sessionId } : {}), startedAt: started.startedAt, chunkCount: 0, mimeType: started.mimeType, events: [] };
     documentRef.current = { ...documentRef.current, recordings: [...(documentRef.current.recordings ?? []), meta] };
     onChange(documentRef.current);
-    stream.current = localStream;
     startedAt.current = Date.parse(started.startedAt);
     const queue = new RecordingChunkQueue(
       0,
       (index, bytes) => window.desk.recordingChunk(started.recordingId, index, bytes),
     );
+    let resourcesStopped = false;
+    const stopResources = () => {
+      if (resourcesStopped) return;
+      resourcesStopped = true;
+      if (nextRecorder.state !== "inactive") nextRecorder.stop();
+      localStream.getTracks().forEach((track) => track.stop());
+    };
+    let lease: ReturnType<RecordingSessionRegistry["begin"]>;
+    try {
+      lease = sessions.current.begin(started.recordingId, stopResources);
+    } catch (error) {
+      stopResources();
+      await window.desk.recordingFinish(started.recordingId, "interrupted").catch(() => {});
+      setStatus(error instanceof Error ? error.message : "Another recording is already active.");
+      finishStarting();
+      return;
+    }
     let pendingData = Promise.resolve();
     let dataReadFailed = false;
     nextRecorder.ondataavailable = (event) => {
@@ -350,20 +407,33 @@ function RecordingControls({
           const finish = await window.desk.recordingFinish(started.recordingId, failure ? "failed" : "complete");
           const status = failure ? "failed" : "complete";
           update(started.recordingId, { status, endedAt: finish.endedAt, durationMs: Math.max(0, Date.parse(finish.endedAt) - startedAt.current), chunkCount: finish.chunkCount });
-          setStatus(failure ? `Recording incomplete after chunk ${failure.chunkIndex + 1} could not be saved. Earlier chunks remain on this Mac.` : "Recording saved in timestamped chunks.");
+          if (lease.isCurrent() || !sessions.current.hasActive())
+            setStatus(failure ? `Recording incomplete after chunk ${failure.chunkIndex + 1} could not be saved. Earlier chunks remain on this Mac.` : "Recording saved in timestamped chunks.");
         } catch {
           update(started.recordingId, { status: "interrupted", endedAt: new Date().toISOString(), durationMs: Math.max(0, Date.now() - startedAt.current) });
-          setStatus("Recording ended before its manifest could be finalized. Saved chunks remain on this Mac.");
+          if (lease.isCurrent() || !sessions.current.hasActive())
+            setStatus("Recording ended before its manifest could be finalized. Saved chunks remain on this Mac.");
         } finally {
-          localStream.getTracks().forEach((track) => track.stop());
-          stream.current = undefined;
-          setRecorder(undefined);
+          stopResources();
+          const released = lease.release();
+          if (released && mountedRef.current) setRecorder(undefined);
         }
       });
     };
-    nextRecorder.start(1000);
+    try {
+      nextRecorder.start(1000);
+    } catch (error) {
+      stopResources();
+      lease.release();
+      await window.desk.recordingFinish(started.recordingId, "failed").catch(() => {});
+      update(started.recordingId, { status: "failed", endedAt: new Date().toISOString(), durationMs: 0 });
+      setStatus(error instanceof Error ? error.message : "Unable to start recording.");
+      finishStarting();
+      return;
+    }
     setRecordingId(started.recordingId);
     setRecorder(nextRecorder);
+    finishStarting();
     setStatus("Recording… audio is saved every second.");
   }
 
@@ -405,7 +475,7 @@ function RecordingControls({
       {recorder ? (
         <button type="button" onClick={stop}>Stop recording</button>
       ) : (
-        <button type="button" onClick={() => void start()}>Record lecture</button>
+        <button type="button" onClick={() => void start()} disabled={starting}>{starting ? "Starting…" : "Record lecture"}</button>
       )}
       {document.recordings && document.recordings.length > 0 && (
         <label className="recording-picker">
