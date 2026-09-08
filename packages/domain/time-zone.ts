@@ -55,12 +55,29 @@ export function calendarDayDistance(from: ZonedDateParts, to: ZonedDateParts): n
   return Math.round((end - start) / 86_400_000);
 }
 
-export function formatInstant(value: string, timeZone?: string | null): string {
-  const date = new Date(value);
+/** Format an instant with an explicit profile zone instead of the host zone. */
+export function formatInstantWithOptions(
+  value: string | number | Date,
+  timeZone: string | null | undefined,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(+date)) return "an unknown date";
-  const resolved = resolveTimeZone(timeZone);
-  return date.toLocaleDateString("en-US", {
-    timeZone: resolved,
+  return new Intl.DateTimeFormat("en-US", {
+    ...options,
+    timeZone: resolveTimeZone(timeZone),
+  }).format(date);
+}
+
+export function formatInstantTime(value: string | number | Date, timeZone?: string | null): string {
+  return formatInstantWithOptions(value, timeZone, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function formatInstant(value: string, timeZone?: string | null): string {
+  return formatInstantWithOptions(value, timeZone, {
     weekday: "short",
     month: "short",
     day: "numeric",

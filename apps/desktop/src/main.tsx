@@ -14,7 +14,12 @@ import { CapturePolicySettings } from "./CapturePolicySettings";
 import { CaptureInbox } from "./CaptureInbox";
 import type { CaptureInboxItem } from "../../../packages/domain/contracts";
 import { userError } from "./errors";
-import { resolveTimeZone } from "../../../packages/domain/time-zone";
+import {
+  formatInstant,
+  formatInstantTime,
+  formatInstantWithOptions,
+  resolveTimeZone,
+} from "../../../packages/domain/time-zone";
 import React, { useEffect, useMemo, useState } from "react";
 const Canvas = React.lazy(() => import("./Canvas"));
 import { createRoot } from "react-dom/client";
@@ -369,6 +374,7 @@ function App() {
     }
   }
   const home = useMemo(() => deriveHome(data, new Date(tick)), [data, tick]);
+  const profileTimeZone = resolveTimeZone(data.user?.timeZone);
   const week = home.plan;
   const plannedNext = home.next ? data.tasks.find((t) => t.id === home.next!.taskId) : undefined;
   const sharedNextAction = intelligence?.nextAction.kind === "start-task" ? intelligence.nextAction : undefined;
@@ -766,7 +772,7 @@ function App() {
         <header>
           <div className="header-context">
             <div className="eyebrow">
-              {new Date(tick).toLocaleDateString(undefined, {
+              {formatInstantWithOptions(tick, profileTimeZone, {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
@@ -890,7 +896,7 @@ function App() {
             {active ? activeHomeSummary : next ? (
               <section className="next">
                 <div className="eyebrow">
-                  Next{home.next && Date.parse(home.next.start) > tick ? ` · ${new Date(home.next.start).toLocaleDateString(undefined, { weekday: "short" })}` : ""} · {data.classes.find((c) => c.id === next.classId)?.name}
+                  Next{home.next && Date.parse(home.next.start) > tick ? ` · ${formatInstantWithOptions(home.next.start, profileTimeZone, { weekday: "short" })}` : ""} · {data.classes.find((c) => c.id === next.classId)?.name}
                 </div>
                 <h2>{next.title}</h2>
                 <p>
@@ -1022,7 +1028,7 @@ function App() {
             <h2 className="section-title">Today</h2>
             {home.today.map((b) => (
               <div className="row" key={b.taskId}>
-                <span>{data.tasks.find((t) => t.id === b.taskId)?.title}<small>{new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</small></span>
+                <span>{data.tasks.find((t) => t.id === b.taskId)?.title}<small>{formatInstantTime(b.start, profileTimeZone)}</small></span>
                 <span>{b.minutes} min</span>
               </div>
             ))}
@@ -1036,7 +1042,7 @@ function App() {
                   <button className="home-class-row" type="button" key={course.id} onClick={() => setPage(course.id)}>
                     <span className="home-class-name"><span className="dot" />{course.name}</span>
                     <span className="home-class-detail">
-                      {first ? <><strong>{first.title}</strong><small>{first.dueAt ? `Due ${new Date(first.dueAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}` : "No due date"}{count > 1 ? ` · ${count} open` : ""}</small></> : <><strong>All clear</strong><small>No unfinished work</small></>}
+                      {first ? <><strong>{first.title}</strong><small>{first.dueAt ? `Due ${formatInstant(first.dueAt, profileTimeZone)}` : "No due date"}{count > 1 ? ` · ${count} open` : ""}</small></> : <><strong>All clear</strong><small>No unfinished work</small></>}
                     </span>
                     <span className="home-class-arrow" aria-hidden="true">›</span>
                   </button>
@@ -1083,7 +1089,7 @@ function App() {
                 {home.upcoming.map((item) => (
                   <div className="row" key={item.id}>
                     <span>{item.title}<small>{item.kind === "assessment" ? "Assessment" : "Deadline"} · {data.classes.find((c) => c.id === item.classId)?.name}</small></span>
-                    <span>{new Date(item.dueAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span>
+                    <span>{formatInstant(item.dueAt, profileTimeZone)}</span>
                   </div>
                 ))}
               </section>

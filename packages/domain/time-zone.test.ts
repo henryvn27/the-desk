@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  formatInstant,
+  formatInstantTime,
+  formatInstantWithOptions,
   formatDateTimeLocal,
   parseDateTimeLocal,
   resolveTimeZone,
@@ -35,4 +38,19 @@ test("invalid profile zones use the explicit UTC fallback", () => {
 
 test("datetime-local validation rejects impossible wall clocks", () => {
   assert.throws(() => parseDateTimeLocal("2026-02-30T09:00", "UTC"), /Invalid local date-time/);
+});
+
+test("academic display formatting stays in the saved profile zone", () => {
+  const instant = "2026-09-08T01:00:00.000Z";
+  assert.equal(formatInstant(instant, "America/New_York"), "Mon, Sep 7");
+  assert.equal(formatInstantTime(instant, "America/New_York"), "9:00 PM");
+  assert.equal(
+    formatInstantWithOptions(instant, "America/New_York", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    }),
+    "Monday, September 7",
+  );
+  assert.equal(formatInstantTime(instant, "Not/AZone"), "1:00 AM");
 });

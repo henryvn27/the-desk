@@ -16,6 +16,7 @@
     "package": "npm run build && electron-builder --dir",
     "lint": "eslint apps packages vite.config.ts",
     "test:desktop": "node scripts/smoke-desktop.mjs",
+    "test:home-time-zone": "node scripts/smoke-home-time-zone.mjs",
     "test:account": "node scripts/smoke-account.mjs",
     "test:cloud-sync": "node scripts/smoke-cloud-sync.mjs",
     "test:cloud-sync-conflict": "node scripts/smoke-cloud-sync-conflict.mjs",
