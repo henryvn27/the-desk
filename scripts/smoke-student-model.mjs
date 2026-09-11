@@ -20,7 +20,12 @@ try {
     },
   });
   const page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
+  const openMoreTools = async () => {
+    const more = page.locator("details.sidebar-more");
+    if (!(await more.evaluate((element) => element.open)))
+      await more.locator("summary").click();
+  };
 
   await page.evaluate(async () => {
     const classRecord = await window.desk.command({
@@ -112,6 +117,7 @@ try {
     });
   });
 
+  await openMoreTools();
   await page.getByRole("button", { name: "Concepts", exact: true }).click();
   const conceptHeading = page.getByRole("heading", {
     name: "Concepts & preparedness",
@@ -126,6 +132,7 @@ try {
   await projectile.getByText(/Prerequisite gap: Vectors/).waitFor();
   await page.screenshot({ path: join(output, "concepts-student-model.png") });
 
+  await openMoreTools();
   await page.getByRole("button", { name: "Assessments", exact: true }).click();
   await page.getByRole("heading", { name: "Assessments", exact: true }).waitFor();
   await page.getByText(/Student Model readiness:/).waitFor();
@@ -138,7 +145,7 @@ try {
     await window.desk.command({ type: "session.start", taskId: task.id });
     await window.desk.command({ type: "session.end", completed: false });
   });
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Today", exact: true }).click();
   await page.getByText("Session saved", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Add details", exact: true }).click();
   await page

@@ -28,6 +28,10 @@
     "test:math": "node scripts/smoke-math.mjs",
     "test:notebook": "node scripts/smoke-notebook.mjs",
     "test:notes": "node scripts/smoke-notes.mjs",
+    "test:first-run": "node scripts/smoke-first-run.mjs",
+    "test:chat-provider": "node scripts/smoke-chat-provider.mjs",
+    "test:packaged-provider": "node scripts/smoke-packaged-provider.mjs",
+    "test:packaged-study": "node scripts/smoke-packaged-study.mjs",
     "test:student-model": "node scripts/smoke-student-model.mjs",
     "test:intelligence": "node scripts/smoke-intelligence.mjs",
     "benchmark:planner": "tsx scripts/benchmark-planner.mjs",
@@ -39,7 +43,8 @@
     "benchmark:intelligence": "tsx scripts/benchmark-intelligence.ts",
     "test:capture": "node scripts/smoke-capture.mjs",
     "test:class": "node scripts/smoke-class.mjs",
-    "test:study-quality": "tsx scripts/smoke-study-quality.mjs"
+    "test:study-quality": "tsx scripts/smoke-study-quality.mjs",
+    "test:study-artifacts": "node scripts/smoke-study-artifacts.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",

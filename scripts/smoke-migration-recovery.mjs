@@ -90,7 +90,7 @@ try {
           { type: "class.create", name: "AP Physics C" },
           createdAt,
         ).classes[0];
-        store.execute(
+        const task = store.execute(
           {
             type: "task.create",
             input: {
@@ -106,6 +106,10 @@ try {
             },
           },
           new Date("2026-09-06T12:01:00.000Z"),
+        ).tasks[0];
+        store.execute(
+          { type: "canvas.create", taskId: task.id, notebook: true },
+          new Date("2026-09-06T12:02:00.000Z"),
         );
         console.log(JSON.stringify({ snapshot: store.snapshot(), batch: store.syncBatch(100) }));
       } finally {
@@ -155,6 +159,7 @@ try {
   const migrated = runStore(legacyPath, openAndInspect);
   assert.deepEqual(migrated.snapshot.classes, seeded.snapshot.classes);
   assert.deepEqual(migrated.snapshot.tasks, seeded.snapshot.tasks);
+  assert.deepEqual(migrated.snapshot.canvases, seeded.snapshot.canvases);
   assert.deepEqual(
     migrated.snapshot.outbox
       .map(({ id, entityId, operation, createdAt }) => ({
@@ -170,7 +175,7 @@ try {
   assert.ok(migrated.batch.every((operation) => operation.payload === "{}"));
 
   const migratedDatabase = new DatabaseSync(legacyPath);
-  assert.equal(schemaVersion(migratedDatabase), 42);
+  assert.equal(schemaVersion(migratedDatabase), 44);
   assert.deepEqual(
     rows(
       migratedDatabase.prepare("SELECT id,name,color FROM classes ORDER BY id"),
@@ -214,7 +219,7 @@ try {
     preservedPayload,
   );
   const resumedDatabase = new DatabaseSync(legacyPath);
-  assert.equal(schemaVersion(resumedDatabase), 42);
+  assert.equal(schemaVersion(resumedDatabase), 44);
   assert.equal(
     resumedDatabase
       .prepare("SELECT payload FROM outbox WHERE id=?")
@@ -372,9 +377,9 @@ try {
       {
         result: "PASS",
         flows: [
-          "schema-36 class, task and outbox rows migrate through the real DeskStore to schema 42",
+          "schema-36 class, task, task-backed Note and outbox rows migrate through the real DeskStore to schema 44",
           "legacy JSON data stays byte-for-byte stable and new outbox fields receive safe defaults",
-          "an existing schema-37 outbox payload survives resumed schema-42 migration exactly",
+          "an existing schema-37 outbox payload survives resumed schema-44 migration exactly",
           "future and structurally corrupt schemas are rejected without replacing their schema, version or sentinel data",
           "an abruptly terminated writer reopens with committed class/task/outbox data and passes SQLite integrity check",
         ],

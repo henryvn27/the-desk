@@ -25,15 +25,20 @@ try{
   await launch();
   const initial=await page.evaluate(()=>window.desk.providerStatus());
   assert.equal(initial.configured,false);
+  assert.equal(initial.selectedProvider,"desk-managed");
   assert.equal(initial.source,null);
   assert.equal(initial.secureStorage,true);
   assert.equal(await page.evaluate(()=>typeof window.desk.saveProviderKey),"undefined");
   await app.evaluate(({dialog},path)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[path]});},keyFile);
   await page.getByRole("button",{name:"Settings",exact:true}).click();
   assert.equal(await page.locator('input[type="password"]').count(),0);
-  await page.getByRole("button",{name:"Import OpenRouter key",exact:true}).click();
-  await page.getByText("OpenRouter key stored securely. Lens will verify it on your next request.",{exact:true}).waitFor();
-  assert.deepEqual(await page.evaluate(()=>window.desk.providerStatus()),{configured:true,secureStorage:true,source:"saved-user-key"});
+  await page.getByRole("button",{name:"Configure",exact:true}).click();
+  await page.getByText("Key stored securely on this Mac.",{exact:true}).waitFor();
+  await page.getByRole("button",{name:"Use BYOK",exact:true}).click();
+  const configured=await page.evaluate(()=>window.desk.providerStatus());
+  assert.equal(configured.configured,true);
+  assert.equal(configured.selectedProvider,"byok");
+  assert.equal(configured.source,"saved-user-key");
   assert.equal((await readFile(join(data,"openrouter-key.enc"))).includes(Buffer.from(syntheticKey)),false);
   await page.screenshot({path:join(output,"openrouter-settings.png")});
   await app.evaluate((_electron,key)=>{
@@ -69,8 +74,7 @@ try{
   await launch();
   assert.equal((await page.evaluate(()=>window.desk.providerStatus())).source,"saved-user-key");
   await page.getByRole("button",{name:"Settings",exact:true}).click();
-  await page.getByRole("button",{name:"Disconnect provider",exact:true}).click();
-  await page.getByText("OpenRouter disconnected.",{exact:true}).waitFor();
+  await page.getByRole("button",{name:"Disconnect",exact:true}).click();
   assert.equal((await page.evaluate(()=>window.desk.providerStatus())).configured,false);
   assert.equal(await readFile(join(data,"provider-key.enc"),"utf8"),"legacy-unread-fixture");
   assert.deepEqual(errors,[]);

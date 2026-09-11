@@ -183,7 +183,7 @@ export function Lens({
       submittedQuestionRef.current = "";
     });
     const errorUnsubscribe = window.desk.onLensError((message) => {
-      setError(message);
+      setError(userError(new Error(message)));
       setBusy(false);
     });
     return () => {
@@ -515,7 +515,7 @@ export function Lens({
           </header>
           <div className="lens-answer-text">{error || answer?.explanation || "Lens could not complete this request."}</div>
           {answer && (
-            <details className="lens-answer-details" open>
+            <details className="lens-answer-details">
               <summary>Save or continue</summary>
               {(scopedSources.length > 0 || browserContext) && (
                 <div className="lens-answer-context">

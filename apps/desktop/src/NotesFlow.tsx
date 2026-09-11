@@ -47,6 +47,7 @@ export default function NotesFlow({
   onStudySelection,
   files,
   onDropText,
+  autoFocus = false,
 }: {
   document: NoteDocument;
   canvasId?: string;
@@ -60,6 +61,7 @@ export default function NotesFlow({
   onStudySelection?: (text: string) => void;
   files?: Record<string, { mimeType: string; dataURL: string }>;
   onDropText?: (text: string) => void;
+  autoFocus?: boolean;
 }) {
   const note = document;
   const [active, setActive] = useState(note.blocks[0]?.id ?? "");
@@ -68,6 +70,7 @@ export default function NotesFlow({
   const lastEditEvent = useRef<{ recordingId: string; blockId: string; atMs: number } | undefined>(undefined);
   const headings = useMemo(() => noteHeadings(note), [note]);
   const recordingEvents = useMemo(() => (note.recordings ?? []).flatMap((recording) => (recording.events ?? []).filter((event) => event.blockId).map((event) => ({ ...event, recordingId: recording.id }))), [note.recordings]);
+  const firstBlockId = note.blocks[0]?.id;
   function navigateToBlock(blockId?: string) {
     if (!blockId || !note.blocks.some((block) => block.id === blockId)) return;
     setActive(blockId);
@@ -83,6 +86,16 @@ export default function NotesFlow({
       globalThis.document.getElementById(`note-block-${initialBlockId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }, [initialBlockId, note.blocks]);
+
+  useEffect(() => {
+    if (!autoFocus || initialBlockId || !firstBlockId) return;
+    requestAnimationFrame(() => {
+      globalThis.document
+        .getElementById(`note-block-${firstBlockId}`)
+        ?.querySelector<HTMLElement>("textarea, input")
+        ?.focus();
+    });
+  }, [autoFocus, firstBlockId, initialBlockId]);
 
   function commit(next: NoteDocument, blockId?: string) {
     let value = next;

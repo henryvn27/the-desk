@@ -25,7 +25,7 @@ try {
   }
   assert.ok(page, "Main Desk window opened");
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.getByText("Make room for focus.").waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   await page.evaluate(async () => {
     await window.desk.command({ type: "planning.preferences", input: { studyStart: "08:00", sleepCutoff: "22:00", studyDays: [0, 1, 2, 3, 4, 5, 6], bufferPercent: 15 } });
     const created = await window.desk.command({ type: "class.create", name: "AP Physics C" });
@@ -57,12 +57,21 @@ try {
   await page.screenshot({ path: join(output, "class-overview.png") });
   assert.equal(await page.getByRole("button", { name: "Start next study", exact: true }).count(), 1);
   assert.ok((await page.getByText("Teacher slides", { exact: true }).count()) >= 1);
+  await page.locator(".class-tabs").getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("button", { name: "New note", exact: true }).click();
+  await page.getByRole("dialog", { name: "Study notes" }).waitFor();
+  await page.getByPlaceholder("Start writing, or type / for a block…").first().fill("A note inherits its active class context.");
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
+  await page.getByText("Saved", { exact: true }).waitFor();
+  const contextualNote = await page.evaluate(async () => (await window.desk.snapshot()).canvases.find((note) => note.classId !== null && note.taskId === null));
+  assert.ok(contextualNote, "class-context New note creates an unassigned task note in the class");
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   assert.deepEqual(errors, []);
   const video = page.video();
   await app.close();
   app = undefined;
   if (video) await copyFile(await video.path(), join(output, "class-overview-operated.webm"));
-  console.log(JSON.stringify({ result: "PASS", flows: ["class graph seeded through V1 commands", "class overview renders progression/next/learning/assessment/teacher/grade evidence", "class material is visible without duplicating domain records"], artifacts: output }, null, 2));
+  console.log(JSON.stringify({ result: "PASS", flows: ["class graph seeded through V1 commands", "class overview renders progression/next/learning/assessment/teacher/grade evidence", "class-context Note creation", "class material is visible without duplicating domain records"], artifacts: output }, null, 2));
 } finally {
   if (app) await app.close().catch(() => {});
   await rm(data, { recursive: true, force: true });

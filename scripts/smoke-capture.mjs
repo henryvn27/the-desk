@@ -21,7 +21,7 @@ try {
     recordVideo: { dir: output },
   });
   const page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   await page.evaluate(async () => {
     await window.desk.command({ type: "class.create", name: "AP Physics C" });
   });

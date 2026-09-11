@@ -9,6 +9,7 @@ import type {
   SourceInput,
   Source,
 } from "../../../packages/domain/contracts";
+import type { StudyArtifactType } from "../../../packages/study/notebook-types";
 import { userError } from "./errors";
 
 export function Sources({
@@ -18,6 +19,7 @@ export function Sources({
   save,
   classify,
   openReader,
+  onStudy,
 }: {
   data: Snapshot;
   classId?: string;
@@ -25,11 +27,13 @@ export function Sources({
   save: (input: SourceInput) => Promise<unknown>;
   classify: (source: Source, kind: SourceKind) => Promise<unknown>;
   openReader: (source: Source) => void;
+  onStudy: (sourceIds: string[], type: StudyArtifactType) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [scopeQuestion, setScopeQuestion] = useState("");
   const [scopeMode, setScopeMode] = useState<"compare" | "synthesize" | "guide" | "quiz">("compare");
+  const [studyMode, setStudyMode] = useState<StudyArtifactType>("quiz");
   const [scopeStatus, setScopeStatus] = useState("");
   const sources = data.sources.filter(
     (s) =>
@@ -80,6 +84,13 @@ export function Sources({
               void window.desk.lens({ question: request, sourceIds: selectedSourceIds }).catch(() => setScopeStatus("Lens could not be opened."));
             }}>Ask Lens with scope</button>
             <button type="button" onClick={() => setSelectedSourceIds([])}>Clear</button>
+            <select aria-label="Study mode" value={studyMode} onChange={(event) => setStudyMode(event.target.value as StudyArtifactType)}>
+              <option value="quiz">Quiz</option>
+              <option value="flashcards">Flashcards</option>
+              <option value="audio">Audio review</option>
+              <option value="video">Video review</option>
+            </select>
+            <button className="primary" type="button" onClick={() => onStudy(selectedSourceIds, studyMode)}>Study together</button>
           </div>
         )}
         {scopeStatus && <p className="muted" role="status">{scopeStatus}</p>}
@@ -111,6 +122,7 @@ export function Sources({
           <SourceClassification source={s} save={classify} />
           <div className="actions source-card-actions">
             <button type="button" className="primary" onClick={() => openReader(s)}>Open reader</button>
+            <button type="button" onClick={() => onStudy([s.id], "quiz")}>Study this</button>
             {s.sourceUrl && <a className="button-link" href={s.sourceUrl} target="_blank" rel="noreferrer">Original</a>}
           </div>
           {!!s.annotations?.length && (

@@ -1,24 +1,24 @@
 # AI routing
 
-Deterministic capture and scheduling remain TypeScript. Normal inference uses a single OpenRouter chat/completions request from Electron main. Desk selects the model; the renderer cannot supply a tier, model, endpoint or credential. No direct provider integration, provider-route fallback or automatic retry is enabled; Lens has an explicit offline response with no visual marks when transport fails.
+Deterministic capture and scheduling remain TypeScript. Interactive AI goes through the canonical `AIProviderRouter` in Electron main. Desk selects the workload/model; the renderer cannot supply a tier, model, endpoint or credential. The selected provider is persisted as Desk Managed by default, with explicit ChatGPT/Codex and BYOK alternatives. No provider-route fallback or automatic retry is enabled; Lens has an explicit offline response with no visual marks when transport fails. See [AI_PROVIDERS.md](./AI_PROVIDERS.md) for provider ownership and credential boundaries.
 
 | Tier | Approved model | Approved OpenRouter endpoint |
 | --- | --- | --- |
-| FAST | openai/gpt-5.6-luna | azure |
-| STANDARD | openai/gpt-5.6-terra | azure |
-| DEEP | openai/gpt-5.6-sol | azure |
+| FAST | openai/gpt-5.6-luna | openai |
+| STANDARD | openai/gpt-5.6-terra | openai |
+| DEEP | openai/gpt-5.6-sol | openai |
 | MULTIMODAL | google/gemini-3.8-flash | google-vertex/global |
 | VERIFY | anthropic/claude-sonnet-5 | amazon-bedrock/global |
 
 Text Lens uses FAST (`openai/gpt-5.6-luna`); explicit image input uses MULTIMODAL. The other tiers are registered. Generic academic inference also starts on FAST and is called only after the deterministic pass marks a critical field ambiguous or incomplete. Requested and returned model identities are checked against the small alias/canonical-ID registry in `packages/intelligence/routing.ts`. Unknown substitutions fail closed. These model IDs and provider ZDR listings were checked against the public catalog on 2026-09-06; availability remains external state.
 
-Every request specifies `only`, `order`, `allow_fallbacks: false`, `require_parameters: true`, `data_collection: deny`, and `zdr: true`. No route silently relaxes privacy when unavailable. Provider retention constraints do not prove OpenRouter account-level input/output logging is disabled. Those account settings remain unverified.
+Every request specifies `only`, `order`, `allow_fallbacks: false`, `require_parameters: true`, and `data_collection: deny`. ZDR is enabled on the Gemini route, where the selected endpoint supports it; the current OpenAI and Bedrock routes explicitly set `zdr: false` because those endpoints do not offer ZDR for the approved models. No route silently relaxes provider selection or falls back to another model when unavailable. Provider retention constraints do not prove OpenRouter account-level input/output logging is disabled. Those account settings remain unverified.
 
 Requests use strict JSON-schema output, bounded input/history/output, a 45-second timeout and cancellation. Lens marks use a validated semantic protocol (`point`, `circle`, `arrow`, `underline`, `highlight`, `label`) with normalized coordinates, optional sequence/duration/confidence, and no provider actions. Questions and active task excerpts are included on Ask. Captured images are included only after explicit sharing. History is bounded and discarded with the Lens window.
 
 ## Academic inference boundary
 
-`packages/intelligence/inference.ts` is the shared deterministic first pass for Capture, browser context, Sources, Notes and future session inputs. It emits per-field confidence, source/revision/location provenance, conflicts and a review requirement without creating academic objects or writing a second store. The trusted main-process `desk:infer` handler may call the structured OpenRouter inference helper only when the deterministic pass cannot resolve a critical field. The renderer can request an inference, but cannot choose the model, tier, endpoint or credential.
+`packages/intelligence/inference.ts` is the shared deterministic first pass for Capture, browser context, Sources, Notes and future session inputs. It emits per-field confidence, source/revision/location provenance, conflicts and a review requirement without creating academic objects or writing a second store. The trusted main-process `desk:infer` handler may call the structured provider helper only when the deterministic pass cannot resolve a critical field. Desk Managed and BYOK use the bounded OpenAI-compatible route; ChatGPT/Codex intentionally keeps background inference local while selected so invisible work does not consume a user's allowance. The renderer can request an inference, but cannot choose the model, tier, endpoint or credential.
 
 Provider suggestions are bounded patches. They can fill an unresolved field at medium confidence, never overwrite a high-confidence or user-confirmed value, and remain marked `desk-inference` until the student confirms them. A provider failure returns the deterministic result with a sanitized reason; there is no retry loop, silent fallback, background autonomy or provider-side arithmetic. Capture continues to preserve the original evidence and route uncertain work through the existing Inbox.
 
@@ -26,7 +26,7 @@ Provider suggestions are bounded patches. They can fill an unresolved field at m
 
 The development launcher explicitly enables main-process loading of the ignored repository `.env.local`. The value never passes through preload or renderer. Packaged apps ignore this development flag and package only explicit build outputs, not environment files. No developer key is bundled.
 
-A packaged user can import their own OpenRouter key through an owned-main-window native file dialog. Main reads the file, validates it, and encrypts it with Electron safeStorage in `openrouter-key.enc`. No key-entry or key-value IPC exists in the renderer. Disconnect removes that encrypted file. Prior direct-provider credential files are ignored and preserved. Secure user-key import is local BYOK, not hosted production provisioning.
+A packaged user can import their own supported provider key through an owned-main-window native file dialog. Main reads the file, validates it, and encrypts it with Electron safeStorage in `openrouter-key.enc`. No key-entry or key-value IPC exists in the renderer. Disconnect removes that encrypted file. Prior direct-provider credential files are ignored and preserved. Secure user-key import is local BYOK, not hosted production provisioning. A Desk Managed gateway receives no reusable client secret; the development-only local key path is excluded from packaged apps.
 
 ## Measurement and evidence
 

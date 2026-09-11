@@ -64,6 +64,8 @@ function snapshot(extra: Partial<Snapshot> = {}): Snapshot {
     classes: [{ id: classId, name: "AP Physics C", color: "#557562" }],
     tasks: [],
     sessions: [],
+    studyMaterialSets: [],
+    studyArtifacts: [],
     planning,
     ...extra,
   };

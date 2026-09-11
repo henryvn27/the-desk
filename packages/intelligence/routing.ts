@@ -17,11 +17,22 @@ export const routingTier = z.enum([
 ]);
 export type RoutingTier = z.infer<typeof routingTier>;
 const routes = {
-  FAST: { model: APPROVED_MODELS[0], provider: "azure" },
-  STANDARD: { model: APPROVED_MODELS[1], provider: "azure" },
-  DEEP: { model: APPROVED_MODELS[2], provider: "azure" },
-  MULTIMODAL: { model: APPROVED_MODELS[3], provider: "google-vertex/global" },
-  VERIFY: { model: APPROVED_MODELS[4], provider: "amazon-bedrock/global" },
+  // OpenAI's current endpoints honor the no-collection policy but do not
+  // advertise Zero Data Retention for these models. Keep the provider
+  // explicit and opt into ZDR only on routes where OpenRouter supports it.
+  FAST: { model: APPROVED_MODELS[0], provider: "openai", zdr: false },
+  STANDARD: { model: APPROVED_MODELS[1], provider: "openai", zdr: false },
+  DEEP: { model: APPROVED_MODELS[2], provider: "openai", zdr: false },
+  MULTIMODAL: {
+    model: APPROVED_MODELS[3],
+    provider: "google-vertex/global",
+    zdr: true,
+  },
+  VERIFY: {
+    model: APPROVED_MODELS[4],
+    provider: "amazon-bedrock/global",
+    zdr: false,
+  },
 } as const;
 export function inferenceRoute(tier: RoutingTier) {
   const route = routes[routingTier.parse(tier)];
@@ -33,7 +44,7 @@ export function inferenceRoute(tier: RoutingTier) {
       allow_fallbacks: false,
       require_parameters: true,
       data_collection: "deny" as const,
-      zdr: true,
+      zdr: route.zdr,
     },
   };
 }

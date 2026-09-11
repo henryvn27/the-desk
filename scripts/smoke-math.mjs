@@ -21,7 +21,7 @@ async function launch() {
   page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("dialog", (dialog) => assert.equal(dialog.type(), "beforeunload"));
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
 }
 async function open() {
   await page.getByRole("button", { name: "Library", exact: true }).click();

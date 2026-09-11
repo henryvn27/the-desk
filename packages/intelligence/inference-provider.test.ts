@@ -26,10 +26,10 @@ test("structured inference uses the Desk-owned Luna route and privacy provider s
   assert.equal(result.model, "openai/gpt-5.6-luna");
   assert.equal(result.usage?.totalTokens, 32);
   assert.equal(request?.authorization, "Bearer synthetic-test-key");
-  assert.deepEqual(request?.body.provider, { only: ["azure"], order: ["azure"], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: true });
+  assert.deepEqual(request?.body.provider, { only: ["openai"], order: ["openai"], allow_fallbacks: false, require_parameters: true, data_collection: "deny", zdr: false });
   assert.equal(request?.body.model, "openai/gpt-5.6-luna");
-  assert.equal(request?.body.max_completion_tokens, 700);
-  assert.equal(request?.body.max_tokens, undefined);
+  assert.equal(request?.body.max_tokens, 700);
+  assert.equal(request?.body.max_completion_tokens, undefined);
 });
 
 test("structured inference rejects an unexpected model and does not retry", async () => {

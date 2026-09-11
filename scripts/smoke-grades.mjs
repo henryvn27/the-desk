@@ -109,7 +109,7 @@ try {
   await page.screenshot({ path: join(output, "grade-projection.png") });
   await page.getByRole("button", { name: "Capture", exact: true }).click();
   await page
-    .getByRole("button", { name: "Enter manually", exact: true })
+    .getByRole("button", { name: "Enter an assignment manually", exact: true })
     .click();
   await page.getByLabel("What needs doing?").fill("Next test preparation");
   await page.getByLabel("Estimated minutes", { exact: true }).fill("30");

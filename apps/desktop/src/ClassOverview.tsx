@@ -1,4 +1,5 @@
 import type { Command, Snapshot, Task } from "../../../packages/domain/contracts";
+import type { StudyArtifactType, StudyMaterialRequest } from "../../../packages/study/notebook-types";
 import { useState } from "react";
 import {
   deriveClassExperience,
@@ -81,19 +82,23 @@ export function ClassOverview({
   data,
   classId,
   openCanvas,
+  newNotebook,
   openSource,
   editTask,
   startTask,
+  onStudy,
   navigate,
   saveGrade,
   nextAction,
 }: {
   data: Snapshot;
   classId: string;
-  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
+  openCanvas: (taskId: string | null, canvasId?: string, blockId?: string, classId?: string | null) => Promise<void>;
+  newNotebook: (taskId: string | null, classId?: string | null) => Promise<void>;
   openSource: (sourceId: string) => void;
   editTask: (task: Task) => void;
   startTask: (taskId: string) => void;
+  onStudy: (type: StudyArtifactType, material: StudyMaterialRequest) => void;
   navigate: (page: string) => void;
   saveGrade: (command: Command) => Promise<unknown>;
   nextAction?: NextAction;
@@ -154,10 +159,10 @@ export function ClassOverview({
           {section === "notes" && (
             <>
               <div className="eyebrow">Notes</div>
-              <h2>Notes from this class</h2>
+              <div className="class-section-heading"><h2>Notes from this class</h2><button type="button" className="primary" onClick={() => void newNotebook(null, classId)}>New note</button></div>
               {notes.length ? notes.map((note) => (
-                <div className="context-row" key={note.id}><div><strong>{note.title}</strong><small>{note.taskTitle} · updated {dateTimeLabel(note.updatedAt)}</small></div><button type="button" className="primary" onClick={() => void openCanvas(note.taskId, note.id, note.blockId)}>Open note</button></div>
-              )) : <p className="muted">No notes yet. Open an assignment to start one.</p>}
+                <div className="context-row" key={note.id}><div><strong>{note.title}</strong><small>{note.taskTitle ?? "Class note"} · updated {dateTimeLabel(note.updatedAt)}</small></div><button type="button" className="primary" onClick={() => void openCanvas(note.taskId, note.id, note.blockId)}>Open note</button></div>
+              )) : <p className="muted">No notes yet. Start one from this class or from Notes.</p>}
             </>
           )}
           {section === "progress" && (
@@ -318,6 +323,9 @@ export function ClassOverview({
                 {assessment.plannedMinutes ? `${assessment.plannedMinutes} min planned` : "No preparation block planned"} · {assessment.sourceTitles.length ? `${assessment.sourceTitles.length} source${assessment.sourceTitles.length === 1 ? "" : "s"}` : "No linked sources"} · {assessment.mistakeCount} related mistake{assessment.mistakeCount === 1 ? "" : "s"}
               </small>
               {assessment.preparedness && <p className="class-assessment-readiness"><strong>Preparedness:</strong> {preparednessLabels[assessment.preparedness] ?? assessment.preparedness}. {assessment.readinessWhy.slice(0, 2).join(" ")}</p>}
+              <div className="actions class-study-actions" aria-label={`Study ${assessment.title}`}>
+                {(["quiz", "flashcards", "audio", "video"] as const).map((type) => <button key={type} type="button" onClick={() => onStudy(type, { classId, assessmentId: assessment.id, taskId: assessment.taskIds[0] })}>{type === "quiz" ? "Quiz" : type === "flashcards" ? "Flashcards" : type === "audio" ? "Audio" : "Video"}</button>)}
+              </div>
             </div>
           </article>
         )) : <p className="muted">No assessments are linked to this class yet.</p>}
@@ -357,7 +365,7 @@ export function ClassOverview({
               <div className="class-material-row" key={note.id}>
                 <div>
                   <strong>{note.title}</strong>
-                  <small>{note.taskTitle} · updated {dateTimeLabel(note.updatedAt)}</small>
+                  <small>{note.taskTitle ?? "Class note"} · updated {dateTimeLabel(note.updatedAt)}</small>
                 </div>
                 <button type="button" onClick={() => void openCanvas(note.taskId, note.id, note.blockId)}>Open</button>
               </div>

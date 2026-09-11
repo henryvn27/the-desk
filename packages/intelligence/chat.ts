@@ -3,6 +3,7 @@ import type { Snapshot } from "../domain/contracts";
 import { deriveHome, type HomeProjection } from "../planner/home";
 import { packAvailableTime, type AvailableTimePlan } from "./learning-loop";
 import type { DeskIntelligence } from "./desk-intelligence";
+import type { StudyArtifactType } from "../study/notebook-types";
 import {
   calendarDayDistance,
   formatInstant,
@@ -38,7 +39,16 @@ export type ChatAction =
   | { type: "start-session"; taskId: string }
   | { type: "resume-session" }
   | { type: "open-page"; page: "Home" | "Plan" | "Notes" | "Library" | "Capture" }
-  | { type: "open-notes"; taskId: string };
+  | { type: "open-notes"; taskId: string }
+  | { type: "new-note"; classId?: string }
+  | {
+      type: "study";
+      mode: StudyArtifactType;
+      classId?: string;
+      assessmentId?: string;
+      taskId?: string;
+      sourceIds?: string[];
+    };
 
 export type ChatUpcomingItem = {
   taskId: string;
@@ -148,7 +158,6 @@ function upcomingResponse(snapshot: Snapshot, home: HomeProjection): ChatRespons
   };
 }
 
-
 /** Literal confirmed deadlines in the next seven local calendar days. */
 export function deadlinePeriodItems(snapshot: Snapshot, now: Date, days = 7) {
   const timeZone = profileTimeZone(snapshot);
@@ -252,6 +261,50 @@ function timeResponse(snapshot: Snapshot, rawMinutes: number, now: Date): ChatRe
   };
 }
 
+function studyContext(snapshot: Snapshot, request: ChatRequest) {
+  const question = request.question.toLocaleLowerCase();
+  const active = snapshot.sessions.find((session) => !session.endedAt);
+  const requestedTask = snapshot.tasks.find((candidate) =>
+    !candidate.completed && question.includes(candidate.title.toLocaleLowerCase()),
+  );
+  let task = request.context?.taskId
+    ? taskFor(snapshot, request.context.taskId)
+    : taskFor(snapshot, active?.taskId) ?? requestedTask;
+  const classId = request.context?.classId ?? task?.classId ?? snapshot.classes.find((course) => question.includes(course.name.toLocaleLowerCase()))?.id;
+  const assessment = snapshot.assessments.find((candidate) =>
+    (classId ? candidate.classId === classId : true) &&
+    (question.includes(candidate.title.toLocaleLowerCase()) || (task ? candidate.taskIds.includes(task.id) : false)),
+  ) ?? (classId ? snapshot.assessments.filter((candidate) => candidate.classId === classId).sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? "")).at(0) : undefined);
+  if (!task && assessment?.taskIds.length === 1) task = taskFor(snapshot, assessment.taskIds[0]);
+  return {
+    ...(classId ?? task?.classId ? { classId: classId ?? task?.classId } : {}),
+    ...(assessment ? { assessmentId: assessment.id } : {}),
+    ...(task ? { taskId: task.id } : {}),
+    ...(request.sourceIds?.length ? { sourceIds: request.sourceIds } : {}),
+  };
+}
+
+function studyResponse(snapshot: Snapshot, request: ChatRequest, mode: StudyArtifactType): ChatResponse {
+  const context = studyContext(snapshot, request);
+  const labels: Record<StudyArtifactType, string> = {
+    quiz: "Quiz",
+    flashcards: "Flashcards",
+    audio: "Audio review",
+    video: "Video review",
+  };
+  const target = context.assessmentId
+    ? snapshot.assessments.find((assessment) => assessment.id === context.assessmentId)?.title
+    : context.classId
+      ? snapshot.classes.find((course) => course.id === context.classId)?.name
+      : "the selected material";
+  return {
+    kind: "deterministic",
+    deterministic: true,
+    text: `I’ll assemble the relevant Desk Sources and Notes for ${target ?? "your study request"} and open a native ${labels[mode].toLocaleLowerCase()} activity.`,
+    action: { type: "study", mode, ...context },
+  };
+}
+
 function directTaskStart(snapshot: Snapshot, question: string): ChatResponse | null {
   const match = question.match(/^(?:start|begin|work on|do)\s+(.+)$/i);
   if (!match?.[1]) return null;
@@ -290,6 +343,7 @@ export function deriveChatSuggestions(snapshot: Snapshot, intelligence: DeskInte
   if (home.attention.length) suggestions.push("What needs my attention?");
   if (deadlinePeriodItems(snapshot, now).items.length) suggestions.push("What’s due this week?");
   if (!suggestions.length) suggestions.push("What should I do now?");
+  if (!snapshot.canvases.length) suggestions.push("Take a note");
   suggestions.push("I have 25 minutes");
   return [...new Set(suggestions)].slice(0, 4);
 }
@@ -337,6 +391,23 @@ export function resolveChat(
   if (minutes?.[1]) return timeResponse(snapshot, Number(minutes[1]), now);
   if (/\b(?:capture|save this|remember this)\b/.test(normalized))
     return { kind: "deterministic", deterministic: true, text: "I can save this to Capture Inbox first, then finish filing it in the background.", action: { type: "open-page", page: "Capture" } };
+  if (/\b(?:quiz me|make (?:a )?quiz|test me|practice quiz)\b/.test(normalized))
+    return studyResponse(snapshot, request, "quiz");
+  if (/\b(?:flashcards?|make cards|study cards)\b/.test(normalized))
+    return studyResponse(snapshot, request, "flashcards");
+  if (/\b(?:audio|listen|something i can listen|podcast)\b/.test(normalized))
+    return studyResponse(snapshot, request, "audio");
+  if (/\b(?:video review|make a video|watch a review)\b/.test(normalized))
+    return studyResponse(snapshot, request, "video");
+  if (/\b(?:take|write|jot down|start)\s+(?:a\s+)?note[s]?\b|\bnew\s+note\b|\bopen\s+(?:a\s+)?blank\s+note\b|\bwrite\s+something\s+down\b/.test(normalized))
+    return {
+      kind: "deterministic",
+      deterministic: true,
+      text: "Opening a blank Note. Add a class whenever you know where it belongs.",
+      action: request.context?.classId
+        ? { type: "new-note", classId: request.context.classId }
+        : { type: "new-note" },
+    };
   if (/\b(?:open|show|go to)\s+(?:my\s+)?notes?\b/.test(normalized))
     return activeTask
       ? { kind: "deterministic", deterministic: true, text: `Open Notes for ${activeTask.title}.`, action: { type: "open-notes", taskId: activeTask.id } }

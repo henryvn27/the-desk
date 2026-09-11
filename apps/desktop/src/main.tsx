@@ -25,9 +25,12 @@ import type {
   SearchResult,
   CanvasRecord,
   LensHotkeyStatus,
+  StudyArtifact,
 } from "../../../packages/domain/contracts";
+import type { StudyArtifactType, StudyMaterialRequest } from "../../../packages/study/notebook-types";
 import type { DeskIntelligence } from "../../../packages/intelligence/desk-intelligence";
 import type { DeskSyncStatus } from "../../../packages/integrations/supabase-sync";
+import type { AIProviderStatus } from "../../../packages/intelligence/ai-provider";
 import { deriveHome } from "../../../packages/planner/home";
 import { defaultPlanningPreferences } from "../../../packages/domain/contracts";
 import { StudyPlan } from "./StudyPlan";
@@ -50,6 +53,7 @@ import { SessionReview } from "./SessionReview";
 import { TestOutPanel } from "./TestOutPanel";
 import { BrowserBridgeSettings } from "./BrowserBridgeSettings";
 import { ChatWorkspace, type ChatThread } from "./ChatWorkspace";
+import { StudyArtifactWorkspace } from "./StudyArtifactWorkspace";
 import { Button, Input } from "./components/base";
 import {
   BookOpen01,
@@ -64,7 +68,7 @@ import type { ChatAction } from "../../../packages/intelligence/chat";
 import type { BrowserBridgeMessage } from "../../../packages/integrations/browser-bridge";
 import type { TestOutPlan } from "../../../packages/intelligence/learning-loop";
 import { learningOverrideText } from "../../../packages/intelligence/learning-loop";
-type CanvasTarget = CanvasRecord & { initialBlockId?: string };
+type CanvasTarget = CanvasRecord & { initialBlockId?: string; autoFocus?: boolean };
 declare global {
   interface Window {
     EXCALIDRAW_ASSET_PATH: string;
@@ -104,6 +108,8 @@ const empty: Snapshot = {
   classes: [],
   tasks: [],
   sessions: [],
+  studyMaterialSets: [],
+  studyArtifacts: [],
   planning: defaultPlanningPreferences,
 };
 const emptySync: DeskSyncStatus = {
@@ -137,11 +143,12 @@ function App() {
   const [editing, setEditing] = useState<Task>();
   const [reviewingCapture, setReviewingCapture] = useState<CaptureInboxItem>();
   const [canvas, setCanvas] = useState<CanvasTarget>();
+  const [studyArtifactId, setStudyArtifactId] = useState<string | null>(null);
   const [browserContext, setBrowserContext] =
     useState<BrowserBridgeMessage | null>(null);
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
   const [activeChatThreadId, setActiveChatThreadId] = useState<string | null>(null);
-  const [providerConfigured, setProviderConfigured] = useState<boolean | null>(null);
+  const [providerStatus, setProviderStatus] = useState<AIProviderStatus | null>(null);
   const [lensHotkeyStatus, setLensHotkeyStatus] = useState<LensHotkeyStatus>({
     available: false,
     source: "unavailable",
@@ -175,49 +182,49 @@ function App() {
     void window.desk
       .providerStatus()
       .then((status) => {
-        if (mounted) setProviderConfigured(status.configured);
+        if (mounted) setProviderStatus(status);
       })
       .catch(() => {
-        if (mounted) setProviderConfigured(false);
+        if (mounted) setProviderStatus(null);
       });
     return () => {
       mounted = false;
     };
   }, []);
-  async function openCanvas(taskId: string, canvasId?: string, blockId?: string) {
+  async function openCanvas(taskId: string | null, canvasId?: string, blockId?: string, classId?: string | null, autoFocus = false) {
     try {
       // Search deep-links carry the canonical canvas id. Read it directly so
       // a just-created or just-updated Note cannot be missed by the React
       // snapshot refresh cadence and accidentally forked into a blank canvas.
       if (canvasId) {
         const direct = await window.desk.canvas(canvasId);
-        if (direct.taskId !== taskId) throw Error("That Note is linked to a different task.");
-        setCanvas(blockId ? { ...direct, initialBlockId: blockId } : direct);
+        if (taskId && direct.taskId !== taskId) throw Error("That Note is linked to a different task.");
+        setCanvas({ ...direct, ...(blockId ? { initialBlockId: blockId } : {}), autoFocus });
         return;
       }
       const existing = data.canvases.find(
-        (c) => c.taskId === taskId,
+        (c) => taskId ? c.taskId === taskId : c.taskId === null && c.classId === (classId ?? null),
       );
       const id =
         existing?.id ??
-        (await act({ type: "canvas.create", taskId }, true))?.canvases.at(-1)
+        (await act({ type: "canvas.create", taskId, ...(classId !== undefined ? { classId } : {}) }, true))?.canvases.at(-1)
           ?.id;
       if (id) {
         const record = await window.desk.canvas(id);
-        setCanvas(blockId ? { ...record, initialBlockId: blockId } : record);
+        setCanvas({ ...record, ...(blockId ? { initialBlockId: blockId } : {}), autoFocus: autoFocus || !existing });
       }
     } catch (e) {
       setError(userError(e));
     }
   }
-  async function newNotebook(taskId: string) {
+  async function newNotebook(taskId: string | null, classId?: string | null) {
     try {
       const created = await act(
-        { type: "canvas.create", taskId, notebook: true },
+        { type: "canvas.create", taskId, classId, notebook: true },
         true,
       );
       const id = created?.canvases.at(-1)?.id;
-      if (id) setCanvas(await window.desk.canvas(id));
+      if (id) setCanvas({ ...(await window.desk.canvas(id)), autoFocus: true });
     } catch (e) {
       setError(userError(e));
     }
@@ -247,6 +254,12 @@ function App() {
   const kind = location.hash.slice(1);
   const active = data.sessions.find((s) => !s.endedAt);
   const activeTask = data.tasks.find((t) => t.id === active?.taskId);
+  const activeStudyArtifact: StudyArtifact | undefined = studyArtifactId
+    ? data.studyArtifacts.find((artifact) => artifact.id === studyArtifactId)
+    : undefined;
+  const activeStudyMaterial = activeStudyArtifact
+    ? data.studyMaterialSets.find((material) => material.id === activeStudyArtifact.materialSetId)
+    : undefined;
   const captureContextClassId = data.classes.some((c) => c.id === page)
     ? page
     : activeTask?.classId;
@@ -330,6 +343,13 @@ function App() {
         setCaptureText("");
         setCapture(true);
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        const activeClassId = data.classes.some((course) => course.id === page)
+          ? page
+          : activeTask?.classId ?? null;
+        void newNotebook(null, activeClassId);
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setPage("Library");
@@ -338,7 +358,7 @@ function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [kind]);
+  }, [activeTask?.classId, data.classes, kind, page]);
   useEffect(() => {
     if (!focusSearch || page !== "Library") return;
     const frame = requestAnimationFrame(() => {
@@ -406,6 +426,28 @@ function App() {
       }
     });
   }, [active, busy, learningTask]);
+  function startStudy(type: StudyArtifactType, material: StudyMaterialRequest) {
+    void window.desk.studyStatus().then(async (status) => {
+      const needsConsent = status.connected && !status.message.toLocaleLowerCase().includes("deterministic") && localStorage.getItem("desk.study.external-consent") !== "accepted";
+      if (needsConsent && !window.confirm("Study generation sends the selected Desk Sources and Notes to your connected Google Notebook account. Continue?")) return null;
+      if (needsConsent) localStorage.setItem("desk.study.external-consent", "accepted");
+      // Chat actions can arrive before the renderer's periodic snapshot refresh
+      // observes a freshly captured task. Read canonical state immediately
+      // before deciding whether this activity should also open StudySession.
+      const latest = await window.desk.snapshot();
+      const artifact = await window.desk.studyGenerate({ type, material });
+      const latestActive = latest.sessions.find((session) => !session.endedAt);
+      if (artifact.status !== "failed" && material.taskId && !latestActive && latest.tasks.some((task) => task.id === material.taskId)) {
+        await act({ type: "session.start", taskId: material.taskId, mode: type === "quiz" ? "quiz" : "standard" }, true);
+      }
+      return artifact;
+    }).then((artifact) => {
+      if (!artifact) return;
+      setStudyArtifactId(artifact.id);
+      setPage("Chat");
+      return window.desk.snapshot().then(setData);
+    }).catch((caught) => setError(userError(caught)));
+  }
   function runChatAction(action: ChatAction) {
     if (action.type === "resume-session") {
       void window.desk.focusController();
@@ -424,6 +466,19 @@ function App() {
     }
     if (action.type === "open-notes") {
       void openCanvas(action.taskId);
+      return;
+    }
+    if (action.type === "new-note") {
+      void newNotebook(null, action.classId ?? null);
+      return;
+    }
+    if (action.type === "study") {
+      startStudy(action.mode, {
+        classId: action.classId,
+        assessmentId: action.assessmentId,
+        taskId: action.taskId,
+        sourceIds: action.sourceIds,
+      });
       return;
     }
     if (action.page === "Capture") {
@@ -662,15 +717,6 @@ function App() {
     <div className="shell">
       <aside>
         <div className="brand">The Desk</div>
-        <Button
-          variant="primary"
-          size="default"
-          className="new-chat-button sidebar-new-chat"
-          onPress={createChatThread}
-          icon={MessageChatCircle}
-        >
-          New chat
-        </Button>
         <nav className="primary-nav" aria-label="Main">
           <Button
             variant="quiet"
@@ -763,7 +809,7 @@ function App() {
           <small>Saved on this Mac</small>
         </div>
       </aside>
-      <main>
+      <main className={page === "Chat" ? "main-chat" : undefined}>
         <header>
           <div className="header-context">
             <div className="eyebrow">
@@ -773,7 +819,7 @@ function App() {
                 day: "numeric",
               })}
             </div>
-            {page !== "Home" && (
+            {page !== "Home" && page !== "Chat" && (
               <span className="header-location">
                 {data.classes.find((course) => course.id === page)?.name ?? page}
               </span>
@@ -793,7 +839,6 @@ function App() {
               <span>Search Library</span>
               <kbd>⌘K</kbd>
             </Button>
-            <Button variant="secondary" size="compact" icon={FilePlus02} onPress={() => setCapture(true)}>Capture</Button>
           </div>
         </header>
         {(workspaceError || error) && (
@@ -856,20 +901,31 @@ function App() {
           </p>
         )}
         {page === "Chat" ? (
-          <ChatWorkspace
-            data={data}
-            intelligence={intelligence}
-            providerConfigured={providerConfigured}
-            busy={busy}
-            page={page}
-            threads={chatThreads}
-            activeThreadId={activeChatThreadId}
-            setThreads={setChatThreads}
-            setActiveThreadId={setActiveChatThreadId}
-            ask={(input) => window.desk.chat(input)}
-            onAction={runChatAction}
-            onNewChat={createChatThread}
-          />
+          <div className="chat-study-stack">
+            {activeStudyArtifact && (
+              <StudyArtifactWorkspace
+                artifact={activeStudyArtifact}
+                material={activeStudyMaterial}
+                data={data}
+                save={(command) => act(command, true)}
+                close={() => setStudyArtifactId(null)}
+              />
+            )}
+            <ChatWorkspace
+              data={data}
+              intelligence={intelligence}
+              providerStatus={providerStatus}
+              busy={busy}
+              page={page}
+              threads={chatThreads}
+              activeThreadId={activeChatThreadId}
+              setThreads={setChatThreads}
+              setActiveThreadId={setActiveChatThreadId}
+              ask={(input) => window.desk.chat(input)}
+              onAction={runChatAction}
+              onNewChat={createChatThread}
+            />
+          </div>
         ) : page === "Home" ? (
           <>
             <div className="home-heading">
@@ -929,30 +985,33 @@ function App() {
                 >
                   Start session → <span className="shortcut-hint" aria-hidden="true">⌘/Ctrl+Enter</span>
                 </button>
-                <div className="actions">
-                  {bestAction?.testOut && (
-                    <button type="button" disabled={busy} onClick={() => setTestOutPlan(bestAction.testOut)}>
-                      Test out instead
+                <details className="next-more-actions">
+                  <summary>Other ways to work</summary>
+                  <div className="actions">
+                    {bestAction?.testOut && (
+                      <button type="button" disabled={busy} onClick={() => setTestOutPlan(bestAction.testOut)}>
+                        Test out instead
+                      </button>
+                    )}
+                    {bestAction?.conceptIds[0] && (
+                      <button type="button" disabled={busy} onClick={() => void act({ type: "memory.create", input: { text: learningOverrideText("skip-concept", bestAction.conceptIds[0]!, "not relevant right now"), category: "planning", classId: bestAction.classId ?? null } })}>
+                        Not relevant
+                      </button>
+                    )}
+                    <button
+                      disabled={busy}
+                      onClick={() => void act({ type: "session.start", taskId: next.id, mode: "quiz" })}
+                    >
+                      Start adaptive quiz
                     </button>
-                  )}
-                  {bestAction?.conceptIds[0] && (
-                    <button type="button" disabled={busy} onClick={() => void act({ type: "memory.create", input: { text: learningOverrideText("skip-concept", bestAction.conceptIds[0]!, "not relevant right now"), category: "planning", classId: bestAction.classId ?? null } })}>
-                      Not relevant
+                    <button
+                      disabled={busy}
+                      onClick={() => void act({ type: "session.start", taskId: next.id, mode: "exam" })}
+                    >
+                      Start fixed exam
                     </button>
-                  )}
-                  <button
-                    disabled={busy}
-                    onClick={() => void act({ type: "session.start", taskId: next.id, mode: "quiz" })}
-                  >
-                    Start adaptive quiz
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => void act({ type: "session.start", taskId: next.id, mode: "exam" })}
-                  >
-                    Start fixed exam
-                  </button>
-                </div>
+                  </div>
+                </details>
               </section>
             ) : bestAction && bestAction.kind !== "done" && bestAction.kind !== "notes" ? (
               <section className="next next-objective">
@@ -995,15 +1054,15 @@ function App() {
                 <h2>
                   {data.classes.length
                     ? home.schedule.length ? "Nothing else needs starting today." : "Ready when you are."
-                    : "Start with one class."}
+                    : "Start anywhere."}
                 </h2>
                 <p>
                   {data.classes.length
                     ? home.schedule.length ? "Your next planned block is shown in Upcoming." : "Capture an assignment to plan your next session."
-                    : "Add a class, then capture your first assignment."}
+                    : "Capture something or take a note. Add a class whenever it becomes useful."}
                 </p>
                 <button onClick={() => setCapture(true)}>
-                  Capture assignment
+                  {data.classes.length ? "Capture assignment" : "Capture something"}
                 </button>
               </section>
             )}
@@ -1108,7 +1167,7 @@ function App() {
             )}
           </>
         ) : page === "Notes" ? (
-          <NotesHub data={data} openCanvas={openCanvas} newNotebook={newNotebook} />
+          <NotesHub data={data} openCanvas={openCanvas} newNotebook={newNotebook} save={(c) => act(c, true)} />
         ) : page === "Memory" ? (
           <Memory data={data} save={(c) => act(c, true)} />
         ) : page === "Mistakes" ? (
@@ -1204,6 +1263,7 @@ function App() {
             saveCommand={(c) => act(c, true)}
             openCanvas={openCanvas}
             newNotebook={newNotebook}
+            onStudy={startStudy}
             navigate={setPage}
             startTask={(taskId) => {
               void act({ type: "session.start", taskId });
@@ -1217,6 +1277,7 @@ function App() {
             record={canvas}
             sources={data.sources}
             initialBlockId={canvas.initialBlockId}
+            autoFocus={canvas.autoFocus}
             close={() => setCanvas(undefined)}
           />
         </React.Suspense>
@@ -1343,15 +1404,19 @@ function NotesHub({
   data,
   openCanvas,
   newNotebook,
+  save,
 }: {
   data: Snapshot;
-  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
-  newNotebook: (taskId: string) => Promise<void>;
+  openCanvas: (taskId: string | null, canvasId?: string, blockId?: string) => Promise<void>;
+  newNotebook: (taskId: string | null, classId?: string | null) => Promise<void>;
+  save: (command: Command) => Promise<Snapshot | undefined>;
 }) {
+  const [contextError, setContextError] = useState("");
   const notes = data.canvases
     .map((note) => ({
       note,
       task: data.tasks.find((task) => task.id === note.taskId),
+      classId: note.classId ?? data.tasks.find((task) => task.id === note.taskId)?.classId ?? null,
     }))
     .sort((a, b) => Date.parse(b.note.updatedAt) - Date.parse(a.note.updatedAt));
   return (
@@ -1362,16 +1427,41 @@ function NotesHub({
           <h1 id="notes-title">Notes</h1>
           <p className="page-lede">Your typed notes and freeform thinking, together.</p>
         </div>
-        <span className="muted">{notes.length} {notes.length === 1 ? "note" : "notes"}</span>
+        <div className="actions">
+          <button type="button" className="primary" onClick={() => void newNotebook(null)}>New note</button>
+          <span className="muted">{notes.length} {notes.length === 1 ? "note" : "notes"}</span>
+        </div>
       </div>
       {notes.length ? (
         <div className="notes-list">
-          {notes.map(({ note, task }) => (
+          {contextError && <p className="error" role="alert">{contextError}</p>}
+          {notes.map(({ note, task, classId }) => (
             <article className="notes-list-row" key={note.id}>
               <div>
-                <div className="eyebrow">{task ? data.classes.find((item) => item.id === task.classId)?.name ?? "Class note" : "Note"}</div>
+                <div className="eyebrow">{classId ? data.classes.find((item) => item.id === classId)?.name ?? "Class note" : "No class yet"}</div>
                 <h2>{note.title || task?.title || "Untitled note"}</h2>
                 <p className="muted">Updated {new Date(note.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
+                {!task && (
+                  <label className="note-context-picker">
+                    <span className="sr-only">Class for {note.title || "this note"}</span>
+                    <select
+                      aria-label={`Class for ${note.title || "this note"}`}
+                      value={note.classId ?? ""}
+                      onChange={(event) => {
+                        setContextError("");
+                        void save({
+                          type: "canvas.context",
+                          id: note.id,
+                          revision: note.revision,
+                          input: { classId: event.target.value || null },
+                        }).catch((value) => setContextError(userError(value)));
+                      }}
+                    >
+                      <option value="">No class yet</option>
+                      {data.classes.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+                    </select>
+                  </label>
+                )}
               </div>
               <button type="button" className="primary" onClick={() => void openCanvas(note.taskId, note.id)}>Open note</button>
             </article>
@@ -1381,16 +1471,20 @@ function NotesHub({
         <section className="empty-state">
           <div className="empty-state-mark">N</div>
           <h2>Start with a note</h2>
-          <p>Open a task from a class to create a note that stays connected to your work.</p>
-          {data.tasks.length > 0 ? (
-            <div className="empty-state-actions">
-              {data.tasks.slice(0, 3).map((task) => (
-                <button key={task.id} type="button" onClick={() => void newNotebook(task.id)}>
-                  New note · {task.title}
-                </button>
-              ))}
-            </div>
-          ) : <p className="muted">Capture an assignment first, then your note will have a place to live.</p>}
+          <p>Start writing now. Add a class or connect a source whenever it becomes useful.</p>
+          <div className="empty-state-actions">
+            <button type="button" className="primary" onClick={() => void newNotebook(null)}>New note</button>
+            {data.tasks.length > 0 && (
+              <details>
+                <summary>Start from an assignment</summary>
+                {data.tasks.slice(0, 3).map((task) => (
+                  <button key={task.id} type="button" onClick={() => void newNotebook(task.id)}>
+                    {task.title}
+                  </button>
+                ))}
+              </details>
+            )}
+          </div>
         </section>
       )}
     </section>
@@ -1409,6 +1503,7 @@ function Library({
   saveProgress,
   openCanvas,
   newNotebook,
+  onStudy,
   navigate,
   startTask,
 }: {
@@ -1423,8 +1518,9 @@ function Library({
     input: import("../../../packages/domain/contracts").SourceInput,
   ) => Promise<unknown>;
   saveCommand: (command: Command) => Promise<Snapshot | undefined>;
-  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
-  newNotebook: (taskId: string) => Promise<void>;
+  openCanvas: (taskId: string | null, canvasId?: string, blockId?: string) => Promise<void>;
+  newNotebook: (taskId: string | null, classId?: string | null) => Promise<void>;
+  onStudy: (type: StudyArtifactType, material: StudyMaterialRequest) => void;
   navigate: (page: string) => void;
   startTask: (taskId: string) => void;
 }) {
@@ -1461,9 +1557,11 @@ function Library({
           nextAction={nextAction}
           classId={classId}
           openCanvas={openCanvas}
+          newNotebook={newNotebook}
           openSource={(sourceId) => setReaderTarget({ sourceId })}
           editTask={edit}
           startTask={startTask}
+          onStudy={onStudy}
           navigate={navigate}
           saveGrade={saveGrade}
         />
@@ -1480,7 +1578,7 @@ function Library({
           <div className="eyebrow">Everywhere in your Desk</div>
           {indexed.length ? indexed.map((result) => (
             <button key={`${result.kind}-${result.id}-${result.blockId ?? ""}`} className="search-result" type="button" onClick={() => {
-              if (result.kind === "note" && result.taskId) void openCanvas(result.taskId, result.id, result.blockId);
+              if (result.kind === "note") void openCanvas(result.taskId ?? null, result.id, result.blockId);
               else if (result.kind === "source") setReaderTarget({ sourceId: result.id, location: result.location });
               else if (result.kind === "annotation" && result.sourceId) setReaderTarget({ sourceId: result.sourceId, location: result.location });
             }}>
@@ -1496,6 +1594,7 @@ function Library({
         search={search}
         save={saveSource}
         openReader={(source) => setReaderTarget({ sourceId: source.id })}
+        onStudy={(sourceIds, type) => onStudy(type, { classId, sourceIds })}
         classify={(source, kind) =>
           saveProgress({
             type: "source.classify",

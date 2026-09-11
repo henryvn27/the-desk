@@ -40,7 +40,7 @@ async function launch() {
   }
   assert.ok(page, "Main Desk window opened");
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.getByText("Make room for focus.").waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
 }
 
 try {
@@ -61,11 +61,14 @@ try {
   await page.getByRole("button", { name: "Add class", exact: true }).click();
   await page.getByRole("button", { name: "Physics", exact: true }).waitFor();
   await page.getByRole("button", { name: "Capture", exact: true }).click();
-  await page.getByRole("button", { name: "Enter manually", exact: true }).click();
+  await page.getByRole("button", { name: "Enter an assignment manually", exact: true }).click();
   await page.getByLabel("What needs doing?").fill("Check force directions");
   await page.getByLabel("Estimated minutes").fill("30");
   await page.getByLabel("I have confirmed").check();
   await page.getByRole("button", { name: "Save assignment", exact: true }).click();
+  // Chat is the startup surface; return to Today before starting the saved
+  // plan item so this smoke follows the same user path as the product.
+  await page.getByRole("button", { name: "Today", exact: true }).click();
   await page.getByRole("button", { name: "Start session →", exact: true }).waitFor();
 
   await page.evaluate(async () => {

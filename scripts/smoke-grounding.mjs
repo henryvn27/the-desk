@@ -28,6 +28,7 @@ try{
  await launch();
  await app.evaluate(({dialog},path)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[path]});},keyFile);
  await page.evaluate(()=>window.desk.importProviderKey());
+ await page.evaluate(()=>window.desk.selectProvider("byok"));
  await app.evaluate(()=>{
    globalThis.tutorRequests=[];globalThis.providerAttack=false;
    globalThis.fetch=async(url,init)=>{

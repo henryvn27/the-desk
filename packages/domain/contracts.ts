@@ -8,6 +8,7 @@ import {
 import { tutoringMode, type TutoringMode } from "../intelligence/tutoring";
 import type { CaptureDraft } from "../intelligence/capture";
 import type { LensInput, LensResponse, LensSelection } from "../intelligence/lens-provider";
+import { aiProviderMode, type AIProviderMode, type AIProviderStatus } from "../intelligence/ai-provider";
 import type { LensInteractionState } from "../intelligence/lens-interaction";
 import {
   studyActivityKind,
@@ -27,14 +28,37 @@ import {
 import type { DeskIntelligence } from "../intelligence/desk-intelligence";
 import type { AcademicInference, InferenceRequest } from "../intelligence/inference";
 import type { ChatRequest, ChatResponse } from "../intelligence/chat";
+import {
+  studyArtifactSchema,
+  studyArtifactUpdateSchema,
+  studyMaterialSetSchema,
+  type StudyArtifact,
+  type StudyArtifactType,
+  type StudyArtifactUpdate,
+  type StudyMaterialRequest,
+  type StudyMaterialSet,
+  type StudyEngineStatus,
+  type StudyGenerationRequest,
+} from "../study/notebook-types";
 export type CanvasRecord = {
   id: string;
-  taskId: string;
+  /** A Note can start before the student has a task or class context. */
+  taskId: string | null;
+  classId?: string | null;
   title: string;
   createdAt: string;
   updatedAt: string;
   revision: number;
   scene: CanvasScene;
+};
+export type {
+  StudyArtifact,
+  StudyArtifactType,
+  StudyArtifactUpdate,
+  StudyMaterialRequest,
+  StudyMaterialSet,
+  StudyEngineStatus,
+  StudyGenerationRequest,
 };
 export type SearchResult = {
   kind: "task" | "source" | "annotation" | "note";
@@ -725,6 +749,8 @@ export type Snapshot = {
   classes: Class[];
   tasks: Task[];
   sessions: StudySession[];
+  studyMaterialSets: StudyMaterialSet[];
+  studyArtifacts: StudyArtifact[];
   planning: PlanningPreferences;
 };
 export const command = z.discriminatedUnion("type", [
@@ -737,6 +763,7 @@ export const command = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("sync.conflict.apply-remote"), id }),
   z.object({ type: z.literal("tutor.mode"), mode: tutoringMode }),
+  z.object({ type: z.literal("ai.provider.select"), mode: aiProviderMode }),
   z.object({ type: z.literal("capture.policy"), mode: capturePolicy }),
   z.object({
     type: z.literal("inbox.import"),
@@ -962,8 +989,18 @@ export const command = z.discriminatedUnion("type", [
 
   z.object({
     type: z.literal("canvas.create"),
-    taskId: id,
+    taskId: id.nullable().optional(),
+    classId: id.nullable().optional(),
     notebook: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal("canvas.context"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: z.object({
+      classId: id.nullable().optional(),
+      taskId: id.nullable().optional(),
+    }).strict(),
   }),
   z.object({ type: z.literal("canvas.recover"), id, scene: canvasScene }),
   z.object({
@@ -1111,6 +1148,36 @@ export const command = z.discriminatedUnion("type", [
     attempts: z.array(sessionAttemptInput).max(20).optional(),
     confidence: confidenceCaptureInput.optional(),
   }),
+  z.object({
+    type: z.literal("study.material.create"),
+    input: studyMaterialSetSchema.omit({ id: true, createdAt: true, updatedAt: true, revision: true }),
+  }),
+  z.object({
+    type: z.literal("study.material.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: studyMaterialSetSchema.omit({ id: true, createdAt: true, updatedAt: true, revision: true }),
+  }),
+  z.object({
+    type: z.literal("study.material.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("study.artifact.create"),
+    input: studyArtifactSchema.omit({ id: true, createdAt: true, updatedAt: true, revision: true }),
+  }),
+  z.object({
+    type: z.literal("study.artifact.update"),
+    id,
+    revision: z.number().int().nonnegative(),
+    input: studyArtifactUpdateSchema,
+  }),
+  z.object({
+    type: z.literal("study.artifact.forget"),
+    id,
+    revision: z.number().int().nonnegative(),
+  }),
 ]);
 export type Command = z.infer<typeof command>;
 export type LensCapture = {
@@ -1189,11 +1256,7 @@ export interface DeskAPI {
     token: string | null;
   }>;
   clearBrowserContext(): Promise<void>;
-  providerStatus(): Promise<{
-    configured: boolean;
-    secureStorage: boolean;
-    source: "development-env" | "saved-user-key" | null;
-  }>;
+  providerStatus(): Promise<AIProviderStatus>;
   accountStatus(): Promise<import("../integrations/supabase-auth").SupabaseAccountStatus>;
   accountSignIn(email: string, password: string): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
   accountSignUp(email: string, password: string): Promise<import("../integrations/supabase-auth").SupabaseAccountResult>;
@@ -1203,6 +1266,9 @@ export interface DeskAPI {
   importProviderKey(): Promise<boolean>;
   importCaptureFiles(): Promise<Snapshot | null>;
   removeProviderKey(): Promise<void>;
+  selectProvider(mode: AIProviderMode): Promise<AIProviderStatus>;
+  connectChatGPT(): Promise<AIProviderStatus>;
+  disconnectChatGPT(): Promise<AIProviderStatus>;
   captureScreen(): Promise<LensCapture>;
   recordingStart(canvasId: string, mimeType?: string): Promise<RecordingStart>;
   recordingChunk(recordingId: string, chunkIndex: number, data: Uint8Array): Promise<RecordingChunkResult>;
@@ -1210,6 +1276,8 @@ export interface DeskAPI {
   recordingURL(recordingId: string): Promise<string>;
   snapshot(): Promise<Snapshot>;
   command(value: Command): Promise<Snapshot>;
+  studyStatus(): Promise<StudyEngineStatus>;
+  studyGenerate(input: StudyGenerationRequest): Promise<StudyArtifact>;
   openResource(taskId: string): Promise<void>;
   lens(input?: { question?: string; activityKind?: import("../study/activities").StudyActivityKind; sourceIds?: string[] }): Promise<void>;
   lensContext(): Promise<{ question?: string; activityKind?: import("../study/activities").StudyActivityKind; sourceIds?: string[] } | null>;

@@ -53,6 +53,20 @@ export class ProviderCredentials {
       );
     }
   }
+  /** Development-only key used by the local managed gateway probe. */
+  developmentKeyValue() {
+    return this.developmentKey();
+  }
+  /** Development-only managed gateway URL; never returned to the renderer. */
+  developmentManagedEndpoint() {
+    if (!this.developmentPath || !existsSync(this.developmentPath)) return undefined;
+    try {
+      const values = parseEnv(readFileSync(this.developmentPath, "utf8"));
+      return parseEndpoint(values.DESK_MANAGED_AI_URL);
+    } catch {
+      return undefined;
+    }
+  }
   importFile(path: string) {
     this.save(readKeyFile(path));
   }
@@ -87,5 +101,16 @@ function readKeyFile(path: string, optional = false) {
     return parseKey(value);
   } catch {
     throw Error("Could not read an OpenRouter key from this file.");
+  }
+}
+
+function parseEndpoint(value: string | undefined) {
+  if (!value?.trim()) return undefined;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" && url.hostname !== "127.0.0.1" && url.hostname !== "localhost") return undefined;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return undefined;
   }
 }

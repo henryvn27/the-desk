@@ -33,11 +33,13 @@ export default function Canvas({
   sources,
   close,
   initialBlockId,
+  autoFocus = false,
 }: {
   record: CanvasRecord;
   sources: Source[];
   close: () => void;
   initialBlockId?: string;
+  autoFocus?: boolean;
 }) {
   const [status, setStatus] = useState("Saved"),
     [error, setError] = useState("");
@@ -392,8 +394,8 @@ export default function Canvas({
           kind: "class-material",
           title: `${record.title} paper capture`,
           text: value,
-          classIds: [],
-          taskIds: [record.taskId],
+          classIds: record.classId ? [record.classId] : [],
+          taskIds: record.taskId ? [record.taskId] : [],
         },
       });
       const source = next.sources.at(-1);
@@ -553,6 +555,7 @@ export default function Canvas({
             document={noteDocument}
             files={documentScene.current.files}
             canvasId={record.id}
+            autoFocus={autoFocus}
             onChange={changeNoteDocument}
             openFreeform={openFreeform}
             initialBlockId={initialBlockId}

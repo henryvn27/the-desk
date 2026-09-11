@@ -6,7 +6,7 @@ import {
   inferenceRequestSchema,
   shouldEscalateInference,
 } from "../../../packages/intelligence/inference";
-import { askAcademicInference, InferenceProviderError } from "../../../packages/intelligence/inference-provider";
+import { InferenceProviderError } from "../../../packages/intelligence/inference-provider";
 import { inferenceRoute } from "../../../packages/intelligence/routing";
 import {
   chatGrounding,
@@ -50,10 +50,11 @@ import { studyBlocksToIcs } from "../../../packages/planner/calendar";
 import { z } from "zod";
 import { ProviderCredentials } from "./credentials";
 import { shouldAllowDeskMediaPermission } from "./permission-policy";
+import { AIProviderError, AIProviderRouter } from "./ai-provider";
+import { CodexAppServer } from "./codex-provider";
 import { SupabaseAccount } from "./supabase";
 import { SupabaseSyncCoordinator } from "./supabase-sync";
 import {
-  askLens,
   LensProviderError,
   LENS_MODEL,
   lensInputSchema,
@@ -83,6 +84,13 @@ import {
   startBrowserBridgeHost,
   type BrowserBridgeHost,
 } from "../../../packages/integrations/browser-bridge-host";
+import {
+  studyGenerationRequestSchema,
+  type StudyArtifact,
+} from "../../../packages/study/notebook-types";
+import type { StudyEngineMaterial } from "../../../packages/study/notebook-engine";
+import { resolveStudyMaterialSet, noteTextForStudy } from "../../../packages/study/material-set";
+import { createNotebookStudyEngine } from "./notebook-study";
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "desk",
@@ -99,9 +107,12 @@ let store: DeskStore;
 let databasePath = "";
 let account: SupabaseAccount;
 let sync: SupabaseSyncCoordinator;
+let aiProvider: AIProviderRouter;
+let notebookStudy = createNotebookStudyEngine();
 let quitRequested = false;
 app.on("before-quit", () => {
   quitRequested = true;
+  aiProvider?.dispose();
 });
 let main: BrowserWindow | null = null;
 let lens: BrowserWindow | null = null;
@@ -109,6 +120,7 @@ let controller: BrowserWindow | null = null;
 let lensRequest: AbortController | null = null;
 let browserBridge: BrowserBridgeHost | null = null;
 let pendingBrowserContext: BrowserBridgeMessage | null = null;
+const backgroundTest = process.env.DESK_TEST_BACKGROUND === "1";
 let pendingLensContext: { question?: string; activityKind?: StudyActivityKind; sourceIds?: string[] } | null = null;
 let lensInteraction: LensInteractionState = initialLensInteractionState();
 let lensHoldTimer: NodeJS.Timeout | null = null;
@@ -178,6 +190,10 @@ function makeWindow(kind: "main" | "lens" | "controller") {
       ? virtualScreenBounds()
       : undefined;
   const win = new BrowserWindow({
+    // Lens is a transient screen layer. Keep its native window invisible until
+    // the renderer has mounted the selection surface so invoking it cannot
+    // flash an empty, ordinary-looking popup over the user's work.
+    show: kind === "lens" ? false : !backgroundTest,
     ...(bounds ?? {
       width: kind === "controller" ? 400 : 1180,
       height: kind === "controller" ? 380 : 800,
@@ -235,16 +251,29 @@ function showLens(
     if (phase === "voice-selecting" || phase === "typed-selecting" || phase === "typed-input") {
       lens.setBounds(virtualScreenBounds());
       lens.setIgnoreMouseEvents(false);
-      lens.show();
+      if (!backgroundTest) lens.show();
     }
-    lens.focus();
+    if (!backgroundTest) lens.focus();
     sendLensContext();
     emitLensInteraction();
     return;
   }
   lens = makeWindow("lens");
-  lens.webContents.once("did-finish-load", sendLensContext);
-  lens.webContents.once("did-finish-load", emitLensInteraction);
+  lens.webContents.once("did-finish-load", () => {
+    sendLensContext();
+    emitLensInteraction();
+    if (
+      !backgroundTest &&
+      (phase === "voice-selecting" || phase === "typed-selecting" || phase === "typed-input") &&
+      lens &&
+      !lens.isDestroyed()
+    ) {
+      lens.setBounds(virtualScreenBounds());
+      lens.setIgnoreMouseEvents(false);
+      lens.show();
+      lens.focus();
+    }
+  });
   setTimeout(sendLensContext, 250);
   lens.on("closed", () => {
     clearLensTimers();
@@ -265,8 +294,10 @@ function showLensAnswer() {
   // content and place the small answer card beside the selection.
   lens.setBounds(screenBounds);
   lens.setIgnoreMouseEvents(false);
-  lens.show();
-  lens.focus();
+  if (!backgroundTest) {
+    lens.show();
+    lens.focus();
+  }
   emitLensInteraction();
 }
 
@@ -467,6 +498,32 @@ app.whenReady().then(async () => {
   const root = resolve(__dirname, "../dist");
   protocol.handle("desk", async (request) => {
     const url = new URL(request.url);
+    if (url.host === "study-media") {
+      const artifactId = decodeURIComponent(url.pathname.slice(1));
+      if (!/^[0-9a-f-]{36}$/i.test(artifactId) || !store)
+        return new Response("Not found", { status: 404 });
+      const artifact = store.snapshot().studyArtifacts.find((candidate) => candidate.id === artifactId);
+      const payload = artifact?.payload;
+      if (!artifact || (payload?.kind !== "audio" && payload?.kind !== "video") || !payload.localPath)
+        return new Response("Not found", { status: 404 });
+      const mediaRoot = resolve(app.getPath("userData"), "study-artifacts");
+      const mediaPath = resolve(payload.localPath);
+      if (!mediaPath.startsWith(mediaRoot + sep)) return new Response("Forbidden", { status: 403 });
+      try {
+        const response = await net.fetch(pathToFileURL(mediaPath).toString());
+        if (!response.ok) return new Response("Not found", { status: 404 });
+        return new Response(response.body, {
+          status: response.status,
+          headers: {
+            "Content-Type": payload.mimeType ?? (payload.kind === "audio" ? "audio/mp4" : "video/mp4"),
+            "Cache-Control": "no-store",
+            "Accept-Ranges": "bytes",
+          },
+        });
+      } catch {
+        return new Response("Not found", { status: 404 });
+      }
+    }
     if (url.host === "recording") {
       const recordingId = decodeURIComponent(url.pathname.slice(1));
       if (!/^[0-9a-f-]{36}$/i.test(recordingId))
@@ -559,6 +616,9 @@ app.whenReady().then(async () => {
     recordingSessions.set(item.recordingId, item.manifest);
   if (recordingRecovery.failed.length)
     console.warn("Some lecture recordings will retry recovery on the next launch.", recordingRecovery.failed.map((item) => item.recordingId));
+  notebookStudy = createNotebookStudyEngine({
+    downloadDir: join(app.getPath("userData"), "study-artifacts"),
+  });
   const check = (event: Electron.IpcMainInvokeEvent) => {
     if (
       ![...windows].some((w) => w.webContents === event.sender) ||
@@ -573,6 +633,13 @@ app.whenReady().then(async () => {
       ? undefined
       : join(app.getAppPath(), ".env.local"),
   );
+  aiProvider = new AIProviderRouter({
+    store,
+    credentials,
+    codex: new CodexAppServer(),
+    userDataPath: app.getPath("userData"),
+    managedEndpoint: process.env.DESK_MANAGED_AI_URL,
+  });
   account = new SupabaseAccount(
     app.getPath("userData"),
     app.isPackaged || process.env.DESK_ENABLE_DEVELOPMENT_KEY !== "1"
@@ -580,6 +647,247 @@ app.whenReady().then(async () => {
       : join(app.getAppPath(), ".env.local"),
   );
   sync = new SupabaseSyncCoordinator(() => store, account);
+  function studyMaterialFor(input: import("../../../packages/study/notebook-types").StudyMaterialRequest) {
+    const snapshot = store.snapshot();
+    const notes = snapshot.canvases.map((summary) => store.canvas(summary.id));
+    const draft = resolveStudyMaterialSet(snapshot, input, notes);
+    const sameIds = (left: string[], right: string[]) => left.length === right.length && left.every((id, index) => id === right[index]);
+    // Keep one external notebook for the same academic selection when its
+    // canonical Source or Note text changes. The adapter can then refresh
+    // only the changed content instead of creating a duplicate notebook.
+    const priorSet = snapshot.studyMaterialSets
+      .filter((candidate) =>
+        candidate.classId === draft.classId &&
+        candidate.assessmentId === draft.assessmentId &&
+        candidate.taskId === draft.taskId &&
+        sameIds(candidate.sourceIds, draft.sourceIds) &&
+        sameIds(candidate.noteIds, draft.noteIds),
+      )
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+    if (priorSet?.externalNotebookId) {
+      draft.externalNotebookId = priorSet.externalNotebookId;
+      draft.externalSourceIds = { ...priorSet.externalSourceIds };
+      draft.externalSourceFingerprints = { ...priorSet.externalSourceFingerprints };
+    }
+    const priorSets = snapshot.studyMaterialSets.filter((candidate) =>
+      candidate.classId === draft.classId &&
+      candidate.assessmentId === draft.assessmentId &&
+      candidate.taskId === draft.taskId &&
+      (!input.sourceIds?.length || sameIds(candidate.sourceIds, draft.sourceIds)) &&
+      (!input.noteIds?.length || sameIds(candidate.noteIds, draft.noteIds)) &&
+      candidate.sourceFingerprint !== draft.sourceFingerprint,
+    );
+    for (const prior of priorSets) {
+      for (const artifact of snapshot.studyArtifacts.filter((candidate) => candidate.materialSetId === prior.id && ["ready", "generating"].includes(candidate.status))) {
+        store.execute({
+          type: "study.artifact.update",
+          id: artifact.id,
+          revision: artifact.revision,
+          input: { status: "stale", error: "The selected Source or Note changed. Generate a fresh study activity to use the current material." },
+        });
+      }
+    }
+    let material = snapshot.studyMaterialSets.find((candidate) =>
+      candidate.sourceFingerprint === draft.sourceFingerprint &&
+      candidate.classId === draft.classId &&
+      candidate.assessmentId === draft.assessmentId &&
+      candidate.taskId === draft.taskId &&
+      JSON.stringify(candidate.sourceIds) === JSON.stringify(draft.sourceIds) &&
+      JSON.stringify(candidate.noteIds) === JSON.stringify(draft.noteIds),
+    );
+    if (!material) {
+      const next = store.execute({ type: "study.material.create", input: draft });
+      material = next.studyMaterialSets.at(-1);
+    }
+    if (!material) throw Error("The study material set could not be saved.");
+    const current = material;
+    const content: StudyEngineMaterial["content"] = [
+      ...current.sourceIds.map((id) => snapshot.sources.find((source) => source.id === id)).filter((source): source is NonNullable<typeof source> => Boolean(source)).map((source) => ({ id: source.id, title: source.title, text: source.text, kind: "source" as const })),
+      ...current.noteIds.map((id) => notes.find((note) => note.id === id)).filter((note): note is NonNullable<typeof note> => Boolean(note)).map((note) => ({ id: note.id, title: note.title, text: noteTextForStudy(note), kind: "note" as const })),
+    ].filter((item) => item.text.trim());
+    if (!content.length) throw Error("The selected material has no readable text yet.");
+    return { material: { ...current, content }, snapshot: store.snapshot() };
+  }
+  async function hydrateExternalStudyArtifact(artifact: StudyArtifact, material: StudyEngineMaterial) {
+    if (!artifact.externalArtifactId || !notebookStudy.poll) return;
+    const poll = notebookStudy.poll.bind(notebookStudy);
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 1_500 : 5_000));
+      const current = store.snapshot().studyArtifacts.find((item) => item.id === artifact.id);
+      if (!current || current.status !== "generating") return;
+      let result: Awaited<ReturnType<typeof poll>>;
+      try {
+        result = await poll(material, current.type, artifact.externalArtifactId);
+      } catch (error) {
+        const latest = store.snapshot().studyArtifacts.find((item) => item.id === artifact.id);
+        if (latest?.status === "generating" && latest.revision === current.revision) {
+          store.execute({
+            type: "study.artifact.update",
+            id: latest.id,
+            revision: latest.revision,
+            input: {
+              status: "failed",
+              error: error instanceof Error ? error.message.slice(0, 2_000) : "The study engine could not be reached.",
+            },
+          });
+        }
+        return;
+      }
+      if (result.status === "generating") continue;
+      const latest = store.snapshot().studyArtifacts.find((item) => item.id === artifact.id);
+      if (!latest || latest.status !== "generating" || latest.revision !== current.revision) return;
+      store.execute({
+        type: "study.artifact.update",
+        id: latest.id,
+        revision: latest.revision,
+        input: {
+          status: result.status === "ready" ? "ready" : "failed",
+          ...(result.payload !== undefined ? { payload: result.payload } : {}),
+          ...(result.externalNotebookId ? { externalNotebookId: result.externalNotebookId } : {}),
+          ...(result.externalArtifactId ? { externalArtifactId: result.externalArtifactId } : {}),
+          error: result.error ?? null,
+        },
+      });
+      return;
+    }
+    const latest = store.snapshot().studyArtifacts.find((item) => item.id === artifact.id);
+    if (latest) {
+      store.execute({
+        type: "study.artifact.update",
+        id: latest.id,
+        revision: latest.revision,
+        input: { status: "failed", error: "Study generation timed out. Try again when the study engine is available." },
+      });
+    }
+  }
+  async function generateStudyArtifact(raw: unknown): Promise<StudyArtifact> {
+    const request = studyGenerationRequestSchema.parse(raw);
+    const { material, snapshot } = studyMaterialFor(request.material);
+    const options = request.options ?? {};
+    const optionKey = JSON.stringify(options);
+    const existing = snapshot.studyArtifacts.find((artifact) =>
+      artifact.materialSetId === material.id &&
+      artifact.type === request.type &&
+      artifact.sourceFingerprint === material.sourceFingerprint &&
+      artifact.status === "ready" &&
+      JSON.stringify(artifact.generationOptions) === optionKey,
+    );
+    if (existing) return existing;
+    const engineStatus = await notebookStudy.status();
+    if (!engineStatus.available || !engineStatus.connected || !engineStatus.capabilities[request.type])
+      throw Error(engineStatus.message);
+    let result: Awaited<ReturnType<typeof notebookStudy.generate>>;
+    try {
+      const ensured = await notebookStudy.ensureMaterialSet(material);
+      if (
+        ensured.externalNotebookId !== material.externalNotebookId ||
+        JSON.stringify(ensured.externalSourceIds ?? {}) !== JSON.stringify(material.externalSourceIds) ||
+        JSON.stringify(ensured.externalSourceFingerprints ?? {}) !== JSON.stringify(material.externalSourceFingerprints)
+      ) {
+        const next = store.execute({
+          type: "study.material.update",
+          id: material.id,
+          revision: material.revision,
+          input: {
+            title: material.title,
+            classId: material.classId,
+            assessmentId: material.assessmentId,
+            taskId: material.taskId,
+            sourceIds: material.sourceIds,
+            noteIds: material.noteIds,
+            sourceFingerprint: material.sourceFingerprint,
+            externalNotebookId: ensured.externalNotebookId ?? null,
+            externalSourceIds: ensured.externalSourceIds ?? {},
+            externalSourceFingerprints: ensured.externalSourceFingerprints ?? {},
+          },
+        });
+        const refreshed = next.studyMaterialSets.find((item) => item.id === material.id);
+        if (refreshed) Object.assign(material, refreshed);
+      }
+      result = await notebookStudy.generate(material, request.type, options);
+    } catch (error) {
+      const failed = store.execute({
+        type: "study.artifact.create",
+        input: {
+          type: request.type,
+          title: material.title,
+          materialSetId: material.id,
+          provider: process.env.DESK_STUDY_ENGINE === "fake" ? "fake" : "notebooklm",
+          status: "failed",
+          externalNotebookId: material.externalNotebookId,
+          externalArtifactId: null,
+          sourceFingerprint: material.sourceFingerprint,
+          payload: null,
+          playbackPositionMs: 0,
+          completed: false,
+          generationOptions: options,
+          error: error instanceof Error ? error.message.slice(0, 2_000) : "Study generation failed.",
+        },
+      });
+      return failed.studyArtifacts.at(-1)!;
+    }
+    const created = store.execute({
+      type: "study.artifact.create",
+      input: {
+        type: request.type,
+        title: material.title,
+        materialSetId: material.id,
+        provider: process.env.DESK_STUDY_ENGINE === "fake" ? "fake" : "notebooklm",
+        status: result.status,
+        externalNotebookId: result.externalNotebookId ?? material.externalNotebookId,
+        externalArtifactId: result.externalArtifactId ?? null,
+        sourceFingerprint: material.sourceFingerprint,
+        payload: result.payload ?? null,
+        playbackPositionMs: 0,
+        completed: false,
+        generationOptions: options,
+        error: result.error ?? null,
+      },
+    });
+    const artifact = created.studyArtifacts.at(-1)!;
+    if (artifact.status === "generating" && artifact.externalArtifactId && notebookStudy.poll) {
+      void hydrateExternalStudyArtifact(artifact, material);
+    }
+    return artifact;
+  }
+  async function resumeStudyArtifacts() {
+    const pending = store.snapshot().studyArtifacts.filter((artifact) => artifact.status === "generating" && artifact.externalArtifactId);
+    for (const artifact of pending) {
+      try {
+        const set = store.snapshot().studyMaterialSets.find((candidate) => candidate.id === artifact.materialSetId);
+        if (!set || set.sourceFingerprint !== artifact.sourceFingerprint) {
+          const latest = store.snapshot().studyArtifacts.find((candidate) => candidate.id === artifact.id);
+          if (latest?.status === "generating")
+            store.execute({ type: "study.artifact.update", id: latest.id, revision: latest.revision, input: { status: "stale", error: "The selected material changed while this activity was generating. Generate a fresh activity." } });
+          continue;
+        }
+        const resolved = studyMaterialFor({
+          classId: set.classId ?? undefined,
+          assessmentId: set.assessmentId ?? undefined,
+          taskId: set.taskId ?? undefined,
+          sourceIds: set.sourceIds,
+          noteIds: set.noteIds,
+          title: set.title,
+        });
+        if (resolved.material.sourceFingerprint !== artifact.sourceFingerprint) {
+          const latest = store.snapshot().studyArtifacts.find((candidate) => candidate.id === artifact.id);
+          if (latest?.status === "generating")
+            store.execute({ type: "study.artifact.update", id: latest.id, revision: latest.revision, input: { status: "stale", error: "The selected material changed while this activity was generating. Generate a fresh activity." } });
+          continue;
+        }
+        if (notebookStudy.poll) void hydrateExternalStudyArtifact(artifact, resolved.material);
+        else {
+          const latest = store.snapshot().studyArtifacts.find((candidate) => candidate.id === artifact.id);
+          if (latest?.status === "generating")
+            store.execute({ type: "study.artifact.update", id: latest.id, revision: latest.revision, input: { status: "failed", error: "The study engine cannot resume this activity after restart. Generate it again." } });
+        }
+      } catch (error) {
+        const latest = store.snapshot().studyArtifacts.find((candidate) => candidate.id === artifact.id);
+        if (latest?.status === "generating")
+          store.execute({ type: "study.artifact.update", id: latest.id, revision: latest.revision, input: { status: "failed", error: error instanceof Error ? error.message.slice(0, 2_000) : "Study generation could not resume." } });
+      }
+    }
+  }
   try {
     browserBridge = await startBrowserBridgeHost((message) => {
       pendingBrowserContext = message;
@@ -611,9 +919,25 @@ app.whenReady().then(async () => {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
   });
-  ipcMain.handle("desk:provider-status", (event) => {
+  ipcMain.handle("desk:provider-status", async (event) => {
     check(event);
-    return credentials.status();
+    return aiProvider.status();
+  });
+  ipcMain.handle("desk:provider-select", async (event, rawMode) => {
+    check(event);
+    return aiProvider.select(rawMode);
+  });
+  ipcMain.handle("desk:provider-connect-chatgpt", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to connect ChatGPT.");
+    return aiProvider.connectChatGPT((url) => shell.openExternal(url));
+  });
+  ipcMain.handle("desk:provider-disconnect-chatgpt", async (event) => {
+    check(event);
+    if (event.sender !== main?.webContents || !main)
+      throw Error("Open Settings in the main Desk window to disconnect ChatGPT.");
+    return aiProvider.disconnectChatGPT();
   });
   ipcMain.handle("desk:browser-context", (event) => {
     check(event);
@@ -758,7 +1082,7 @@ app.whenReady().then(async () => {
         bounds: normalized,
       };
     } finally {
-      if (restore && !target.isDestroyed()) target.show();
+      if (restore && !target.isDestroyed() && !backgroundTest) target.show();
     }
   }
 
@@ -787,10 +1111,9 @@ app.whenReady().then(async () => {
       .filter(Boolean)
       .join("\n\n")
       .slice(0, 20_000);
-    const key = credentials.read();
     lensRequest = new AbortController();
     try {
-      return await askLens(input, key, {
+      return await aiProvider.askLens(input, {
         tutoringMode: snapshot.tutoringMode,
         signal: lensRequest.signal,
         onTelemetry: (event) => store.recordAI(event, active?.id ?? null),
@@ -963,13 +1286,23 @@ app.whenReady().then(async () => {
   ipcMain.handle("desk:focus-controller", (event) => {
     check(event);
     if (controller && !controller.isDestroyed()) {
-      controller.show();
-      controller.focus();
+      if (!backgroundTest) {
+        controller.show();
+        controller.focus();
+      }
     }
   });
   ipcMain.handle("desk:snapshot", (event) => {
     check(event);
     return store.snapshot();
+  });
+  ipcMain.handle("desk:study-status", async (event) => {
+    check(event);
+    return notebookStudy.status();
+  });
+  ipcMain.handle("desk:study-generate", async (event, rawValue) => {
+    check(event);
+    return generateStudyArtifact(rawValue);
   });
   ipcMain.handle("desk:data-export", async (event) => {
     check(event);
@@ -1077,6 +1410,14 @@ app.whenReady().then(async () => {
       throw error;
     }
     store = new DeskStore(databasePath);
+    aiProvider.dispose();
+    aiProvider = new AIProviderRouter({
+      store,
+      credentials,
+      codex: new CodexAppServer(),
+      userDataPath: app.getPath("userData"),
+      managedEndpoint: process.env.DESK_MANAGED_AI_URL,
+    });
     sync.schedule();
     return store.snapshot();
   });
@@ -1099,18 +1440,6 @@ app.whenReady().then(async () => {
     const intelligence = deriveDeskIntelligence(snapshot);
     const deterministic = resolveChat(snapshot, intelligence, input);
 
-    let key: string;
-    try {
-      key = credentials.read();
-    } catch {
-      if (deterministic) return deterministic;
-      return {
-        kind: "unavailable",
-        deterministic: false,
-        text: "I can handle planning, deadlines, study time, and saved work locally. Connect OpenRouter in Settings for open-ended explanations.",
-        suggestions: ["What should I do now?", "What’s due this week?"],
-      };
-    }
     const active = snapshot.sessions.find((session) => !session.endedAt);
     const sourceContext = input.sourceIds?.length || active
       ? lensContext(snapshot, input.question, input.sourceIds).slice(0, 7_000)
@@ -1130,15 +1459,13 @@ app.whenReady().then(async () => {
       .join("\n\n")
       .slice(0, 20_000);
     try {
-      const response = await askLens(
+      const response = await aiProvider.askLens(
         {
           question: input.question,
           context,
           ...(input.sourceIds?.length ? { sourceIds: input.sourceIds } : {}),
           ...(input.history?.length ? { history: input.history } : {}),
-          activity: { kind: "check" },
         },
-        key,
         {
           tutoringMode: snapshot.tutoringMode,
           onTelemetry: (telemetry) => store.recordAI(telemetry, active?.id ?? null),
@@ -1153,12 +1480,15 @@ app.whenReady().then(async () => {
         ...(deterministic?.suggestions ? { suggestions: deterministic.suggestions } : {}),
         model: response.resolvedModel,
       };
-    } catch {
+    } catch (error) {
       if (deterministic) return deterministic;
+      const message = error instanceof AIProviderError
+        ? error.message
+        : "I couldn’t reach the selected AI provider.";
       return {
         kind: "unavailable",
         deterministic: false,
-        text: "I couldn’t reach the AI provider. Your saved work and local planning are still available; try again or ask a planning question.",
+        text: `${message} Your saved work and local planning are still available; try again or ask a planning question.`,
         suggestions: ["What should I do now?", "Show what needs my attention"],
       };
     }
@@ -1194,21 +1524,10 @@ app.whenReady().then(async () => {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
     if (!shouldEscalateInference(deterministic)) return deterministic;
-    let key: string;
     try {
-      key = credentials.read();
-    } catch {
-      record({ success: false, httpStatus: null, errorCode: "provider-unavailable", usage: null });
-      return {
-        ...deterministic,
-        provider: { attempted: false, applied: false, reason: "provider-unavailable" },
-      };
-    }
-    try {
-      const provider = await askAcademicInference(
+      const provider = await aiProvider.askInference(
         input,
         snapshot.classes.map((course) => course.name),
-        key,
         { tier: "FAST" },
       );
       record({
@@ -1226,7 +1545,11 @@ app.whenReady().then(async () => {
         provider.model,
       );
     } catch (error) {
-      const reason = error instanceof InferenceProviderError ? error.code : "provider-failed";
+      const reason = error instanceof AIProviderError
+        ? error.code
+        : error instanceof InferenceProviderError
+          ? error.code
+          : "provider-failed";
       record({
         success: false,
         httpStatus: error instanceof InferenceProviderError ? error.status : null,
@@ -1359,7 +1682,7 @@ app.whenReady().then(async () => {
         capturedAt: new Date().toISOString(),
       };
     } finally {
-      if (!target.isDestroyed()) target.show();
+      if (!target.isDestroyed() && !backgroundTest) target.show();
     }
   });
   ipcMain.handle("desk:recording-start", async (event, rawCanvasId, rawMimeType) => {
@@ -1429,6 +1752,7 @@ app.whenReady().then(async () => {
     store.canvas(manifest.canvasId);
     return `desk://recording/${recordingId}`;
   });
+  void resumeStudyArtifacts();
   ipcMain.handle("desk:dismiss", (event) => {
     check(event);
     if (lens?.webContents === event.sender) {
@@ -1451,14 +1775,16 @@ app.whenReady().then(async () => {
   main.on("closed", () => {
     main = null;
   });
-  startNativeLensHotkey();
+  if (!backgroundTest) startNativeLensHotkey();
   app.on("second-instance", () => {
-    main?.show();
-    main?.focus();
+    if (!backgroundTest) {
+      main?.show();
+      main?.focus();
+    }
   });
   app.on("activate", () => {
     if (!main) main = makeWindow("main");
-    else main.show();
+    else if (!backgroundTest) main.show();
   });
 });
 app.on("will-quit", () => {

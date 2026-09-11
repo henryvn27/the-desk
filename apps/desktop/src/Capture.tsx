@@ -227,7 +227,7 @@ export function Capture({
             </p>
           )}
           <button type="button" onClick={() => setManual(true)}>
-            Enter manually
+            Enter an assignment manually
           </button>
           <p className="muted">
             {policy === "conservative"
@@ -390,7 +390,19 @@ export function Capture({
               ))}
             </select>
           </label>
-          {!classes.length && <p>Add a class in the sidebar first.</p>}
+          {!classes.length && (
+            <>
+              <p className="muted">
+                Quick capture saves without a class. Add a class when you want
+                this to become a structured assignment.
+              </p>
+              {!draft && !existing && (
+                <button type="button" onClick={() => setManual(false)}>
+                  Back to quick capture
+                </button>
+              )}
+            </>
+          )}
           <div className="fields">
             <label>
               Due date

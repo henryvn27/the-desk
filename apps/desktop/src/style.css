@@ -2305,7 +2305,9 @@ body:has(.lens),
   color: var(--ink-soft);
   font-size: 11px;
   line-height: 1.4;
-  pointer-events: auto;
+  /* Status is announcement-only. It must never sit above and block the
+     action row underneath the transient Lens card. */
+  pointer-events: none;
 }
 
 .lens-stage-hint {
@@ -3374,7 +3376,7 @@ main.lens .lens-status {
   z-index: 8;
   max-width: min(420px, calc(100vw - 36px));
   margin: 0;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 /* Notes document flow sits on top of the existing Canvas engine. */
@@ -4330,6 +4332,32 @@ h3 {
   font-size: 12px;
 }
 
+.note-context-picker {
+  display: inline-flex;
+  margin-top: 8px;
+}
+
+.note-context-picker select {
+  min-height: 28px;
+  padding: 3px 26px 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.class-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.class-section-heading h2 {
+  margin: 0;
+}
+
 .empty-state {
   max-width: 620px;
   margin-top: 18px;
@@ -4480,6 +4508,97 @@ dialog.capture-dialog .capture-rail {
 .canvas-header {
   border-bottom-color: var(--line);
   background: rgba(255, 255, 255, 0.92);
+}
+
+.chat-study-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.study-artifact-workspace {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  padding: 20px;
+  box-shadow: 0 12px 32px rgba(24, 39, 30, 0.08);
+}
+
+.study-artifact-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.study-artifact-header h2 {
+  margin: 4px 0 2px;
+}
+
+.study-quiz-card,
+.study-flashcard-card,
+.study-media-card,
+.study-completion {
+  max-width: 720px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-subtle, #fafbf8);
+}
+
+.study-question {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.study-choice-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.study-choice-list button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+}
+
+.study-choice-list button.selected {
+  border-color: var(--accent, #b4532f);
+  background: color-mix(in srgb, var(--accent, #b4532f) 10%, white);
+}
+
+.study-choice-key {
+  min-width: 1.35rem;
+  font-weight: 700;
+}
+
+.study-flashcard-face {
+  min-height: 150px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.study-flashcard-face p {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+
+.study-media-card audio,
+.study-media-card video {
+  display: block;
+  width: 100%;
+}
+
+.study-provenance {
+  margin: 16px 0 0;
+  color: var(--muted, #66736a);
+  font-size: 0.85rem;
 }
 
 @media (max-width: 860px) {

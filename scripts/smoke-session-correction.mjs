@@ -52,7 +52,7 @@ try {
   await page.getByRole("button", { name: "Physics", exact: true }).waitFor();
   await page.getByRole("button", { name: "Capture", exact: true }).click();
   await page
-    .getByRole("button", { name: "Enter manually", exact: true })
+    .getByRole("button", { name: "Enter an assignment manually", exact: true })
     .click();
   await page.getByLabel("What needs doing?").fill("Vectors correction");
   await page.getByLabel("I have confirmed").check();

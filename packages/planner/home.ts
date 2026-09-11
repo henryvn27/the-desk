@@ -281,6 +281,7 @@ function continueItems(snapshot: Snapshot, now: Date): HomeContinue[] {
   for (const canvas of [...snapshot.canvases]
     .filter((candidate) => Date.parse(candidate.updatedAt) <= +now + 60_000)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))) {
+    if (!canvas.taskId) continue;
     const task = taskFor(snapshot, canvas.taskId);
     if (!task || activeIds.has(task.id)) continue;
     const ref = noteRefs.get(canvas.id);

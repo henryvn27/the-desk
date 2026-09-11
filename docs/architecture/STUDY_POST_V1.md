@@ -6,7 +6,7 @@ The post-V1 study layer extends the shipped `StudySession`; it does not create a
 
 `packages/study/activities.ts` defines the value object persisted in `StudySession.activityState`. A plan contains `LEARN`, `CHECK`, `HINT`, `PRACTICE`, `QUIZ`, `EXAM`, `EXPLAIN`, `RECALL` and `CORRECT_MISTAKE` moves, their concept/source/mistake links, intended difficulty, response surface, hint policy, rationale and status. `planStudyActivities` uses the canonical Student Model to prefer prerequisite recall, low-retrievability retrieval, correction of recorded mistakes, transfer practice and assessment-linked checks. The mode is additive: `standard`, `quiz` and `exam` all use the existing session lifecycle.
 
-Lens receives the same activity kind as an optional request context. Its trusted OpenRouter prompt adds the deterministic activity contract while preserving Guide me, Balanced and Explain directly. Notes can send the active document block to Lens with `CHECK`; the existing paper capture action uses the same Lens window and contract. No provider or tutor backend is duplicated.
+Lens receives the same activity kind as an optional request context. Its trusted provider route adds the deterministic activity contract while preserving Guide me, Balanced and Explain directly. Notes can send the active document block to Lens with `CHECK`; the existing paper capture action uses the same Lens window and contract. No provider or tutor backend is duplicated.
 
 ## Integrity and evidence
 

@@ -41,6 +41,20 @@ async function launch() {
 }
 try {
   await launch();
+  await page.evaluate(() => window.desk.lens());
+  const initialLens = await waitForWindow("#lens");
+  await initialLens.locator(".lens.lens-typed-selecting").waitFor();
+  assert.equal(
+    desktop.windows().filter((window) => window.url().endsWith("#lens")).length,
+    1,
+    "Lens opens one transient selection layer",
+  );
+  assert.equal(
+    await initialLens.locator(".lens-input-popover").count(),
+    0,
+    "Lens does not show a setup/input popup before selection",
+  );
+  await initialLens.evaluate(() => window.desk.dismiss());
   await page.evaluate(async () => {
     await window.desk.command({ type: "planning.mode", mode: "suggest" });
     await window.desk.command({ type: "planning.preferences", input: { studyStart: "00:00", sleepCutoff: "23:59", studyDays: [0,1,2,3,4,5,6], bufferPercent: 15 } });
@@ -55,7 +69,7 @@ try {
     .getByRole("button", { name: "Capture assignment", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Enter manually", exact: true })
+    .getByRole("button", { name: "Enter an assignment manually", exact: true })
     .click();
   await page
     .getByLabel("What needs doing?")
@@ -113,7 +127,8 @@ try {
   await lens.getByLabel("Ask Lens", { exact: true }).fill("Why does friction point this way?");
   await lens.getByLabel("Ask Lens", { exact: true }).press("Enter");
   await lens
-    .getByText("Connect an AI provider in Settings first.", { exact: true })
+    .getByText(/Desk AI is unavailable|Connect ChatGPT|Configure a supported provider key/, { exact: false })
+    .first()
     .waitFor();
   await lens.screenshot({ path: join(output, "lens-selection.png") });
   await lens.getByRole("button", { name: "Dismiss Lens" }).click();
@@ -295,7 +310,7 @@ try {
   await page.getByText("Study preferences saved.", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Capture", exact: true }).last().click();
   await page
-    .getByRole("button", { name: "Enter manually", exact: true })
+    .getByRole("button", { name: "Enter an assignment manually", exact: true })
     .click();
   await page.getByLabel("What needs doing?").fill("Long practice packet");
   await page.getByLabel("Estimated minutes").fill("180");
@@ -371,7 +386,7 @@ try {
         ],
         limitations: [
           process.env.DESK_EXECUTABLE
-            ? "installed development package, unsigned"
+            ? "installed executable supplied by DESK_EXECUTABLE; signing is checked separately"
             : "development executable, not installed package",
           "no AI, voice or captured-screen interpretation",
           "no external resource in this smoke",

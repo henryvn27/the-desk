@@ -74,6 +74,10 @@ try {
     };
   }, keyFile);
   await page.evaluate(() => window.desk.importProviderKey());
+  // Importing credentials is intentionally separate from selecting a
+  // provider. Make the test explicit so it does not silently rely on a
+  // development-managed key being present.
+  await page.evaluate(() => window.desk.selectProvider("byok"));
   await page.evaluate(async () => {
     await window.desk.command({ type: "class.create", name: "Physics" });
     const course = (await window.desk.snapshot()).classes[0];
@@ -115,6 +119,7 @@ try {
       { exact: true },
     )
     .waitFor();
+  await lens.locator(".lens-answer-details summary").click();
 
   await lens
     .getByRole("button", { name: "Save as source", exact: true })

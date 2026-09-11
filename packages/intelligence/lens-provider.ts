@@ -175,6 +175,8 @@ export type AskLensOptions = {
   tutoringMode?: TutoringMode;
   tier?: RoutingTier;
   fetch?: typeof fetch;
+  /** Optional Desk-managed gateway. It must speak the bounded OpenAI-compatible contract. */
+  endpoint?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
   onTelemetry?: (event: LensTelemetryEvent) => void | Promise<void>;
@@ -252,7 +254,7 @@ export async function askLens(
   const parsedInput = lensInputSchema.safeParse(input);
   if (!parsedInput.success)
     throw new LensProviderError("invalid_input", "Lens input is invalid.");
-  if (!apiKey.trim())
+  if (!apiKey.trim() && !options.endpoint)
     throw new LensProviderError(
       "invalid_input",
       "An OpenRouter API key is required.",
@@ -297,11 +299,11 @@ export async function askLens(
 
   try {
     const response = await fetcher(
-      "https://openrouter.ai/api/v1/chat/completions",
+      options.endpoint ?? "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey}` } : {}),
           "Content-Type": "application/json",
         },
         body: JSON.stringify(
@@ -419,9 +421,10 @@ function buildRequest(
       })),
       { role: "user", content },
     ],
-    ...(route.model.startsWith("openai/")
-      ? { max_completion_tokens: 4096 }
-      : { max_tokens: 4096 }),
+    // OpenRouter's OpenAI-compatible endpoint currently accepts the shared
+    // max_tokens field for Luna/Terra/Sol. max_completion_tokens is rejected
+    // by the OpenAI provider even though it is accepted by some native APIs.
+    max_tokens: 4096,
     response_format: {
       type: "json_schema",
       json_schema: {

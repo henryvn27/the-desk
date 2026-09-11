@@ -24,7 +24,7 @@ async function launch() {
     recordVideo: { dir: output },
   });
   page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   page.on("pageerror", (e) => errors.push(e.message));
   // Electron handles beforeunload without a browser dialog. Prevent Playwright
   // from auto-dismissing a transient protocol event after the save closes it.
@@ -411,5 +411,8 @@ try {
   throw new Error(error.message);
 } finally {
   if (app) await app.close();
-  await rm(data, { recursive: true, force: true });
+  // Electron can release Chromium's Session Storage directory a few ticks
+  // after close. Retry the isolated fixture cleanup so a successful Canvas
+  // run is not reported as failed by a transient teardown race.
+  await rm(data, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }

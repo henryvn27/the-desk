@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Snapshot } from "../../../packages/domain/contracts";
 import type { DeskIntelligence } from "../../../packages/intelligence/desk-intelligence";
+import type { AIProviderStatus } from "../../../packages/intelligence/ai-provider";
 import { Button, Textarea } from "./components/base";
 import { WorkspaceHeader } from "./components/desk";
 import { Plus, Send01 } from "@untitledui/icons";
@@ -34,7 +35,7 @@ export type ChatThread = {
 type Props = {
   data: Snapshot;
   intelligence?: DeskIntelligence;
-  providerConfigured: boolean | null;
+  providerStatus: AIProviderStatus | null;
   busy: boolean;
   page: string;
   threads: ChatThread[];
@@ -59,8 +60,8 @@ function initialAssistant(data: Snapshot) {
   const active = data.sessions.find((session) => !session.endedAt);
   const task = active ? data.tasks.find((candidate) => candidate.id === active.taskId) : undefined;
   return task
-    ? `You’re in the middle of ${task.title}. I can keep you moving, explain a concept, or help with the next step.`
-    : "I’m ready to help you decide what matters now, understand your work, or open the right Desk workspace.";
+    ? `You’re in the middle of ${task.title}. Ask for the next step, an explanation, or a quick check.`
+    : "Ask what to do next, explain a problem, or open the work you need.";
 }
 
 function messageHistory(messages: ChatMessage[]) {
@@ -142,7 +143,7 @@ function Artifact({ artifact, onAction, profileTimeZone }: { artifact: ChatArtif
 export function ChatWorkspace({
   data,
   intelligence,
-  providerConfigured,
+  providerStatus,
   busy,
   page,
   threads,
@@ -192,12 +193,20 @@ export function ChatWorkspace({
       updatedAt: new Date().toISOString(),
     } : thread));
     try {
+      const activeSession = data.sessions.find((session) => !session.endedAt);
+      const activeTask = activeSession
+        ? data.tasks.find((task) => task.id === activeSession.taskId)
+        : undefined;
+      const classContextId = data.classes.some((course) => course.id === page)
+        ? page
+        : activeTask?.classId;
       const response = await ask({
         question,
         history: messageHistory(prior),
         context: {
           page,
-          ...(data.classes.some((course) => course.id === page) ? { classId: page } : {}),
+          ...(classContextId ? { classId: classContextId } : {}),
+          ...(activeTask ? { taskId: activeTask.id } : {}),
         },
       });
       const assistant: ChatMessage = {
@@ -233,29 +242,33 @@ export function ChatWorkspace({
         className="chat-heading"
         eyebrow="Your academic workspace"
         title="What are you working on?"
-        detail="Ask The Desk to help you decide, understand, or continue."
+        detail="Ask, decide, then do the work."
         status={{
-          tone: providerConfigured === false ? "warning" : providerConfigured === true ? "positive" : "neutral",
-          label: providerConfigured === false ? "AI needs a provider key in Settings" : providerConfigured === true ? "AI connected · Luna" : "Checking AI connection…",
+          tone: providerStatus?.availability === "ready" ? "positive" : providerStatus?.availability === "offline" ? "warning" : "neutral",
+          label: providerStatus?.availability === "ready"
+            ? providerStatus.selectedProvider === "desk-managed" ? "AI ready" : `AI · ${providerStatus.providerLabel}`
+            : providerStatus?.selectedProvider === "desk-managed" ? "AI unavailable · local work still works" : "AI needs attention in Settings",
         }}
         actions={<Button variant="secondary" size="compact" className="chat-new-button" icon={Plus} onPress={onNewChat}>New chat</Button>}
       />
-      <div className="chat-layout">
-        <aside className="chat-history" aria-label="Recent chats">
-          <div className="chat-history-label">Recent</div>
-          {sortedThreads.map((thread) => (
-            <Button
-              size="compact"
-              className="chat-thread"
-              key={thread.id}
-              aria-current={thread.id === current?.id ? "page" : undefined}
-              onPress={() => setActiveThreadId(thread.id)}
-            >
-              <strong>{thread.title}</strong>
-              <span>{thread.messages.length ? `${thread.messages.length} messages` : "New conversation"}</span>
-            </Button>
-          ))}
-        </aside>
+      <div className={`chat-layout${sortedThreads.length > 1 ? "" : " chat-layout-single"}`}>
+        {sortedThreads.length > 1 && (
+          <aside className="chat-history" aria-label="Recent chats">
+            <div className="chat-history-label">Recent</div>
+            {sortedThreads.map((thread) => (
+              <Button
+                size="compact"
+                className="chat-thread"
+                key={thread.id}
+                aria-current={thread.id === current?.id ? "page" : undefined}
+                onPress={() => setActiveThreadId(thread.id)}
+              >
+                <strong>{thread.title}</strong>
+                <span>{thread.messages.length ? `${thread.messages.length} messages` : "New conversation"}</span>
+              </Button>
+            ))}
+          </aside>
+        )}
         <section className="chat-main" aria-label="Desk conversation">
           <div className="chat-scroll">
             {!current?.messages.length && intelligence && (
@@ -277,7 +290,11 @@ export function ChatWorkspace({
                   <p>{message.content}</p>
                   {message.artifact && <Artifact artifact={message.artifact} onAction={onAction} profileTimeZone={data.user?.timeZone} />}
                   {message.action && !message.artifact && (
-                    <Button variant="primary" size="compact" className="chat-artifact-action" onPress={() => onAction(message.action!)}>Open</Button>
+                    <Button variant="primary" size="compact" className="chat-artifact-action" onPress={() => onAction(message.action!)}>
+                      {message.action.type === "study"
+                        ? `Start ${message.action.mode === "flashcards" ? "flashcards" : message.action.mode}`
+                        : "Open"}
+                    </Button>
                   )}
                   {message.suggestions && (
                     <div className="chat-suggestions">
@@ -301,7 +318,7 @@ export function ChatWorkspace({
                 if (event.key === "Escape") { event.preventDefault(); setDraft(""); return; }
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); void submit(); }
               }}
-              placeholder="Ask The Desk anything…"
+              placeholder="Ask what to do, explain a problem, or open your work…"
               rows={2}
               disabled={sending || busy}
             />

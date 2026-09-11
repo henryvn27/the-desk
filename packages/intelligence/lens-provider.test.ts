@@ -84,6 +84,28 @@ test("sends one strict OpenRouter request with approved multimodal routing and p
   assert.equal(result.cost, null);
 });
 
+test("Desk Managed gateways do not require a client provider key", async () => {
+  let authorization: string | null = null;
+  let requestedURL = "";
+  const result = await askLens(
+    { question: "What is the next step?" },
+    "",
+    {
+      endpoint: "https://desk.example.test/ai",
+      fetch: async (url, init) => {
+        requestedURL = String(url);
+        authorization = new Headers(init?.headers).get("Authorization");
+        return response({
+          choices: [{ finish_reason: "stop", message: { content: JSON.stringify(modelOutput) } }],
+        });
+      },
+    },
+  );
+  assert.equal(requestedURL, "https://desk.example.test/ai");
+  assert.equal(authorization, null);
+  assert.equal(result.explanation, modelOutput.explanation);
+});
+
 test("reports actual cached token usage and OpenRouter-reported cost", async () => {
   const events: LensTelemetryEvent[] = [];
   const result = await askLens({ question: "Teach me." }, "test-key", {

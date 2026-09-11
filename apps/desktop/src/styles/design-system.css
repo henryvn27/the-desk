@@ -502,6 +502,15 @@ button.primary:hover:not(:disabled) {
   background: var(--ds-bg-workspace);
 }
 
+/* Chat owns the work area below the shell header. The legacy page padding
+   belongs to document views and otherwise pushes the composer below the fold. */
+.shell > main.main-chat {
+  width: auto;
+  max-width: none;
+  padding: 0;
+}
+.shell > main.main-chat > header { margin-bottom: 0; }
+
 .shell > main > header {
   min-height: 58px;
   padding: 12px 26px;
@@ -533,8 +542,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .chat-workspace {
-  min-height: calc(100dvh - 58px);
+  height: calc(100dvh - 58px);
+  min-height: 0;
   padding: 32px 34px 28px;
+  box-sizing: border-box;
 }
 
 .chat-heading {
@@ -569,11 +580,42 @@ button.primary:hover:not(:disabled) {
 .chat-provider-status-offline { color: var(--ds-warning); }
 .chat-provider-status-offline span { color: var(--ds-warning); }
 
+.provider-settings {
+  max-width: 720px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ds-border-subtle);
+}
+.provider-settings > h2 { margin-bottom: 6px; }
+.provider-settings > p { max-width: 620px; }
+.settings-list { display: grid; gap: 1px; margin-top: 18px; border: 1px solid var(--ds-border-subtle); border-radius: 12px; overflow: hidden; background: var(--ds-border-subtle); }
+.provider-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 16px; background: var(--ds-surface); }
+.provider-row-active { background: color-mix(in srgb, var(--ds-accent-soft) 38%, var(--ds-surface)); }
+.provider-row > div { min-width: 0; display: grid; gap: 3px; }
+.provider-row strong { color: var(--ds-text); font-size: 13px; }
+.provider-row span { color: var(--ds-text-muted); font-size: 12px; line-height: 1.45; }
+.provider-row small { color: var(--ds-accent); font-size: 11px; font-weight: 650; }
+.provider-row button { flex: 0 0 auto; }
+.provider-limits { display: grid; gap: 6px; margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--ds-surface-muted); }
+.provider-limit { display: flex; justify-content: space-between; gap: 16px; color: var(--ds-text-muted); font-size: 11px; }
+.provider-status-message { margin-top: 12px; }
+
+@media (prefers-reduced-transparency: reduce) {
+  .provider-row-active { background: var(--ds-surface-muted); }
+}
+
 .chat-layout {
-  grid-template-columns: 180px minmax(0, 760px);
+  grid-template-columns: 180px minmax(0, 820px);
   justify-content: center;
   align-items: stretch;
   gap: 30px;
+  height: min(760px, calc(100dvh - 265px));
+  min-height: 420px;
+}
+
+.chat-layout-single {
+  grid-template-columns: minmax(0, 900px);
+  max-width: 900px;
 }
 
 .chat-history {
@@ -630,9 +672,15 @@ button.primary:hover:not(:disabled) {
 .chat-welcome p,
 .chat-message p { max-width: 66ch; color: var(--ds-text-primary); font-size: 14px; line-height: 1.65; }
 
-.chat-suggestions { gap: 7px; margin-top: 16px; }
+.chat-suggestions {
+  min-width: 0;
+  gap: 7px;
+  margin-top: 16px;
+}
 
 .chat-suggestions button {
+  min-width: 0;
+  max-width: 100%;
   min-height: 30px;
   padding: 5px 10px;
   border-color: var(--ds-border);
@@ -641,6 +689,9 @@ button.primary:hover:not(:disabled) {
   color: var(--ds-text-secondary);
   font-size: 12px;
   font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
 }
 
 .chat-suggestions button:hover:not(:disabled) { border-color: var(--ds-border-interactive); background: var(--ds-bg-hover); }
@@ -692,6 +743,15 @@ button.primary:hover:not(:disabled) {
 .chat-composer-footer { margin-top: 5px; padding-top: 8px; border-top: 1px solid var(--ds-border); }
 .chat-composer-footer span { color: var(--ds-text-tertiary); font-size: 10px; }
 .chat-composer-footer .primary { min-height: 30px; padding: 5px 11px; font-size: 12px; }
+
+.next-more-actions { margin-top: 12px; }
+.next-more-actions summary {
+  width: fit-content;
+  color: var(--ds-text-tertiary);
+  font-size: 12px;
+  font-weight: 650;
+}
+.next-more-actions .actions { margin-top: 10px; }
 
 .card,
 .class-hero,
@@ -818,7 +878,7 @@ dialog::backdrop {
 .lens-close:hover:not(:disabled) { border-color: transparent; background: var(--ds-bg-hover); }
 
 /* The work surface should begin with the work, not an empty vertical stage. */
-.chat-main { min-height: 520px; }
+.chat-main { min-height: 0; }
 .chat-scroll { min-height: 0; }
 .chat-welcome { margin: 0; padding-top: 28px; }
 .chat-message { content-visibility: auto; contain-intrinsic-size: auto 72px; }
@@ -847,6 +907,7 @@ dialog::backdrop {
 
 .next,
 .class-next {
+  max-width: 980px;
   background: color-mix(in srgb, var(--ds-bg-surface) 88%, var(--ds-accent-soft));
 }
 
@@ -879,7 +940,7 @@ textarea { font-variant-numeric: tabular-nums; }
 @media (max-width: 980px) {
   .shell { grid-template-columns: 196px minmax(0, 1fr); }
   .chat-workspace { padding: 24px 22px; }
-  .chat-layout { grid-template-columns: 150px minmax(0, 1fr); gap: 20px; }
+  .chat-layout { grid-template-columns: 150px minmax(0, 1fr); gap: 20px; height: min(700px, calc(100dvh - 245px)); }
 }
 
 @media (max-width: 760px) {
@@ -889,7 +950,7 @@ textarea { font-variant-numeric: tabular-nums; }
   .sidebar-classes,
   .sidebar-more,
   .sidebar-bottom { display: none; }
-  .chat-layout { grid-template-columns: 1fr; }
+  .chat-layout { grid-template-columns: 1fr; height: auto; min-height: 0; }
   .chat-history { display: none; }
   .chat-main { min-height: 0; }
 }

@@ -67,7 +67,7 @@ test("schema 1 data survives the telemetry migration and future schema is reject
     assert.equal(migrated.snapshot().classes[0]!.name, "Physics");
     migrated.close();
     const check = new DatabaseSync(path);
-    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 42);
+    assert.equal(check.prepare("PRAGMA user_version").get()!.user_version, 44);
     assert.ok(
       check
         .prepare(
@@ -135,6 +135,20 @@ test("schema 1 data survives the telemetry migration and future schema is reject
       check
         .prepare(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='plans'",
+        )
+        .get(),
+    );
+    assert.ok(
+      check
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='study_material_sets'",
+        )
+        .get(),
+    );
+    assert.ok(
+      check
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='study_artifacts'",
         )
         .get(),
     );
@@ -619,6 +633,64 @@ test("canvas revisions prevent stale overwrite and scenes persist separately fro
     assert.deepEqual(store.canvas(board.id).scene, recoveredScene);
     assert.equal(store.canvas(board.id).revision, 2);
     assert.throws(() => store.execute({ type: "task.undo", id: taskId }));
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
+test("a Note can start unassigned, persist, and gain class context later", () => {
+  const directory = mkdtempSync(join(tmpdir(), "desk-unassigned-note-"));
+  const path = join(directory, "notes.sqlite");
+  let store = new DeskStore(path);
+  try {
+    let snapshot = store.execute({ type: "canvas.create", taskId: null, notebook: true });
+    const note = snapshot.canvases.at(-1)!;
+    assert.equal(note.taskId, null);
+    assert.equal(note.classId, null);
+    const scene = store.canvas(note.id).scene;
+    store.execute({
+      type: "canvas.save",
+      id: note.id,
+      revision: note.revision,
+      scene: {
+        ...scene,
+        document: {
+          version: 1,
+          blocks: [{ id: "first", type: "paragraph", text: "Newton's laws" }],
+        },
+      },
+    });
+    const classId = store.execute({ type: "class.create", name: "AP Physics C" }).classes[0]!.id;
+    const contextual = store.execute({ type: "canvas.create", taskId: null, classId, notebook: true }).canvases.at(-1)!;
+    assert.equal(contextual.taskId, null);
+    assert.equal(contextual.classId, classId);
+    snapshot = store.execute({
+      type: "canvas.context",
+      id: note.id,
+      revision: 1,
+      input: { classId },
+    });
+    assert.equal(snapshot.canvases.find((item) => item.id === note.id)?.classId, classId);
+    store.close();
+    store = new DeskStore(path);
+    const reopened = store.canvas(note.id);
+    assert.equal(reopened.taskId, null);
+    assert.equal(reopened.classId, classId);
+    const firstBlock = reopened.scene.document?.blocks[0];
+    assert.equal(firstBlock?.type, "paragraph");
+    if (firstBlock?.type === "paragraph") assert.equal(firstBlock.text, "Newton's laws");
+    const removed = store.execute({
+      type: "canvas.context",
+      id: note.id,
+      revision: reopened.revision,
+      input: { classId: null },
+    });
+    assert.equal(removed.canvases.find((item) => item.id === note.id)?.classId, null);
+    store.close();
+    store = new DeskStore(path);
+    assert.equal(store.canvas(note.id).classId, null);
+    assert.equal(store.search("Newton's laws").find((item) => item.kind === "note")?.id, note.id);
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

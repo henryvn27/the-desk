@@ -69,7 +69,7 @@ try {
   await launch();
   await page.getByRole("button", { name: "Capture", exact: true }).click();
   await page
-    .getByRole("button", { name: "Enter manually", exact: true })
+    .getByRole("button", { name: "Enter an assignment manually", exact: true })
     .click();
   await page.getByLabel("What needs doing?").fill("Next problem set");
   await page

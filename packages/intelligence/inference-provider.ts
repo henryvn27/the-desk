@@ -87,6 +87,8 @@ export class InferenceProviderError extends Error {
 
 export type AskInferenceOptions = {
   fetch?: typeof fetch;
+  /** Optional Desk-managed gateway using the same bounded OpenAI-compatible contract. */
+  endpoint?: string;
   signal?: AbortSignal;
   timeoutMs?: number;
   tier?: Extract<RoutingTier, "FAST" | "DEEP" | "VERIFY">;
@@ -159,9 +161,9 @@ function buildRequest(input: InferenceRequest, classes: readonly string[], tier:
   return {
     model: route.model,
     provider: route.provider,
-    ...(route.model.startsWith("openai/")
-      ? { max_completion_tokens: 700 }
-      : { max_tokens: 700 }),
+    // Keep the OpenRouter request shape consistent across approved models.
+    // The OpenAI provider rejects max_completion_tokens on this route.
+    max_tokens: 700,
     messages: [
       { role: "system", content: INSTRUCTIONS },
       {
@@ -193,7 +195,7 @@ export async function askAcademicInference(
 ): Promise<InferenceProviderResult> {
   const parsed = inferenceRequestSchema.safeParse(input);
   if (!parsed.success) throw new InferenceProviderError("invalid_input", "Inference input is invalid.");
-  if (!apiKey.trim()) throw new InferenceProviderError("invalid_input", "An OpenRouter API key is required.");
+  if (!apiKey.trim() && !options.endpoint) throw new InferenceProviderError("invalid_input", "An AI provider is required.");
   if (!classes.length || classes.some((value) => !value.trim())) throw new InferenceProviderError("invalid_input", "At least one class name is required.");
   const fetcher = options.fetch ?? globalThis.fetch;
   if (typeof fetcher !== "function") throw new InferenceProviderError("network_error", "Network requests are unavailable.");
@@ -207,9 +209,9 @@ export async function askAcademicInference(
   const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   try {
     const route = inferenceRoute(options.tier ?? "FAST");
-    const response = await fetcher("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetcher(options.endpoint ?? "https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey}` } : {}), "Content-Type": "application/json" },
       body: JSON.stringify(buildRequest(parsed.data, classes, options.tier ?? "FAST")),
       signal: controller.signal,
     });

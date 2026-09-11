@@ -83,7 +83,7 @@ export default function SourceReader({
   initialLocation?: ReaderLocation;
   close: () => void;
   saveCommand: (command: Command) => Promise<Snapshot | undefined>;
-  openCanvas: (taskId: string, canvasId?: string, blockId?: string) => Promise<void>;
+  openCanvas: (taskId: string | null, canvasId?: string, blockId?: string) => Promise<void>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -98,7 +98,7 @@ export default function SourceReader({
   }>();
   const [comment, setComment] = useState("");
   const [targetCanvasId, setTargetCanvasId] = useState("");
-  const [targetTaskId, setTargetTaskId] = useState(source.taskIds[0] ?? "");
+  const [targetTaskId, setTargetTaskId] = useState<string | null>(source.taskIds[0] ?? null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -109,7 +109,7 @@ export default function SourceReader({
     [currentSource.text, query],
   );
   const linkedCanvases = useMemo(
-    () => data.canvases.filter((canvas) => currentSource.taskIds.includes(canvas.taskId)),
+    () => data.canvases.filter((canvas) => canvas.taskId && currentSource.taskIds.includes(canvas.taskId)),
     [currentSource.taskIds, data.canvases],
   );
   const sourceRevision = currentSource.revision ?? 0;
@@ -193,10 +193,6 @@ export default function SourceReader({
       setError("Select a shorter passage before adding it to a Note.");
       return;
     }
-    if (!targetTaskId) {
-      setError("Link this source to an assignment before adding a passage to a Note.");
-      return;
-    }
     setBusy(true);
     setError("");
     setMessage("");
@@ -225,11 +221,17 @@ export default function SourceReader({
         : linkedCanvases[0];
       let snapshot = annotated ?? data;
       if (!canvasMeta) {
-        const created = await saveCommand({ type: "canvas.create", taskId: targetTaskId });
+        const created = await saveCommand({
+          type: "canvas.create",
+          taskId: targetTaskId,
+          ...(targetTaskId ? {} : { classId: currentSource.classIds[0] ?? null }),
+        });
         snapshot = created ?? snapshot;
-        canvasMeta = snapshot.canvases.find((canvas) => canvas.taskId === targetTaskId);
+        canvasMeta = created?.canvases.at(-1) ?? snapshot.canvases.find((canvas) =>
+          targetTaskId ? canvas.taskId === targetTaskId : canvas.taskId === null && canvas.classId === (currentSource.classIds[0] ?? null),
+        );
       }
-      if (!canvasMeta) throw Error("Create a Note for the linked assignment before adding this passage.");
+      if (!canvasMeta) throw Error("The Note could not be opened.");
       const record = await window.desk.canvas(canvasMeta.id);
       const document = ensureNoteDocument(record.scene.document);
       const provenance = sourceProvenance.parse({
@@ -348,14 +350,14 @@ export default function SourceReader({
                 <label>
                   Add to Note
                   <select value={targetCanvasId} onChange={(event) => setTargetCanvasId(event.target.value)}>
-                    <option value="">{linkedCanvases.length ? `Latest Note · ${linkedCanvases[0]!.title}` : "Create a Note for this assignment"}</option>
+                    <option value="">{linkedCanvases.length ? `Latest Note · ${linkedCanvases[0]!.title}` : "Create a Note for this source"}</option>
                     {linkedCanvases.map((canvas) => <option key={canvas.id} value={canvas.id}>{canvas.title}</option>)}
                   </select>
                 </label>
                 {!targetCanvasId && currentSource.taskIds.length > 1 && (
                   <label>
                     Assignment
-                    <select value={targetTaskId} onChange={(event) => setTargetTaskId(event.target.value)}>
+                    <select value={targetTaskId ?? ""} onChange={(event) => setTargetTaskId(event.target.value || null)}>
                       {currentSource.taskIds.map((taskId) => <option key={taskId} value={taskId}>{data.tasks.find((task) => task.id === taskId)?.title ?? taskId}</option>)}
                     </select>
                   </label>
@@ -385,8 +387,8 @@ export default function SourceReader({
                   {!!annotation.noteRefs.length && <small>Used in {annotation.noteRefs.length} Note{annotation.noteRefs.length === 1 ? "" : "s"}.</small>}
                   {annotation.noteRefs.map((ref) => {
                     const canvas = data.canvases.find((candidate) => candidate.id === ref.canvasId);
-                    const taskId = canvas?.taskId ?? currentSource.taskIds[0];
-                    return taskId && canvas ? <button className="reader-backlink" type="button" key={`${ref.canvasId}-${ref.blockId}`} onClick={() => void openCanvas(taskId, ref.canvasId, ref.blockId)}>Open {canvas.title}</button> : null;
+                    const taskId = canvas?.taskId ?? currentSource.taskIds[0] ?? null;
+                    return canvas ? <button className="reader-backlink" type="button" key={`${ref.canvasId}-${ref.blockId}`} onClick={() => void openCanvas(taskId, ref.canvasId, ref.blockId)}>Open {canvas.title}</button> : null;
                   })}
                 </article>
               );

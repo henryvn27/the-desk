@@ -18,11 +18,23 @@ try {
     recordVideo: { dir: output },
   });
   page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   // Electron can emit a transient beforeunload event while the Notes modal
   // flushes its last revision. Leave that protocol event untouched; the app
   // owns the save-and-close path.
   page.on("dialog", (dialog) => assert.equal(dialog.type(), "beforeunload"));
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("heading", { name: "Notes", exact: true }).waitFor();
+  await page.screenshot({ path: join(output, "notes-empty.png") });
+  await page.getByRole("button", { name: "New note", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "Study notes" }).waitFor();
+  const unassignedInput = page.getByPlaceholder("Start writing, or type / for a block…").first();
+  await unassignedInput.fill("A note can start before I choose a class.");
+  await page.getByRole("button", { name: "Save notes", exact: true }).click();
+  await page.getByText("Saved", { exact: true }).waitFor();
+  const unassigned = await page.evaluate(async () => (await window.desk.snapshot()).canvases.find((note) => note.taskId === null));
+  assert.ok(unassigned, "zero-class note is persisted without a task");
+  await page.getByRole("button", { name: "Close notes", exact: true }).click();
   await page.evaluate(async () => {
     const created = await window.desk.command({ type: "class.create", name: "Calculus" });
     await window.desk.command({
@@ -81,7 +93,7 @@ try {
   await page.getByRole("button", { name: "Save notes", exact: true }).click();
   await page.getByText("Saved", { exact: true }).waitFor();
 
-  const canvasId = await page.evaluate(async () => (await window.desk.snapshot()).canvases[0].id);
+  const canvasId = await page.evaluate(async () => (await window.desk.snapshot()).canvases.find((note) => note.taskId !== null).id);
   const recording = await page.evaluate(async (id) => {
     const started = await window.desk.recordingStart(id, "audio/webm");
     await window.desk.recordingChunk(started.recordingId, 0, new Uint8Array([1, 2, 3]));
@@ -106,7 +118,7 @@ try {
   await page.getByRole("button", { name: "Play lecture at 1s", exact: true }).waitFor();
   await page.locator(".note-block.is-active.note-image, .note-block.is-active.note-file").waitFor();
   await page.screenshot({ path: join(output, "notes-deep-link.png") });
-  console.log(JSON.stringify({ result: "PASS", flows: ["keyboard document flow", "Markdown heading and inline math", "semantic unit-aware math", "linked live graph", "calculated columns and regression data plot", "paper original plus semantic layer and Sources link", "durable recording chunks and note marker", "unified search deep-link"] }));
+  console.log(JSON.stringify({ result: "PASS", flows: ["zero-class note creation and persistence", "keyboard document flow", "Markdown heading and inline math", "semantic unit-aware math", "linked live graph", "calculated columns and regression data plot", "paper original plus semantic layer and Sources link", "durable recording chunks and note marker", "unified search deep-link"] }));
 } finally {
   if (app) await app.close().catch(() => {});
   await rm(data, { recursive: true, force: true });

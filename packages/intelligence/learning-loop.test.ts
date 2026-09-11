@@ -99,6 +99,8 @@ function snapshot(extra: Partial<Snapshot> = {}): Snapshot {
     classes: [{ id: classId, name: "AP Physics C", color: "#50705A" }],
     tasks: [],
     sessions: [],
+    studyMaterialSets: [],
+    studyArtifacts: [],
     planning: { studyStart: "08:00", sleepCutoff: "22:00", studyDays: [0, 1, 2, 3, 4, 5, 6], bufferPercent: 15 },
     ...extra,
   };

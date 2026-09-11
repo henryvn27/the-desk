@@ -24,7 +24,7 @@ try {
     env: { ...process.env, DESK_DATA_DIR: data, DESK_ENABLE_DEVELOPMENT_KEY: "0", TZ: "UTC" },
   });
   const page = await app.firstWindow();
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
   await page.evaluate(async () => {
     const first = await window.desk.command({ type: "class.create", name: "AP Calculus" });
     const classId = first.classes.at(-1).id;

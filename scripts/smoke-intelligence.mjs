@@ -23,7 +23,7 @@ try {
   });
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.getByText("Make room for focus.", { exact: true }).waitFor();
+  await page.getByText("What are you working on?", { exact: true }).waitFor();
 
   const seeded = await page.evaluate(async () => {
     const classSnapshot = await window.desk.command({
@@ -101,6 +101,7 @@ try {
   assert.equal(seeded.inference.fields.title.provenance[0].sourceId, "smoke-capture");
   assert.equal(seeded.inference.provider, undefined);
 
+  await page.locator("details.sidebar-more > summary").click();
   await page.getByRole("button", { name: "Capture Inbox", exact: true }).click();
   await page.getByRole("heading", { name: "Capture Inbox", exact: true }).waitFor();
   await page.getByRole("button", { name: "Review capture", exact: true }).click();

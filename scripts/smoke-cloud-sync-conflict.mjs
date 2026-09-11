@@ -10,6 +10,7 @@ const data = await mkdtemp(join(tmpdir(), "desk-cloud-sync-conflict-"));
 const output = resolve("artifacts/cloud-sync");
 await mkdir(output, { recursive: true });
 const requests = [];
+const remoteCreatedAt = new Date(Date.now() + 60_000).toISOString();
 const server = createServer(async (request, response) => {
   let body = "";
   for await (const chunk of request) body += chunk;
@@ -47,7 +48,7 @@ const server = createServer(async (request, response) => {
             entity_id: entityId,
             operation: "class.create",
             payload: { entityId, operation: "class.create", remote: true },
-            created_at: "2026-09-07T12:00:00.000Z",
+            created_at: remoteCreatedAt,
           },
         ]),
       );

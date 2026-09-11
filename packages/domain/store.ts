@@ -1,5 +1,6 @@
 import { durationMemories } from "../learning/memory";
 import { tutoringMode } from "../intelligence/tutoring";
+import { aiProviderMode, DEFAULT_AI_PROVIDER, type AIProviderMode } from "../intelligence/ai-provider";
 import { decideCapture } from "../intelligence/capture-policy";
 import { interpretCapture } from "../intelligence/capture";
 import { chooseStableRepair, planWeek } from "../planner";
@@ -10,6 +11,12 @@ import { sourceSearch } from "../sources/reader";
 import { planStudyActivities } from "../study/activities";
 import { inferSessionSummary } from "../study/session-summary";
 import { metadataForMistake, validatePracticeCandidate } from "../study/practice";
+import {
+  studyArtifactSchema,
+  studyMaterialSetSchema,
+  type StudyArtifact,
+  type StudyMaterialSet,
+} from "../study/notebook-types";
 import type { LensTelemetryEvent } from "../intelligence/lens-provider";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
@@ -74,6 +81,14 @@ function isRecord(value: unknown): value is RemoteSyncRow {
 
 function requiredRemoteString(row: RemoteSyncRow, key: string, table: string) {
   const value = row[key];
+  if (typeof value !== "string" || value.length === 0)
+    throw Error(`Remote ${table} row has an invalid ${key}.`);
+  return value;
+}
+
+function nullableRemoteString(row: RemoteSyncRow, key: string, table: string) {
+  const value = row[key];
+  if (value === undefined || value === null) return null;
   if (typeof value !== "string" || value.length === 0)
     throw Error(`Remote ${table} row has an invalid ${key}.`);
   return value;
@@ -218,7 +233,7 @@ export class DeskStore {
     const version = (
       this.db.prepare("PRAGMA user_version").get() as { user_version: number }
     ).user_version;
-    if (version > 42) {
+    if (version > 44) {
       this.db.close();
       throw Error("This data requires a newer Desk version.");
     }
@@ -415,6 +430,47 @@ export class DeskStore {
       if (!sourceColumns.has("revisionHistory"))
         this.db.exec("ALTER TABLE sources ADD COLUMN revisionHistory TEXT NOT NULL DEFAULT '[]';");
       this.db.exec("PRAGMA user_version=42; COMMIT;");
+    }
+    // Schema 43 makes Notes first-class before academic organization. Existing
+    // task-backed notes keep their task link; new notes may start unassigned.
+    if (version <= 42) {
+      this.db.exec(`BEGIN;
+        ALTER TABLE canvases RENAME TO canvases_legacy;
+        CREATE TABLE canvases(
+          id TEXT PRIMARY KEY,
+          taskId TEXT REFERENCES tasks(id),
+          classId TEXT REFERENCES classes(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          scene TEXT NOT NULL
+        );
+        INSERT INTO canvases(id,taskId,classId,title,createdAt,updatedAt,revision,scene)
+          SELECT canvases_legacy.id,canvases_legacy.taskId,tasks.class_id,canvases_legacy.title,canvases_legacy.createdAt,canvases_legacy.updatedAt,canvases_legacy.revision,canvases_legacy.scene
+          FROM canvases_legacy LEFT JOIN tasks ON tasks.id=canvases_legacy.taskId;
+        DROP TABLE canvases_legacy;
+        PRAGMA user_version=43;
+        COMMIT;`);
+    }
+    if (version <= 43)
+      this.db.exec(`BEGIN;
+        CREATE TABLE IF NOT EXISTS study_material_sets(id TEXT PRIMARY KEY,data TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS study_artifacts(id TEXT PRIMARY KEY,material_set_id TEXT NOT NULL REFERENCES study_material_sets(id) ON DELETE CASCADE,data TEXT NOT NULL);
+        PRAGMA user_version=44;
+        COMMIT;`);
+  }
+  aiProviderMode(): AIProviderMode {
+    const raw = this.db
+      .prepare("SELECT data FROM settings WHERE id='ai-provider'")
+      .get()?.data;
+    if (raw === undefined) return DEFAULT_AI_PROVIDER;
+    try {
+      return aiProviderMode.parse(JSON.parse(String(raw)));
+    } catch {
+      // A malformed preference must never block the local-first product. The
+      // safe migration target is the zero-setup managed provider.
+      return DEFAULT_AI_PROVIDER;
     }
   }
   previewRebalance(now = new Date()): RebalancePreview {
@@ -722,7 +778,7 @@ export class DeskStore {
         ),
       canvases: this.db
         .prepare(
-          "SELECT id,taskId,title,createdAt,updatedAt,revision FROM canvases",
+          "SELECT id,taskId,classId,title,createdAt,updatedAt,revision FROM canvases",
         )
         .all() as Omit<CanvasRecord, "scene">[],
       sources: this.db
@@ -777,6 +833,14 @@ export class DeskStore {
         .prepare("SELECT data FROM sessions ORDER BY rowid")
         .all()
         .map((r) => JSON.parse(r.data as string) as StudySession),
+      studyMaterialSets: this.db
+        .prepare("SELECT data FROM study_material_sets ORDER BY rowid")
+        .all()
+        .map((r) => studyMaterialSetSchema.parse(JSON.parse(r.data as string))),
+      studyArtifacts: this.db
+        .prepare("SELECT data FROM study_artifacts ORDER BY rowid")
+        .all()
+        .map((r) => studyArtifactSchema.parse(JSON.parse(r.data as string))),
     };
   }
   syncBatch(limit = 25): SyncEnvelope[] {
@@ -1009,13 +1073,16 @@ export class DeskStore {
       return;
     }
     if (table === "canvases") {
+      const taskId = nullableRemoteString(row, "taskId", table);
+      const classId = nullableRemoteString(row, "classId", table);
       this.db
         .prepare(
-          "INSERT INTO canvases(id,taskId,title,createdAt,updatedAt,revision,scene) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET taskId=excluded.taskId,title=excluded.title,createdAt=excluded.createdAt,updatedAt=excluded.updatedAt,revision=excluded.revision,scene=excluded.scene",
+          "INSERT INTO canvases(id,taskId,classId,title,createdAt,updatedAt,revision,scene) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET taskId=excluded.taskId,classId=excluded.classId,title=excluded.title,createdAt=excluded.createdAt,updatedAt=excluded.updatedAt,revision=excluded.revision,scene=excluded.scene",
         )
         .run(
           id,
-          requiredRemoteString(row, "taskId", table),
+          taskId,
+          classId,
           requiredRemoteString(row, "title", table),
           requiredRemoteString(row, "createdAt", table),
           requiredRemoteString(row, "updatedAt", table),
@@ -1334,6 +1401,14 @@ export class DeskStore {
         this.db
           .prepare(
             "INSERT INTO settings VALUES('tutor-mode',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+          )
+          .run(JSON.stringify(c.mode));
+      }
+      if (c.type === "ai.provider.select") {
+        entityId = "ai-provider";
+        this.db
+          .prepare(
+            "INSERT INTO settings VALUES('ai-provider',?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
           )
           .run(JSON.stringify(c.mode));
       }
@@ -2290,8 +2365,15 @@ export class DeskStore {
           .run(entityId, taskId, JSON.stringify(block));
       }
       if (c.type === "canvas.create") {
-        const task = state.tasks.find((t) => t.id === c.taskId);
-        if (!task) throw Error("Assignment no longer exists.");
+        const task = c.taskId
+          ? state.tasks.find((t) => t.id === c.taskId)
+          : undefined;
+        if (c.taskId && !task) throw Error("Assignment no longer exists.");
+        const classId = c.classId ?? task?.classId ?? null;
+        if (classId && !state.classes.some((course) => course.id === classId))
+          throw Error("Class no longer exists.");
+        if (task && classId && task.classId !== classId)
+          throw Error("A Note cannot link a task from a different class.");
         entityId = randomUUID();
         const blank = {
           engine: "excalidraw" as const,
@@ -2302,16 +2384,44 @@ export class DeskStore {
         };
         const scene = c.notebook ? startNotebook(blank, randomUUID()) : blank;
         this.db
-          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
+          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?,?)")
           .run(
             entityId,
-            task.id,
-            c.notebook ? `${task.title} notebook` : task.title,
+            task?.id ?? null,
+            classId,
+            c.notebook
+              ? task?.title
+                ? `${task.title} notebook`
+                : "Untitled note"
+              : task?.title ?? "Untitled note",
             timestamp,
             timestamp,
             0,
             JSON.stringify(scene),
           );
+      }
+      if (c.type === "canvas.context") {
+        const current = this.canvas(c.id);
+        if (current.revision !== c.revision)
+          throw Error("This Note changed elsewhere. Reopen it before updating its context.");
+        const taskId: string | null = c.input.taskId === undefined
+          ? current.taskId
+          : c.input.taskId ?? null;
+        const task = taskId ? state.tasks.find((candidate) => candidate.id === taskId) : undefined;
+        if (taskId && !task) throw Error("Assignment no longer exists.");
+        const classId: string | null = c.input.classId === undefined
+          ? current.classId ?? task?.classId ?? null
+          : c.input.classId ?? null;
+        if (classId && !state.classes.some((course) => course.id === classId))
+          throw Error("Class no longer exists.");
+        if (task && classId && task.classId !== classId)
+          throw Error("A Note cannot link a task from a different class.");
+        const result = this.db
+          .prepare("UPDATE canvases SET taskId=?,classId=?,revision=revision+1,updatedAt=? WHERE id=? AND revision=?")
+          .run(taskId, classId, timestamp, c.id, c.revision);
+        if (!result.changes)
+          throw Error("This Note changed elsewhere. Reopen it before updating its context.");
+        entityId = c.id;
       }
       if (c.type === "canvas.save" || c.type === "canvas.recover") {
         for (const sourceId of c.scene.sourceIds ?? []) {
@@ -2331,10 +2441,11 @@ export class DeskStore {
         const original = this.canvas(c.id);
         entityId = randomUUID();
         this.db
-          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?)")
+          .prepare("INSERT INTO canvases VALUES(?,?,?,?,?,?,?,?)")
           .run(
             entityId,
             original.taskId,
+            original.classId ?? null,
             original.title + " (recovery copy)",
             timestamp,
             timestamp,
@@ -2682,6 +2793,20 @@ export class DeskStore {
             )
             .run(normalized.id, JSON.stringify(normalized));
           entityId = normalized.id;
+          if (c.type === "attempt.create" && normalized.activityId) {
+            const evidenceSession = active && active.taskId === normalized.taskId && active.activityState?.activities.some((activity) => activity.id === normalized.activityId)
+              ? active
+              : undefined;
+            if (evidenceSession) {
+              evidenceSession.evidenceAttemptIds = [
+                ...new Set([...(evidenceSession.evidenceAttemptIds ?? []), normalized.id]),
+              ];
+              evidenceSession.revision = (evidenceSession.revision ?? 0) + 1;
+              this.db
+                .prepare("UPDATE sessions SET data=? WHERE id=?")
+                .run(JSON.stringify(evidenceSession), evidenceSession.id);
+            }
+          }
         } else {
           this.db.prepare("DELETE FROM attempts WHERE id=?").run(previous!.id);
           entityId = previous!.id;
@@ -3380,6 +3505,93 @@ export class DeskStore {
           .prepare("UPDATE sessions SET data=? WHERE id=?")
           .run(JSON.stringify(session), session.id);
       }
+      if (
+        c.type === "study.material.create" ||
+        c.type === "study.material.update" ||
+        c.type === "study.material.forget"
+      ) {
+        queueCommand = false;
+        const previous = c.type === "study.material.create"
+          ? undefined
+          : state.studyMaterialSets.find((item) => item.id === c.id);
+        if (c.type !== "study.material.create" && (!previous || previous.revision !== c.revision))
+          throw Error("This study material set changed. Reopen it before saving.");
+        const input = c.type === "study.material.forget" ? undefined : c.input;
+        if (input) {
+          const classId = input.classId ?? null;
+          if (classId && !state.classes.some((course) => course.id === classId))
+            throw Error("The study material set refers to a class that no longer exists.");
+          const task = input.taskId ? state.tasks.find((item) => item.id === input.taskId) : undefined;
+          if (input.taskId && !task) throw Error("The study material set refers to an assignment that no longer exists.");
+          if (task && classId && task.classId !== classId) throw Error("The assignment does not belong to the selected class.");
+          const assessment = input.assessmentId ? state.assessments.find((item) => item.id === input.assessmentId) : undefined;
+          if (input.assessmentId && !assessment) throw Error("The study material set refers to an assessment that no longer exists.");
+          if (assessment && classId && assessment.classId !== classId) throw Error("The assessment does not belong to the selected class.");
+          if (input.sourceIds.some((id) => !state.sources.some((source) => source.id === id)))
+            throw Error("The study material set refers to a Source that no longer exists.");
+          if (input.noteIds.some((id) => !state.canvases.some((note) => note.id === id)))
+            throw Error("The study material set refers to a Note that no longer exists.");
+          if (!input.sourceIds.length && !input.noteIds.length)
+            throw Error("Add a Source or Note before generating study material.");
+          const material: StudyMaterialSet = studyMaterialSetSchema.parse({
+            ...input,
+            id: previous?.id ?? randomUUID(),
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+            revision: (previous?.revision ?? -1) + 1,
+          });
+          entityId = material.id;
+          this.db
+            .prepare("INSERT INTO study_material_sets VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data")
+            .run(material.id, JSON.stringify(material));
+        } else {
+          if (!previous) throw Error("This study material set no longer exists.");
+          entityId = previous.id;
+          this.db.prepare("DELETE FROM study_material_sets WHERE id=?").run(previous.id);
+        }
+      }
+      if (c.type === "study.artifact.create") {
+        queueCommand = false;
+        const material = state.studyMaterialSets.find((item) => item.id === c.input.materialSetId);
+        if (!material) throw Error("The study material set no longer exists.");
+        if (c.input.sourceFingerprint !== material.sourceFingerprint)
+          throw Error("The study material changed. Refresh the study set before generating again.");
+        if (c.input.payload && c.input.payload.kind !== c.input.type)
+          throw Error("The generated study payload does not match its artifact type.");
+        const artifact: StudyArtifact = studyArtifactSchema.parse({
+          ...c.input,
+          id: randomUUID(),
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          revision: 0,
+        });
+        entityId = artifact.id;
+        this.db.prepare("INSERT INTO study_artifacts VALUES(?,?,?)").run(artifact.id, artifact.materialSetId, JSON.stringify(artifact));
+      }
+      if (c.type === "study.artifact.update") {
+        queueCommand = false;
+        const previous = state.studyArtifacts.find((item) => item.id === c.id);
+        if (!previous || previous.revision !== c.revision)
+          throw Error("This generated study artifact changed. Reopen it before updating.");
+        const merged: StudyArtifact = studyArtifactSchema.parse({
+          ...previous,
+          ...c.input,
+          updatedAt: timestamp,
+          revision: previous.revision + 1,
+        });
+        if (merged.payload && merged.payload.kind !== merged.type)
+          throw Error("The generated study payload does not match its artifact type.");
+        entityId = merged.id;
+        this.db.prepare("UPDATE study_artifacts SET data=? WHERE id=?").run(JSON.stringify(merged), merged.id);
+      }
+      if (c.type === "study.artifact.forget") {
+        queueCommand = false;
+        const previous = state.studyArtifacts.find((item) => item.id === c.id);
+        if (!previous || previous.revision !== c.revision)
+          throw Error("This generated study artifact changed. Reopen it before removing it.");
+        entityId = previous.id;
+        this.db.prepare("DELETE FROM study_artifacts WHERE id=?").run(previous.id);
+      }
       if (queueCommand && entityId) this.queue(entityId, c.type, timestamp);
       this.db.exec("COMMIT");
       if (c.type === "planning.rebalance") this.rebalance = undefined;
@@ -3594,7 +3806,7 @@ export class DeskStore {
         "sources",
         "SELECT id,title,text,createdAt,authority,kind,revision,format,sourceUrl,annotations,revisionHistory FROM sources WHERE id=?",
       ],
-      ["canvases", "SELECT id,taskId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
+      ["canvases", "SELECT id,taskId,classId,title,createdAt,updatedAt,revision,scene FROM canvases WHERE id=?"],
       ["study_blocks", "SELECT id,task_id,data FROM study_blocks WHERE id=?"],
       ["plan_changes", "SELECT id,appliedAt,data FROM plan_changes WHERE id=?"],
       ["grade_categories", "SELECT id,class_id,data FROM grade_categories WHERE id=?"],
@@ -3698,7 +3910,7 @@ export class DeskStore {
       }
     }
     for (const row of this.db
-      .prepare("SELECT id,taskId,title,updatedAt,scene FROM canvases ORDER BY updatedAt DESC")
+      .prepare("SELECT id,taskId,classId,title,updatedAt,scene FROM canvases ORDER BY updatedAt DESC")
       .all()) {
       let scene: ReturnType<typeof canvasScene.parse>;
       try {
@@ -3716,7 +3928,7 @@ export class DeskStore {
         id: row.id as string,
         title: row.title as string,
         snippet: searchSnippet(hit.text, needle),
-        taskId: row.taskId as string,
+        ...(typeof row.taskId === "string" ? { taskId: row.taskId } : {}),
         blockId: hit.blockId,
         updatedAt: row.updatedAt as string,
       });

@@ -106,8 +106,8 @@ export type ClassSourceView = {
 export type ClassNoteView = {
   id: string;
   title: string;
-  taskId: string;
-  taskTitle: string;
+  taskId: string | null;
+  taskTitle?: string;
   updatedAt: string;
   blockId?: string;
 };
@@ -518,13 +518,13 @@ function noteViews(snapshot: Snapshot, classId: string, tasks: Task[]) {
     }
   }
   return snapshot.canvases
-    .filter((canvas) => taskMap.has(canvas.taskId))
+    .filter((canvas) => canvas.classId === classId || (canvas.taskId ? taskMap.has(canvas.taskId) : false))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map((canvas): ClassNoteView => ({
       id: canvas.id,
       title: canvas.title,
       taskId: canvas.taskId,
-      taskTitle: taskMap.get(canvas.taskId)!.title,
+      ...(canvas.taskId && taskMap.get(canvas.taskId) ? { taskTitle: taskMap.get(canvas.taskId)!.title } : {}),
       updatedAt: canvas.updatedAt,
       ...(noteRefs.has(canvas.id) ? { blockId: noteRefs.get(canvas.id) } : {}),
     }));

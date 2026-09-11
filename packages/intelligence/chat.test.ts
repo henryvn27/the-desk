@@ -71,6 +71,7 @@ test("chat suggestions stay short and context-aware", () => {
     const suggestions = deriveChatSuggestions(snapshot, intelligence, now);
     assert.ok(suggestions.length >= 1 && suggestions.length <= 4);
     assert.ok(suggestions.some((suggestion) => /what should i do/i.test(suggestion)));
+    assert.ok(suggestions.includes("Take a note"));
   } finally {
     store.close();
   }
@@ -83,6 +84,78 @@ test("unknown chat questions do not produce an implicit command", () => {
     const intelligence = deriveDeskIntelligence(snapshot, now);
     const response = resolveChat(snapshot, intelligence, { question: "Tell me something surprising about this semester." }, now);
     assert.equal(response, null);
+  } finally {
+    store.close();
+  }
+});
+
+test("chat opens a blank Note without academic setup", () => {
+  const store = new DeskStore(":memory:");
+  try {
+    const snapshot = store.snapshot();
+    const intelligence = deriveDeskIntelligence(snapshot, now);
+    const response = resolveChat(snapshot, intelligence, { question: "I need to write something down" }, now);
+    assert.deepEqual(response?.action, { type: "new-note" });
+    assert.match(response?.text ?? "", /blank Note/i);
+  } finally {
+    store.close();
+  }
+});
+
+test("chat study requests stay native to Desk and inherit the active class context", () => {
+  const store = new DeskStore(":memory:");
+  try {
+    const classId = store.execute({ type: "class.create", name: "AP Physics C" }).classes[0]!.id;
+    const taskId = store.execute({
+      type: "task.create",
+      input: {
+        title: "Review forces",
+        classId,
+        dueAt: null,
+        minutes: 30,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: true,
+      },
+    }).tasks[0]!.id;
+    const snapshot = store.snapshot();
+    const intelligence = deriveDeskIntelligence(snapshot, now);
+    const response = resolveChat(snapshot, intelligence, {
+      question: "make me flashcards for AP Physics C",
+      context: { page: "Chat", classId, taskId },
+    }, now);
+    assert.equal(response?.action?.type, "study");
+    assert.equal(response?.action?.mode, "flashcards");
+    assert.equal(response?.action?.classId, classId);
+    assert.equal(response?.action?.taskId, taskId);
+  } finally {
+    store.close();
+  }
+});
+
+test("chat study requests infer an exact open task from the request", () => {
+  const store = new DeskStore(":memory:");
+  try {
+    const classId = store.execute({ type: "class.create", name: "AP Physics C" }).classes[0]!.id;
+    const taskId = store.execute({
+      type: "task.create",
+      input: {
+        title: "Review forces",
+        classId,
+        dueAt: null,
+        minutes: 30,
+        resource: null,
+        notes: "",
+        deadlineConfirmed: true,
+      },
+    }).tasks[0]!.id;
+    const snapshot = store.snapshot();
+    const intelligence = deriveDeskIntelligence(snapshot, now);
+    const response = resolveChat(snapshot, intelligence, { question: "quiz me for Review forces" }, now);
+    assert.equal(response?.action?.type, "study");
+    assert.equal(response?.action?.mode, "quiz");
+    assert.equal(response?.action?.classId, classId);
+    assert.equal(response?.action?.taskId, taskId);
   } finally {
     store.close();
   }
