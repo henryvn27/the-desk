@@ -475,6 +475,7 @@ function App() {
                     ?.id === unreviewed.id
                 }
                 task={reviewTask}
+                concepts={data.concepts}
                 save={act}
                 busy={busy}
               />

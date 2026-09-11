@@ -599,6 +599,13 @@ export type Attempt = AttemptInput & {
   createdAt: string;
   updatedAt: string;
 };
+export const sessionEvidenceInput = z.object({
+  notes: z.string().trim().max(20000),
+  remainingMinutes: z.number().int().min(5).max(2400).nullable(),
+  attempts: z.array(attemptInput).max(100),
+  mistake: mistakeInput.nullable(),
+});
+export type SessionEvidenceInput = z.infer<typeof sessionEvidenceInput>;
 export type Snapshot = {
   user: User | null;
   mistakes: Mistake[];
@@ -977,6 +984,13 @@ export const command = z.discriminatedUnion("type", [
     id,
     notes: z.string().trim().max(20000),
     remainingMinutes: z.number().int().min(5).max(2400).nullable(),
+  }),
+  z.object({
+    type: z.literal("session.evidence"),
+    id,
+    revision: z.number().int().nonnegative(),
+    taskRevision: z.number().int().nonnegative(),
+    input: sessionEvidenceInput,
   }),
 ]);
 export type Command = z.infer<typeof command>;

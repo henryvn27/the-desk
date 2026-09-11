@@ -2452,6 +2452,143 @@ export class DeskStore {
           .prepare("UPDATE sessions SET data=? WHERE id=?")
           .run(JSON.stringify(session), session.id);
       }
+      if (c.type === "session.evidence") {
+        const session = state.sessions.find((s) => s.id === c.id);
+        if (!session?.endedAt)
+          throw Error("End this session before recording evidence.");
+        const task = state.tasks.find((candidate) => candidate.id === session.taskId);
+        if (!task)
+          throw Error("The assignment for this session no longer exists.");
+        if (
+          (session.revision ?? 0) !== c.revision ||
+          (task.revision ?? 0) !== c.taskRevision
+        )
+          throw Error(
+            "This session or assignment changed. Close and reopen the review.",
+          );
+        if (
+          state.sessions.filter((candidate) => candidate.taskId === task.id).at(-1)
+            ?.id !== session.id
+        )
+          throw Error(
+            "A newer session exists. Record evidence on the latest session.",
+          );
+        if (c.input.remainingMinutes !== null && task.completed)
+          throw Error("Completed work cannot have remaining study time.");
+
+        const conceptEdits = new Map(
+          state.concepts.map((concept) => [concept.id, { ...concept }]),
+        );
+        const dirtyConcepts = new Set<string>();
+        const applyAttempt = (attempt: Attempt) => {
+          for (const conceptId of new Set(attempt.conceptIds)) {
+            const concept = conceptEdits.get(conceptId);
+            if (!concept) continue;
+            concept.attempts += 1;
+            if (attempt.unaided) {
+              concept.unaidedTotal += 1;
+              if (attempt.result === "correct") concept.unaidedCorrect += 1;
+            }
+            concept.hintCount += attempt.hintCount;
+            if (
+              !concept.lastReviewedAt ||
+              Date.parse(attempt.attemptedAt) > Date.parse(concept.lastReviewedAt)
+            )
+              concept.lastReviewedAt = attempt.attemptedAt;
+            concept.revision += 1;
+            concept.updatedAt = timestamp;
+            dirtyConcepts.add(concept.id);
+          }
+        };
+
+        const attempts: Attempt[] = [];
+        for (const input of c.input.attempts) {
+          if (input.classId !== task.classId || input.taskId !== task.id)
+            throw Error(
+              "Every session attempt must link to the session assignment.",
+            );
+          const conceptIds = [...new Set(input.conceptIds)];
+          if (
+            conceptIds.some(
+              (conceptId) =>
+                !state.concepts.some(
+                  (concept) =>
+                    concept.id === conceptId && concept.classId === task.classId,
+                ),
+            )
+          )
+            throw Error(
+              "Every session concept attempt must belong to the assignment class.",
+            );
+          const attempt: Attempt = {
+            ...input,
+            conceptIds,
+            id: randomUUID(),
+            revision: 0,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+          attempts.push(attempt);
+          applyAttempt(attempt);
+        }
+
+        let mistake: Mistake | undefined;
+        if (c.input.mistake) {
+          if (
+            c.input.mistake.classId !== task.classId ||
+            c.input.mistake.taskId !== task.id
+          )
+            throw Error(
+              "The session mistake must link to the session assignment.",
+            );
+          mistake = {
+            ...c.input.mistake,
+            id: randomUUID(),
+            revision: 0,
+            practiceTaskIds: [],
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+        }
+
+        if (c.input.remainingMinutes !== null) {
+          task.minutes = c.input.remainingMinutes;
+          task.revision = (task.revision ?? 0) + 1;
+          this.db
+            .prepare("UPDATE tasks SET data=? WHERE id=?")
+            .run(JSON.stringify(task), task.id);
+          this.queue(task.id, "task.remaining-time", timestamp);
+        }
+        for (const attempt of attempts) {
+          this.db
+            .prepare("INSERT INTO attempts VALUES(?,?)")
+            .run(attempt.id, JSON.stringify(attempt));
+          this.queue(attempt.id, "attempt.create", timestamp);
+        }
+        for (const conceptId of dirtyConcepts) {
+          const concept = conceptEdits.get(conceptId)!;
+          this.db
+            .prepare("UPDATE concepts SET data=? WHERE id=?")
+            .run(JSON.stringify(concept), concept.id);
+          this.queue(concept.id, "concept.evidence", timestamp);
+        }
+        if (mistake) {
+          this.db
+            .prepare("INSERT INTO mistakes VALUES(?,?)")
+            .run(mistake.id, JSON.stringify(mistake));
+          this.queue(mistake.id, "mistake.create", timestamp);
+        }
+        session.revision = (session.revision ?? 0) + 1;
+        session.review = {
+          reviewedAt: timestamp,
+          notes: c.input.notes,
+          remainingMinutes: c.input.remainingMinutes,
+        };
+        entityId = session.id;
+        this.db
+          .prepare("UPDATE sessions SET data=? WHERE id=?")
+          .run(JSON.stringify(session), session.id);
+      }
       if (queueCommand && entityId) this.queue(entityId, c.type, timestamp);
       this.db.exec("COMMIT");
       if (c.type === "planning.rebalance") this.rebalance = undefined;
