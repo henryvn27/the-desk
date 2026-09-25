@@ -1,0 +1,54 @@
+name: Agent task
+description: Create a scoped, verifiable engineering issue
+title: ""
+labels: []
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: Why this work matters.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: The bounded behavior or code to change.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable conditions required before closure.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: scope-guard
+    attributes:
+      label: Scope guard / out of scope
+      description: Explicitly exclude adjacent work.
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and blockers
+      description: Link blocking issues and required decisions.
+  - type: textarea
+    id: verification
+    attributes:
+      label: QA / verification
+      description: Exact checks or evidence required.
+    validations:
+      required: true
+  - type: input
+    id: release-target
+    attributes:
+      label: Release target
+      description: Milestone or target version, when applicable.
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk and residual concerns
+      description: Known risk, rollout needs, or remaining uncertainty.
